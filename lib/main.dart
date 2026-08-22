@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
 import 'theme/app_theme.dart';
-import 'screens/workout_break_screen.dart';
+import 'router/app_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Supabase için gerekli
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://scycflgsxpkgoouunptr.supabase.co', // Kopyaladığın URL
+    publishableKey:
+        'sb_publishable_6DIZ_1cdyXAFe1EXCKy3AA_ClBEe2ah', // Kopyaladığın Anon Key
+  );
+
   runApp(const SeriesApp());
 }
 
@@ -11,11 +20,12 @@ class SeriesApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    // MaterialApp yerine MaterialApp.router kullanıyoruz
+    return MaterialApp.router(
       title: 'Series',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      home: const WorkoutBreakScreen(),
+      routerConfig: AppRouter.router, // Trafik polisimizi buraya atadık
     );
   }
 }

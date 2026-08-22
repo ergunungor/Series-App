@@ -61,30 +61,53 @@ class WorkoutBreakScreen extends StatelessWidget {
               SizedBox(
                 width: 230,
                 height: 230,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
+                child: // workout_break_screen.dart dosyasında, progress barın olduğu Stack kısmını bul ve değiştir:
                     SizedBox(
-                      width: 230,
-                      height: 230,
-                      child: CircularProgressIndicator(
-                        value: progress,
-                        strokeWidth: 18,
-                        strokeCap: StrokeCap.round,
-                        backgroundColor: Colors.transparent,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          AppColors.brandPrimary,
+                  width: 230,
+                  height: 230,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // YENİ: Neon parlama efekti için arka plana yuvarlak gölgeli bir Container
+                      Container(
+                        width: 230,
+                        height: 230,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.brandPrimary.withOpacity(
+                                0.3,
+                              ), // Parlama rengi
+                              blurRadius: 25,
+                              spreadRadius: 2,
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                    Text(
-                      '$remainingSeconds',
-                      style: AppTypography.heading1.copyWith(
-                        color: AppColors.brandPrimary,
-                        fontSize: 60,
+                      // Mevcut progress bar'ın
+                      SizedBox(
+                        width: 230,
+                        height: 230,
+                        child: CircularProgressIndicator(
+                          value: progress,
+                          strokeWidth: 18,
+                          strokeCap: StrokeCap.round,
+                          backgroundColor: Colors.transparent,
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            AppColors.brandPrimary,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                      Text(
+                        '$remainingSeconds',
+                        style: AppTypography.heading1.copyWith(
+                          color: AppColors.brandPrimary,
+                          fontSize: 60,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 16),

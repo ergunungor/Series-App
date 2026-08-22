@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/app_logo.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class WorkoutPlayerScreen extends StatefulWidget {
   const WorkoutPlayerScreen({super.key});
@@ -217,19 +218,30 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                       size: 48,
                     ),
                   ),
+
+                  // workout_player_screen.dart dosyasındaki Container'ı bul ve şu şekilde değiştir:
                   Container(
                     width: 124,
                     height: 124,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white,
+                      // Butonun ekrandan hafif dışarı fırlaması için ufak bir gölge ekliyoruz
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: IconButton(
                       onPressed: () {},
-                      icon: const Icon(
-                        Icons.check,
-                        color: Colors.green,
-                        size: 48,
+                      // YENİ: Standart Icon yerine SVG kullanıyoruz
+                      icon: SvgPicture.asset(
+                        'assets/images/check_icon.svg',
+                        width: 56, // Figma'daki o dolgun boyutu yakalamak için
+                        height: 56,
                       ),
                     ),
                   ),

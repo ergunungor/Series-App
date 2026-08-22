@@ -4,8 +4,7 @@ import '../theme/app_typography.dart';
 import '../widgets/app_top_bar.dart';
 import '../widgets/workout_card.dart';
 import '../widgets/gradient_progress_bar.dart';
-
-// yeni:
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/app_menu_overlay.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -17,6 +16,47 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _isMenuOpen = false;
+  String _firstName = 'İsim'; // Varsayılan değer
+  bool _isLoading = true; // Veri çekilirken loading göstermek için
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserData(); // Sayfa açılırken veriyi çekmeye başla
+  }
+
+  Future<void> _fetchUserData() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        // profiles tablosundan bu user'ın verisini çekiyoruz
+        final response =
+            await Supabase.instance.client
+                .from('profiles')
+                .select('full_name')
+                .eq('id', user.id)
+                .single(); // Sadece tek bir satır döneceğini biliyoruz
+
+        if (response['full_name'] != null) {
+          final fullName = response['full_name'] as String;
+          // Sadece ilk ismini almak için boşluktan bölüyoruz
+          final firstName = fullName.split(' ')[0];
+
+          if (mounted) {
+            setState(() {
+              _firstName = firstName;
+              _isLoading = false;
+            });
+          }
+        }
+      }
+    } catch (error) {
+      debugPrint('Veri çekme hatası: $error');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,10 +90,10 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 AppTopBar(onMenuTap: () => setState(() => _isMenuOpen = true)),
                 const SizedBox(height: 28),
-                const WorkoutCard(
+                WorkoutCard(
                   date: '22/08/2026',
                   streakCount: 5,
-                  greeting: 'Hoş Geldin, İsim',
+                  greeting: 'Hoş Geldin, $_firstName',
                   workoutSummary: '6 Hareket - 24 set (~55dk)',
                   nextWorkoutName: 'PUSH DAY - 1',
                 ),

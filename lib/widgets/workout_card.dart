@@ -32,10 +32,11 @@ class WorkoutCard extends StatelessWidget {
           colors: [AppColors.brandPrimary, Color(0xFF300000)],
         ),
         boxShadow: [
+          // YENİ: Kendi renginden yumuşak ve daha derin bir gölge
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
-            blurRadius: 4,
-            offset: const Offset(-3, 3),
+            color: AppColors.brandPrimary.withOpacity(0.4),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -113,8 +114,16 @@ class WorkoutCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border.all(color: AppColors.brandSecondary, width: 2),
+              // YENİ: Border'ı tamamen sildik (pürüzsüz durması için)
               borderRadius: BorderRadius.circular(45),
+              boxShadow: [
+                // İsteğe bağlı: Butonun altına çok hafif bir beyaz gölge atılabilir
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 5,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

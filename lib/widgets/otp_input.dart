@@ -50,36 +50,46 @@ class _OtpInputState extends State<OtpInput> {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: List.generate(widget.length, (index) {
-        return Padding(
-          padding: EdgeInsets.only(right: index == widget.length - 1 ? 0 : 16),
-          child: SizedBox(
-            width: 48,
-            height: 48,
-            child: TextField(
-              controller: _controllers[index],
-              focusNode: _focusNodes[index],
-              textAlign: TextAlign.center,
-              keyboardType: TextInputType.number,
-              maxLength: 1,
-              style: AppTypography.heading3.copyWith(
-                color: Colors.black,
-                fontSize: 22,
-              ),
-              decoration: InputDecoration(
-                counterText: '',
-                contentPadding: const EdgeInsets.all(10),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.brandSecondary),
+        return Expanded(
+          // YENİ: Sabit width yerine Expanded kullandık. Ekranı eşit böler.
+          child: Padding(
+            // Kutular arası boşluğu 16'dan 8'e düşürdük
+            padding: EdgeInsets.only(right: index == widget.length - 1 ? 0 : 8),
+            child: SizedBox(
+              height:
+                  52, // Dokunma alanı rahat olsun diye yüksekliği biraz artırdık
+              child: TextField(
+                controller: _controllers[index],
+                focusNode: _focusNodes[index],
+                textAlign: TextAlign.center,
+                keyboardType: TextInputType.number,
+                maxLength: 1,
+                style: AppTypography.heading3.copyWith(
+                  color: Colors.black,
+                  fontSize: 20, // Ekrana sığması için fontu çok az küçülttük
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: AppColors.textSecondary),
+                decoration: InputDecoration(
+                  counterText: '',
+                  contentPadding:
+                      EdgeInsets
+                          .zero, // Yazının tam ortalanması için sıfırladık
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(
+                      color: AppColors.brandSecondary,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ),
+                onChanged: (v) => _onChanged(index, v),
               ),
-              onChanged: (v) => _onChanged(index, v),
             ),
           ),
         );
