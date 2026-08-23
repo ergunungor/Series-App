@@ -8,6 +8,7 @@ class WorkoutCard extends StatelessWidget {
   final String greeting;
   final String workoutSummary;
   final String nextWorkoutName;
+  final int? nextWorkoutDurationMin;
   final VoidCallback? onPlayTap;
 
   const WorkoutCard({
@@ -17,25 +18,25 @@ class WorkoutCard extends StatelessWidget {
     required this.greeting,
     required this.workoutSummary,
     required this.nextWorkoutName,
+    this.nextWorkoutDurationMin,
     this.onPlayTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(45),
+        borderRadius: BorderRadius.circular(28),
         gradient: const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [AppColors.brandPrimary, Color(0xFF300000)],
         ),
         boxShadow: [
-          // YENİ: Kendi renginden yumuşak ve daha derin bir gölge
           BoxShadow(
-            color: AppColors.brandPrimary.withOpacity(0.4),
-            blurRadius: 15,
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 12,
             offset: const Offset(0, 6),
           ),
         ],
@@ -45,49 +46,40 @@ class WorkoutCard extends StatelessWidget {
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
                 date,
                 style: AppTypography.body12Regular.copyWith(
-                  color: AppColors.brandSecondary,
+                  color: AppColors.brandSecondary.withOpacity(0.65),
                 ),
               ),
-              Row(
-                children: [
-                  Text(
-                    'Haftalık Seri',
-                    style: AppTypography.body12Regular.copyWith(
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(45),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.local_fire_department,
+                      size: 16,
                       color: AppColors.streak,
                     ),
-                  ),
-                  const SizedBox(width: 5),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 5,
+                    const SizedBox(width: 5),
+                    Text(
+                      '$streakCount Günlük Seri',
+                      style: AppTypography.body12Medium.copyWith(
+                        color: Colors.white,
+                      ),
                     ),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.textSecondary),
-                      borderRadius: BorderRadius.circular(45),
-                    ),
-                    child: Row(
-                      children: [
-                        Text(
-                          '$streakCount',
-                          style: AppTypography.body12Regular.copyWith(
-                            color: AppColors.streak,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.local_fire_department,
-                          size: 16,
-                          color: AppColors.streak,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -96,49 +88,66 @@ class WorkoutCard extends StatelessWidget {
             greeting,
             style: AppTypography.heading2.copyWith(color: Colors.white),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Text(
             workoutSummary,
             style: AppTypography.body14Regular.copyWith(
               color: AppColors.brandSecondary,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           Text(
-            'Sıradaki Antrenman:',
+            'Sıradaki Antrenman',
             style: AppTypography.body18Medium.copyWith(color: Colors.white),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: BoxDecoration(
               color: Colors.white,
-              // YENİ: Border'ı tamamen sildik (pürüzsüz durması için)
-              borderRadius: BorderRadius.circular(45),
-              boxShadow: [
-                // İsteğe bağlı: Butonun altına çok hafif bir beyaz gölge atılabilir
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 5,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              border: Border.all(color: AppColors.brandSecondary, width: 2),
+              borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  nextWorkoutName,
-                  style: AppTypography.heading3.copyWith(
-                    color: AppColors.textPrimary,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        nextWorkoutName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.heading3.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      if (nextWorkoutDurationMin != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '~$nextWorkoutDurationMin dk',
+                          style: AppTypography.body12Regular.copyWith(
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                IconButton(
-                  onPressed: onPlayTap,
-                  icon: Icon(
-                    Icons.play_arrow_rounded,
-                    color: AppColors.textPrimary,
+                const SizedBox(width: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.brandTertiary,
+                  ),
+                  child: IconButton(
+                    onPressed: onPlayTap,
+                    icon: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ],

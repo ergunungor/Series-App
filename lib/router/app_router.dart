@@ -12,6 +12,9 @@ import '../screens/workout_player_screen.dart';
 import '../screens/workout_break_screen.dart';
 import '../widgets/main_shell.dart';
 import '../screens/onboarding_survey_screen.dart';
+import '../screens/program_detail_screen.dart';
+import '../models/program.dart';
+import '../screens/workout_day_detail_screen.dart';
 
 class AppRouter {
   static final router = GoRouter(
@@ -82,6 +85,18 @@ class AppRouter {
       GoRoute(
         path: '/onboarding-survey',
         builder: (context, state) => const OnboardingSurveyScreen(),
+      ),
+      GoRoute(
+        path: '/program-detail',
+        builder:
+            (context, state) =>
+                ProgramDetailScreen(program: state.extra as ActiveProgram),
+      ),
+      GoRoute(
+        path: '/workout-day-detail',
+        builder:
+            (context, state) =>
+                WorkoutDayDetailScreen(workout: state.extra as WorkoutDay),
       ),
 
       // ── YENİ: bottom nav shell ──

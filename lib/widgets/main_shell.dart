@@ -19,15 +19,7 @@ class MainShell extends StatelessWidget {
     // yeni:
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
-        switchInCurve: Curves.easeOut,
-        switchOutCurve: Curves.easeIn,
-        transitionBuilder:
-            (child, animation) =>
-                FadeTransition(opacity: animation, child: child),
-        child: KeyedSubtree(key: ValueKey(currentIndex), child: child),
-      ),
+      body: child,
       bottomNavigationBar: SafeArea(
         child: AppBottomNav(currentIndex: currentIndex, onTap: onTap),
       ),
