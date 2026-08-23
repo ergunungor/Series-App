@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
-import '../widgets/app_top_bar.dart';
-import '../widgets/app_button.dart';
-import '../models/program.dart';
-import '../services/program_repository.dart';
 
 class ProgramsScreen extends StatefulWidget {
   const ProgramsScreen({super.key});
@@ -16,187 +11,231 @@ class ProgramsScreen extends StatefulWidget {
 }
 
 class _ProgramsScreenState extends State<ProgramsScreen> {
-  ActiveProgram? _activeProgram;
-  bool _isLoading = true;
+  // Şimdilik arayüzü görmek için sahte (mock) bir veri koyuyoruz.
+  // İleride burası Supabase'den gelen programların listesi olacak.
+  final List<Map<String, dynamic>> _myPrograms = [
+    {
+      'id': '1',
+      'name': '4 Haftalık Hipertrofi',
+      'description': 'AI tarafından oluşturulmuş özel güç programı.',
+      'progress': 0.35, // %35 tamamlanmış
+    },
+  ];
 
-  @override
-  void initState() {
-    super.initState();
-    _fetch();
-  }
-
-  Future<void> _fetch() async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) {
-      if (mounted) setState(() => _isLoading = false);
-      return;
-    }
-    try {
-      final program = await ProgramRepository.fetchActiveProgram(user.id);
-      if (mounted) {
-        setState(() {
-          _activeProgram = program;
-          _isLoading = false;
-        });
-      }
-    } catch (error) {
-      debugPrint('Program çekme hatası: $error');
-      if (mounted) setState(() => _isLoading = false);
-    }
+  void _showAddProgramMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor:
+          Colors
+              .transparent, // Arka planı transparan yapıp kendi tasarımımızı veriyoruz
+      builder: (context) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome,
+                        color: Colors.black,
+                      ),
+                    ),
+                    title: Text(
+                      'Yapay Zeka ile Oluştur',
+                      // DOĞRU:
+                      style: AppTypography.body16Regular.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Hedeflerine özel akıllı program hazırlanır',
+                      style: AppTypography.body14Regular.copyWith(
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Anket ekranına yönlendirme
+                      context.push('/onboarding');
+                    },
+                  ),
+                  const Divider(height: 16),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.upload_file, color: Colors.black),
+                    ),
+                    title: Text(
+                      'Program Yükle',
+                      // DOĞRU:
+                      style: AppTypography.body14Regular.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Mevcut JSON veya kod ile program içe aktar',
+                      style: AppTypography.body14Regular.copyWith(
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      // TODO: Yükleme ekranına yönlendirilecek
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Column(
-            children: [
-              const AppTopBar(),
-              const SizedBox(height: 28),
-              Expanded(
-                child:
-                    _isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : _activeProgram == null
-                        ? _EmptyState(
-                          onCreate: () => context.push('/onboarding-survey'),
-                        )
-                        : _ProgramDetail(program: _activeProgram!),
-              ),
-            ],
-          ),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(
+          'Programlarım',
+          style: AppTypography.heading2.copyWith(color: Colors.black),
         ),
       ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  final VoidCallback onCreate;
-
-  const _EmptyState({required this.onCreate});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 96,
-            height: 96,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
-              border: Border.all(color: AppColors.brandSecondary),
-            ),
-            child: Icon(
-              Icons.auto_awesome,
-              size: 40,
-              color: AppColors.brandPrimary,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Henüz bir programın yok',
-            style: AppTypography.heading2.copyWith(
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Birkaç soruyla sana özel bir antrenman\nprogramı oluşturalım.',
-            textAlign: TextAlign.center,
-            style: AppTypography.body14Regular.copyWith(
-              color: AppColors.textTertiary,
-            ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: 220,
-            child: AppButton(
-              text: 'Program Oluştur',
-              showIcon: false,
-              onPressed: onCreate,
-            ),
-          ),
-        ],
+      body:
+          _myPrograms.isEmpty
+              ? Center(
+                child: Text(
+                  'Henüz bir programın yok.\nSağ alttan yeni bir tane oluştur!',
+                  textAlign: TextAlign.center,
+                  style: AppTypography.body16Regular.copyWith(
+                    color: Colors.grey,
+                  ),
+                ),
+              )
+              : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _myPrograms.length,
+                itemBuilder: (context, index) {
+                  final program = _myPrograms[index];
+                  return _buildProgramCard(program);
+                },
+              ),
+      // YENİ EKLENEN + BUTONU
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddProgramMenu,
+        backgroundColor: Colors.black, // Marka rengine göre güncelleyebilirsin
+        elevation: 4,
+        child: const Icon(Icons.add, color: Colors.white, size: 28),
       ),
     );
   }
-}
 
-class _ProgramDetail extends StatelessWidget {
-  final ActiveProgram program;
-
-  const _ProgramDetail({required this.program});
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '"${program.name}"',
-            style: AppTypography.heading2.copyWith(
-              color: AppColors.textPrimary,
-            ),
-          ),
-          if (program.description.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              program.description,
-              style: AppTypography.body14Regular.copyWith(
-                color: AppColors.textTertiary,
-              ),
+  Widget _buildProgramCard(Map<String, dynamic> program) {
+    return GestureDetector(
+      onTap: () {
+        // Kartın üstüne tıklanınca program detayına (günlerin listesine) gidecek
+        // context.push('/program-details', extra: program['id']);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
-          const SizedBox(height: 24),
-          ...program.workouts.map(
-            (workout) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: AppColors.brandSecondary),
-                  borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    program['name'],
+                    style: AppTypography.heading3.copyWith(color: Colors.black),
+                  ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Gün ${workout.dayNumber}: ${workout.name}',
-                            style: AppTypography.body16Medium.copyWith(
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${workout.exercises.length} hareket · ~${workout.estimatedDurationMin} dk',
-                            style: AppTypography.body14Regular.copyWith(
-                              color: AppColors.textTertiary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.chevron_right, color: AppColors.textTertiary),
-                  ],
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: Colors.grey,
                 ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              program['description'],
+              style: AppTypography.body14Regular.copyWith(
+                color: Colors.grey.shade600,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 20),
+            // İlerleme çubuğu (opsiyonel ama şık durur)
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: program['progress'],
+                      backgroundColor: Colors.grey.shade200,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Colors.black,
+                      ),
+                      minHeight: 6,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '%${(program['progress'] * 100).toInt()}',
+                  // DOĞRU:
+                  style: AppTypography.body14Regular.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
