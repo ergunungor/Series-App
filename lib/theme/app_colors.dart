@@ -15,4 +15,5 @@ class AppColors {
   static const Color white = Color(0xFFFFFFFF);
   static const Color streak = Color(0xFFFF3C00);
   static const Color progressTrack = Color(0xFFD9D9D9);
+  static const Color navSelectedBg = Color(0xFFEDEDED);
 }

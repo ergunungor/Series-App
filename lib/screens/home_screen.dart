@@ -3,9 +3,11 @@ import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/app_top_bar.dart';
 import '../widgets/workout_card.dart';
-import '../widgets/gradient_progress_bar.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../widgets/app_menu_overlay.dart';
+import '../models/program.dart';
+import '../services/program_repository.dart';
+import '../widgets/app_button.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,15 +16,38 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+// yeni:
 class _HomeScreenState extends State<HomeScreen> {
-  bool _isMenuOpen = false;
   String _firstName = 'İsim'; // Varsayılan değer
   bool _isLoading = true; // Veri çekilirken loading göstermek için
+  ActiveProgram? _activeProgram;
+  bool _isLoadingProgram = true;
 
   @override
   void initState() {
     super.initState();
     _fetchUserData(); // Sayfa açılırken veriyi çekmeye başla
+    _fetchActiveProgram();
+  }
+
+  Future<void> _fetchActiveProgram() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _isLoadingProgram = false);
+      return;
+    }
+    try {
+      final program = await ProgramRepository.fetchActiveProgram(user.id);
+      if (mounted) {
+        setState(() {
+          _activeProgram = program;
+          _isLoadingProgram = false;
+        });
+      }
+    } catch (error) {
+      debugPrint('Program çekme hatası: $error');
+      if (mounted) setState(() => _isLoadingProgram = false);
+    }
   }
 
   Future<void> _fetchUserData() async {
@@ -62,62 +87,38 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+      // yeni:
       body: SafeArea(
-        child: AppMenuOverlay(
-          isOpen: _isMenuOpen,
-          onClose: () => setState(() => _isMenuOpen = false),
-          items: [
-            MenuOverlayItem(
-              icon: Icons.calendar_month,
-              label: 'Programlarım',
-              onTap: () {},
-            ),
-            MenuOverlayItem(
-              icon: Icons.history,
-              label: 'Geçmiş Antrenmanlarım',
-              onTap: () {},
-            ),
-            MenuOverlayItem(
-              icon: Icons.fitness_center,
-              label: 'Antrenmanlarım',
-              onTap: () {},
-            ),
-          ],
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AppTopBar(onMenuTap: () => setState(() => _isMenuOpen = true)),
-                const SizedBox(height: 28),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const AppTopBar(),
+              const SizedBox(height: 28),
+              // yeni:
+              if (_isLoadingProgram)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_activeProgram == null ||
+                  _activeProgram!.workouts.isEmpty)
+                _NoProgramCard(greeting: 'Hoş Geldin, $_firstName')
+              else
                 WorkoutCard(
                   date: '22/08/2026',
                   streakCount: 5,
                   greeting: 'Hoş Geldin, $_firstName',
-                  workoutSummary: '6 Hareket - 24 set (~55dk)',
-                  nextWorkoutName: 'PUSH DAY - 1',
+                  workoutSummary:
+                      '${_activeProgram!.workouts.first.exercises.length} Hareket - '
+                      '${_activeProgram!.workouts.first.exercises.fold<int>(0, (sum, e) => sum + e.sets)} set '
+                      '(~${_activeProgram!.workouts.first.estimatedDurationMin}dk)',
+                  nextWorkoutName: _activeProgram!.workouts.first.name,
                 ),
-                const SizedBox(height: 32),
-                Row(
-                  children: [
-                    Text(
-                      'Haftalık Performans',
-                      style: AppTypography.body16Medium.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '(2/4)',
-                      style: AppTypography.body16Regular.copyWith(
-                        color: AppColors.brandSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const GradientProgressBar(value: 0.5),
-                const SizedBox(height: 32),
+              // yeni:
+              const SizedBox(height: 32),
+              if (_activeProgram != null)
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
@@ -139,56 +140,76 @@ class _HomeScreenState extends State<HomeScreen> {
                       Divider(color: AppColors.brandSecondary, height: 1),
                       const SizedBox(height: 16),
                       Text(
-                        '"4 Günlük Hipertrofi"',
+                        '"${_activeProgram!.name}"',
                         style: AppTypography.body18Medium.copyWith(
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Text(
-                            '3. Hafta',
-                            style: AppTypography.body16Medium.copyWith(
-                              color: AppColors.textTertiary,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            height: 20,
-                            child: VerticalDivider(
-                              color: AppColors.textTertiary,
-                              width: 1,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '12/16 Antrenman',
-                            style: AppTypography.body16Medium.copyWith(
-                              color: AppColors.textTertiary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      const GradientProgressBar(value: 0.75),
-                      const SizedBox(height: 4),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          '%75',
+                      if (_activeProgram!.description.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          _activeProgram!.description,
                           style: AppTypography.body14Regular.copyWith(
-                            color: AppColors.brandSecondary,
+                            color: AppColors.textTertiary,
                           ),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Text(
+                        '${_activeProgram!.workouts.length} Antrenman Günü',
+                        style: AppTypography.body16Medium.copyWith(
+                          color: AppColors.textTertiary,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _NoProgramCard extends StatelessWidget {
+  final String greeting;
+
+  const _NoProgramCard({required this.greeting});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: AppColors.brandSecondary),
+        borderRadius: BorderRadius.circular(45),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            greeting,
+            style: AppTypography.heading2.copyWith(
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Henüz aktif bir programın yok.',
+            style: AppTypography.body14Regular.copyWith(
+              color: AppColors.textTertiary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          AppButton(
+            text: 'Program Oluştur',
+            showIcon: false,
+            onPressed: () => context.push('/onboarding-survey'),
+          ),
+        ],
       ),
     );
   }

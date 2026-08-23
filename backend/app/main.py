@@ -1,5 +1,7 @@
+# yeni:
 import os
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from .schemas import UserOnboardingData
@@ -10,6 +12,16 @@ load_dotenv()
 
 app = FastAPI(title="Series App Backend")
 
+# Geliştirme aşamasında tüm origin'lere izin veriyoruz (Flutter web dev server
+# her çalıştırmada farklı bir port kullanabiliyor). Production'a geçerken
+# bunu gerçek domain'inle sınırlaman gerekecek.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Supabase Bağlantısı
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")

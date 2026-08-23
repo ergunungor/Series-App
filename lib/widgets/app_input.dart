@@ -6,7 +6,9 @@ class AppInput extends StatefulWidget {
   final String hintText;
   final IconData? prefixIcon;
   final bool isPassword;
+  // yeni:
   final TextEditingController? controller;
+  final TextInputType? keyboardType;
 
   const AppInput({
     super.key,
@@ -14,6 +16,7 @@ class AppInput extends StatefulWidget {
     this.prefixIcon,
     this.isPassword = false,
     this.controller,
+    this.keyboardType,
   });
 
   @override
