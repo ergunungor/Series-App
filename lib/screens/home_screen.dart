@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/program.dart';
 import '../services/program_repository.dart';
 import '../widgets/app_button.dart';
+import '../widgets/app_confirm_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -105,6 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
               else if (_activeProgram == null ||
                   _activeProgram!.workouts.isEmpty)
                 _NoProgramCard(greeting: 'Hoş Geldin, $_firstName')
+              // yeni:
               else
                 WorkoutCard(
                   date: '22/08/2026',
@@ -115,8 +117,23 @@ class _HomeScreenState extends State<HomeScreen> {
                       '${_activeProgram!.workouts.first.exercises.fold<int>(0, (sum, e) => sum + e.sets)} set '
                       '(~${_activeProgram!.workouts.first.estimatedDurationMin}dk)',
                   nextWorkoutName: _activeProgram!.workouts.first.name,
+                  // yeni:
+                  nextWorkoutDurationMin:
+                      _activeProgram!.workouts.first.estimatedDurationMin,
+                  onPlayTap: () async {
+                    final workout = _activeProgram!.workouts.first;
+                    final confirmed = await showAppConfirmDialog(
+                      context: context,
+                      title: 'Antrenmanı Başlat',
+                      message:
+                          '"${workout.name}" antrenmanına başlamak istiyor musunuz?',
+                      confirmLabel: 'Başla',
+                    );
+                    if (confirmed && context.mounted) {
+                      context.push('/workout-player', extra: workout);
+                    }
+                  },
                 ),
-              // yeni:
               const SizedBox(height: 32),
               if (_activeProgram != null)
                 Container(

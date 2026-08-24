@@ -8,8 +8,7 @@ import '../screens/home_screen.dart';
 import '../screens/programs_screen.dart';
 import '../screens/workouts_screen.dart';
 import '../screens/profile_screen.dart';
-import '../screens/workout_player_screen.dart';
-import '../screens/workout_break_screen.dart';
+import '../screens/workout_session_screen.dart';
 import '../widgets/main_shell.dart';
 import '../screens/onboarding_survey_screen.dart';
 import '../screens/program_detail_screen.dart';
@@ -73,15 +72,13 @@ class AppRouter {
           return VerificationScreen(fullName: fullName, email: email);
         },
       ),
+      // yeni:
       GoRoute(
         path: '/workout-player',
-        builder: (context, state) => const WorkoutPlayerScreen(),
+        builder:
+            (context, state) =>
+                WorkoutSessionScreen(workout: state.extra as WorkoutDay),
       ),
-      GoRoute(
-        path: '/workout-break',
-        builder: (context, state) => const WorkoutBreakScreen(),
-      ),
-      // '/workout-break' route'undan hemen sonra ekle:
       GoRoute(
         path: '/onboarding-survey',
         builder: (context, state) => const OnboardingSurveyScreen(),

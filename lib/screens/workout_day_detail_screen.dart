@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../models/program.dart';
+import '../widgets/app_confirm_dialog.dart';
 
 class WorkoutDayDetailScreen extends StatelessWidget {
   final WorkoutDay workout;
@@ -125,6 +127,38 @@ class WorkoutDayDetailScreen extends StatelessWidget {
                       ),
                     );
                   },
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                // yeni:
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final confirmed = await showAppConfirmDialog(
+                      context: context,
+                      title: 'Antrenmanı Başlat',
+                      message:
+                          '"${workout.name}" antrenmanına başlamak istiyor musunuz?',
+                      confirmLabel: 'Başla',
+                    );
+                    if (confirmed && context.mounted) {
+                      context.push('/workout-player', extra: workout);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.brandTertiary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Antrenmanı Başlat',
+                    style: AppTypography.body16Medium.copyWith(
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
             ],
