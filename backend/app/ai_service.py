@@ -11,18 +11,22 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 model = genai.GenerativeModel('gemini-3.6-flash')
 
 def generate_workout_program(data: UserOnboardingData):
+    # Boş liste ve özel karakter güvenlik önlemleri
+    interests_str = ", ".join(data.specific_interests) if data.specific_interests else "Genel Vücut"
+    restrictions_str = ", ".join(data.health_restrictions) if data.health_restrictions else "Yok"
+
     prompt = f"""
     Sen dünya çapında uzman bir fitness ve kalistenik koçusun. 
     Kullanıcı Profili:
     - Yaş: {data.age}
     - Tecrübe: {data.experience}
     - Ana Hedef: {data.primary_goal}
-    - Odaklanmak İstediği Alanlar: {', '.join(data.specific_interests)}
-    - Sağlık Kısıtlamaları/Sakatlıklar: {', '.join(data.health_restrictions)}
+    - Odaklanmak İstediği Alanlar: {interests_str}
+    - Sağlık Kısıtlamaları/Sakatlıklar: {restrictions_str}
     - Antrenman Yeri: {data.logistics.location}
     - Haftalık Gün Sayısı: {data.logistics.days_per_week} gün
     - Maksimum Süre: {data.logistics.max_duration_min} dakika
-    - Zihinsel Engel: {data.mental_blocker}
+    - Zihinsel Engel: {data.mental_blocker or 'Yok'}
 
     Kullanıcının sağlık kısıtlamalarına KESİNLİKLE dikkat et. Bu profile uygun {data.logistics.days_per_week} günlük bir antrenman programı oluştur.
     
@@ -34,7 +38,7 @@ def generate_workout_program(data: UserOnboardingData):
         {{
           "day_number": 1,
           "name": "Push Day veya Üst Vücut vb.",
-          "estimated_duration_min": 45,
+          "estimated_duration_min": {data.logistics.max_duration_min},
           "exercises": [
             {{
               "name": "Hareket ismi",
@@ -49,11 +53,11 @@ def generate_workout_program(data: UserOnboardingData):
     }}
     """
 
-    # Modelden sadece JSON formatında yanıt istiyoruz
     response = model.generate_content(
         prompt,
         generation_config={"response_mime_type": "application/json"}
     )
     
-    # Gelen metni Python Dictionary (JSON) objesine çevirip döndürüyoruz
-    return json.loads(response.text)
+    # Gelen metni temizleyip JSON objesine dönüştürüyoruz
+    clean_text = response.text.strip()
+    return json.loads(clean_text)

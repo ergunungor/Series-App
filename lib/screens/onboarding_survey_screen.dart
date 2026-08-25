@@ -25,13 +25,22 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
   int _currentStep = 0;
   bool _isSubmitting = false;
 
+  // yeni:
   static const int totalSteps = 9;
-  static const List<String> _experienceOptions = ['Başlangıç', 'Orta', 'İleri'];
+  static const List<String> _experienceOptions = [
+    'Başlangıç',
+    'Orta',
+    'İleri',
+    'Profesyonel/Atlet',
+  ];
   static const List<String> _goalOptions = [
     'Kas Kütlesi',
     'Yağ Yakımı',
     'Dayanıklılık',
     'Genel Fitness',
+    'Güç (Strength)',
+    'Esneklik & Hareketlilik',
+    'Sağlık / Rehabilitasyon',
   ];
   static const List<String> _interestOptions = [
     'Karın',
@@ -40,6 +49,10 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     'Sırt',
     'Göğüs',
     'Omuz',
+    'Kalça / Glute',
+    'Baldır',
+    'Ön Kol',
+    'Core / Bel',
   ];
   static const List<String> _restrictionOptions = [
     'Yok',
@@ -47,13 +60,18 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     'Bel/Sırt',
     'Omuz',
     'Bilek',
+    'Dirsek',
+    'Kalça',
+    'Boyun',
+    'Ayak Bileği',
   ];
   static const List<String> _locationOptions = [
     'Ev',
     'Spor Salonu',
     'Açık Hava',
+    'Ofis',
+    'Seyahat/Otel',
   ];
-
   @override
   void dispose() {
     _ageController.dispose();
