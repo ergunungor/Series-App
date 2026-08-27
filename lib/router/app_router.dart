@@ -14,6 +14,8 @@ import '../screens/onboarding_survey_screen.dart';
 import '../screens/program_detail_screen.dart';
 import '../models/program.dart';
 import '../screens/workout_day_detail_screen.dart';
+import '../screens/workout_history_detail_screen.dart';
+import '../models/workout_history.dart';
 
 class AppRouter {
   static final router = GoRouter(
@@ -94,6 +96,13 @@ class AppRouter {
         builder:
             (context, state) =>
                 WorkoutDayDetailScreen(workout: state.extra as WorkoutDay),
+      ),
+      GoRoute(
+        path: '/workout-history-detail',
+        builder:
+            (context, state) => WorkoutHistoryDetailScreen(
+              session: state.extra as WorkoutHistorySession,
+            ),
       ),
 
       // ── YENİ: bottom nav shell ──

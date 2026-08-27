@@ -1,6 +1,7 @@
 import 'dart:async'; // Timer için gerekli
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart'; // Sayfa geçişi için gerekli
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/app_logo.dart';
@@ -21,8 +22,8 @@ class _SplashScreenState extends State<SplashScreen> {
     Timer(const Duration(seconds: 2), () {
       // Eğer sayfa hala ekrandaysa geçiş yap (güvenlik kontrolü)
       if (mounted) {
-        // AppRouter'da tanımladığımız o özel 500ms'lik geçiş tetiklenecek
-        context.go('/login');
+        final hasSession = Supabase.instance.client.auth.currentSession != null;
+        context.go(hasSession ? '/home' : '/login');
       }
     });
   }

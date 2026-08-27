@@ -123,7 +123,15 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     setState(() => _isSubmitting = true);
     try {
       await ProgramService.generateProgram(_data, user.id);
-      if (mounted) context.go('/home');
+      if (mounted) {
+        // Eğer bu ekrana context.push() ile gelindiyse (sağ alttaki + butonundan):
+        if (context.canPop()) {
+          context.pop(true); // Geriye 'true' döndürür
+        } else {
+          // Eğer ilk kayıt/onboarding akışından gelindiyse:
+          context.go('/home');
+        }
+      }
     } catch (error) {
       if (mounted) _showError('Program oluşturulurken bir hata oluştu: $error');
     } finally {

@@ -68,7 +68,14 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                         ? const Center(child: CircularProgressIndicator())
                         : _programs.isEmpty
                         ? _EmptyState(
-                          onCreate: () => context.push('/onboarding-survey'),
+                          // ESKİ: onCreate: () => context.push('/onboarding-survey'),
+                          // DÜZELTME:
+                          onCreate: () async {
+                            final created = await context.push<bool>(
+                              '/onboarding-survey',
+                            );
+                            if (created == true) _fetch();
+                          },
                         )
                         : ListView.separated(
                           itemCount: _programs.length,
@@ -93,7 +100,12 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
         onPressed:
             () => showAddProgramSheet(
               context: context,
-              onCreateWithAi: () => context.push('/onboarding-survey'),
+              onCreateWithAi: () async {
+                Navigator.pop(context); // Bottom sheet'i kapatır
+                final created = await context.push<bool>('/onboarding-survey');
+                if (created == true)
+                  _fetch(); // Anket bittiğinde çalışan _fetch() fonksiyonunu tetikler
+              },
               onImportProgram: () {},
             ),
         backgroundColor: AppColors.brandTertiary,

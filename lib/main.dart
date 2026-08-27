@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'theme/app_theme.dart';
 import 'router/app_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // Supabase için gerekli
+import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('tr_TR', null);
 
   await Supabase.initialize(
     url: 'https://scycflgsxpkgoouunptr.supabase.co', // Kopyaladığın URL
