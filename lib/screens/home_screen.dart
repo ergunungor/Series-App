@@ -3,10 +3,14 @@ import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/app_top_bar.dart';
 import '../widgets/workout_card.dart';
+import '../widgets/gradient_progress_bar.dart';
+import '../widgets/app_logo.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/program.dart';
+import '../models/workout_history.dart';
 import '../services/program_repository.dart';
+import '../services/workout_history_repository.dart';
 import '../widgets/app_button.dart';
 import '../widgets/app_confirm_dialog.dart';
 
@@ -17,17 +21,18 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-// yeni:
 class _HomeScreenState extends State<HomeScreen> {
-  String _firstName = 'İsim'; // Varsayılan değer
-  bool _isLoading = true; // Veri çekilirken loading göstermek için
+  String _firstName = 'İsim';
+  bool _isLoading = true;
   ActiveProgram? _activeProgram;
   bool _isLoadingProgram = true;
+  int _weeklyCompleted = 0;
+  int _weeklyTotal = 0;
 
   @override
   void initState() {
     super.initState();
-    _fetchUserData(); // Sayfa açılırken veriyi çekmeye başla
+    _fetchUserData();
     _fetchActiveProgram();
   }
 
@@ -45,9 +50,51 @@ class _HomeScreenState extends State<HomeScreen> {
           _isLoadingProgram = false;
         });
       }
+      // Program yüklendikten sonra haftalık performansı hesaplıyoruz —
+      // hangi workout id'lerinin bu programa ait olduğunu bilmemiz lazım,
+      // o yüzden bu adım _activeProgram set edildikten sonra çalışıyor.
+      if (program != null) _fetchWeeklyPerformance(program);
     } catch (error) {
       debugPrint('Program çekme hatası: $error');
       if (mounted) setState(() => _isLoadingProgram = false);
+    }
+  }
+
+  Future<void> _fetchWeeklyPerformance(ActiveProgram program) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    try {
+      final history = await WorkoutHistoryRepository.fetchHistory(user.id);
+      final now = DateTime.now();
+      // Haftanın başlangıcı = bu haftanın Pazartesi'si, saat 00:00.
+      final startOfWeek = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).subtract(Duration(days: now.weekday - 1));
+      final programWorkoutIds = program.workouts.map((w) => w.id).toSet();
+
+      // Bu programa ait, bu hafta içinde tamamlanmış seansların hangi
+      // antrenman günlerine (workout id) ait olduğunu benzersiz olarak
+      // topluyoruz — aynı günü iki kez yapsa bile "1 gün tamamlandı" sayılır.
+      final doneThisWeek =
+          history
+              .where(
+                (s) =>
+                    programWorkoutIds.contains(s.workoutId) &&
+                    !s.completedAt.isBefore(startOfWeek),
+              )
+              .map((s) => s.workoutId)
+              .toSet();
+
+      if (mounted) {
+        setState(() {
+          _weeklyCompleted = doneThisWeek.length;
+          _weeklyTotal = program.workouts.length;
+        });
+      }
+    } catch (error) {
+      debugPrint('Haftalık performans hesaplama hatası: $error');
     }
   }
 
@@ -55,17 +102,15 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user != null) {
-        // profiles tablosundan bu user'ın verisini çekiyoruz
         final response =
             await Supabase.instance.client
                 .from('profiles')
                 .select('full_name')
                 .eq('id', user.id)
-                .single(); // Sadece tek bir satır döneceğini biliyoruz
+                .single();
 
         if (response['full_name'] != null) {
           final fullName = response['full_name'] as String;
-          // Sadece ilk ismini almak için boşluktan bölüyoruz
           final firstName = fullName.split(' ')[0];
 
           if (mounted) {
@@ -78,9 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (error) {
       debugPrint('Veri çekme hatası: $error');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -88,7 +131,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      // yeni:
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -97,7 +139,20 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               const AppTopBar(),
               const SizedBox(height: 28),
-              // yeni:
+              Text(
+                'Hoş Geldin, $_firstName',
+                style: AppTypography.heading1.copyWith(
+                  color: AppColors.brandPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Sıradaki antrenman:',
+                style: AppTypography.body18Medium.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+              const SizedBox(height: 16),
               if (_isLoadingProgram)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 40),
@@ -105,22 +160,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 )
               else if (_activeProgram == null ||
                   _activeProgram!.workouts.isEmpty)
-                _NoProgramCard(greeting: 'Hoş Geldin, $_firstName')
-              // yeni:
+                _NoProgramCard(
+                  onCreate: () => context.push('/onboarding-survey'),
+                )
               else
                 WorkoutCard(
-                  date: '22/08/2026',
-                  streakCount: 5,
-                  greeting: 'Hoş Geldin, $_firstName',
-                  workoutSummary:
-                      '${_activeProgram!.workouts.first.exercises.length} Hareket - '
-                      '${_activeProgram!.workouts.first.exercises.fold<int>(0, (sum, e) => sum + e.sets)} set '
-                      '(~${_activeProgram!.workouts.first.estimatedDurationMin}dk)',
                   nextWorkoutName: _activeProgram!.workouts.first.name,
-                  // yeni:
-                  nextWorkoutDurationMin:
-                      _activeProgram!.workouts.first.estimatedDurationMin,
-                  onPlayTap: () async {
+                  onStartTap: () async {
                     final workout = _activeProgram!.workouts.first;
                     final confirmed = await showAppConfirmDialog(
                       context: context,
@@ -134,53 +180,120 @@ class _HomeScreenState extends State<HomeScreen> {
                     }
                   },
                 ),
-              const SizedBox(height: 32),
-              if (_activeProgram != null)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: AppColors.brandSecondary),
-                    borderRadius: BorderRadius.circular(45),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'AKTİF PROGRAM',
-                        style: AppTypography.heading3.copyWith(
-                          color: AppColors.textPrimary,
-                        ),
+              if (_activeProgram != null) ...[
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Text(
+                      'Haftalık Performans',
+                      style: AppTypography.body16Medium.copyWith(
+                        color: AppColors.brandTertiary,
                       ),
-                      const SizedBox(height: 8),
-                      Divider(color: AppColors.brandSecondary, height: 1),
-                      const SizedBox(height: 16),
-                      Text(
-                        '"${_activeProgram!.name}"',
-                        style: AppTypography.body18Medium.copyWith(
-                          color: AppColors.textPrimary,
-                        ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '($_weeklyCompleted/$_weeklyTotal)',
+                      style: AppTypography.body16Regular.copyWith(
+                        color: AppColors.brandSecondary,
                       ),
-                      if (_activeProgram!.description.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          _activeProgram!.description,
-                          style: AppTypography.body14Regular.copyWith(
-                            color: AppColors.textTertiary,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                GradientProgressBar(
+                  value:
+                      _weeklyTotal == 0 ? 0 : _weeklyCompleted / _weeklyTotal,
+                ),
+                const SizedBox(height: 32),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Aktif Program',
+                      style: AppTypography.heading3.copyWith(
+                        color: AppColors.brandPrimary,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => context.go('/programs'),
+                      icon: Icon(
+                        Icons.swap_horiz,
+                        size: 20,
+                        color: AppColors.brandTertiary,
+                      ),
+                      tooltip: 'Programı değiştir',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    onTap:
+                        () => context.push(
+                          '/program-detail',
+                          extra: _activeProgram,
+                        ),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.brandSecondary),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const AppLogo(
+                            explicitSize: 56,
+                            type: AppLogoType.dark,
                           ),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      Text(
-                        '${_activeProgram!.workouts.length} Antrenman Günü',
-                        style: AppTypography.body16Medium.copyWith(
-                          color: AppColors.textTertiary,
-                        ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _activeProgram!.name,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTypography.body18Medium.copyWith(
+                                    color: AppColors.brandTertiary,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Programa git',
+                                      style: AppTypography.body16Regular
+                                          .copyWith(
+                                            color: AppColors.textTertiary,
+                                          ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.chevron_right,
+                                      size: 20,
+                                      color: AppColors.textTertiary,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
+              ],
             ],
           ),
         ),
@@ -190,41 +303,34 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _NoProgramCard extends StatelessWidget {
-  final String greeting;
+  final VoidCallback onCreate;
 
-  const _NoProgramCard({required this.greeting});
+  const _NoProgramCard({required this.onCreate});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: AppColors.brandSecondary),
-        borderRadius: BorderRadius.circular(45),
+        border: Border.all(color: AppColors.brandPrimary),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            greeting,
-            style: AppTypography.heading2.copyWith(
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
             'Henüz aktif bir programın yok.',
-            style: AppTypography.body14Regular.copyWith(
-              color: AppColors.textTertiary,
+            style: AppTypography.body16Medium.copyWith(
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 16),
           AppButton(
             text: 'Program Oluştur',
             showIcon: false,
-            onPressed: () => context.push('/onboarding-survey'),
+            onPressed: onCreate,
           ),
         ],
       ),

@@ -376,7 +376,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                           const Spacer(),
                           // yeni:
                           SizedBox(
-                            width: 72,
+                            width: 80,
                             height: 34,
                             child: TextField(
                               controller: _repsController,
@@ -390,9 +390,10 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                                 // Önceki seansta bu set için değer girilmişse
                                 // onu placeholder olarak gösteriyoruz (opsiyonel
                                 // ipucu); yoksa sade "Tekrar" yazısı kalıyor.
+                                labelText: 'Tekrar',
                                 hintText:
                                     _lastPerformanceForCurrentSet != null
-                                        ? '${_lastPerformanceForCurrentSet!.repsPerformed}'
+                                        ? '${_lastPerformanceForCurrentSet!.repsPerformed} (önceki)'
                                         : 'Tekrar',
                                 hintStyle: AppTypography.body12Regular.copyWith(
                                   color: Colors.white70,
@@ -413,7 +414,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                           ),
                           const SizedBox(width: 6),
                           SizedBox(
-                            width: 72,
+                            width: 80,
                             height: 34,
                             child: TextField(
                               controller: _weightController,
@@ -426,13 +427,11 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                                 color: Colors.white,
                               ),
                               decoration: InputDecoration(
+                                labelText: 'Ağırlık',
                                 isDense: true,
                                 hintText:
                                     _lastPerformanceForCurrentSet != null
-                                        ? _formatWeight(
-                                          _lastPerformanceForCurrentSet!
-                                              .weightUsed,
-                                        )
+                                        ? '${_formatWeight(_lastPerformanceForCurrentSet!.weightUsed)} (önceki)'
                                         : 'Ağırlık',
                                 hintStyle: AppTypography.body12Regular.copyWith(
                                   color: Colors.white70,

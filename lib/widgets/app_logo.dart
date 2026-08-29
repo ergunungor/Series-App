@@ -8,20 +8,24 @@ enum AppLogoType { light, dark }
 class AppLogo extends StatelessWidget {
   final AppLogoSize size;
   final AppLogoType type;
+  final double? explicitSize;
 
   const AppLogo({
     super.key,
     this.size = AppLogoSize.large,
     this.type = AppLogoType.dark,
+    this.explicitSize,
   });
 
   @override
   Widget build(BuildContext context) {
-    final double dimension = switch (size) {
-      AppLogoSize.large => 180,
-      AppLogoSize.medium => 112,
-      AppLogoSize.small => 56,
-    };
+    final double dimension =
+        explicitSize ??
+        switch (size) {
+          AppLogoSize.large => 180,
+          AppLogoSize.medium => 112,
+          AppLogoSize.small => 32,
+        };
     return SvgPicture.asset(
       'assets/images/series_logo.svg',
       width: dimension,

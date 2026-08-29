@@ -395,7 +395,7 @@ class _ProgramCard extends StatelessWidget {
               ] else ...[
                 // Marka logosunu küçük bir daire içinde göstererek kartın
                 // "bir program" olduğunu görsel olarak da anlatıyoruz —
-                const AppLogo(size: AppLogoSize.small, type: AppLogoType.dark),
+                const AppLogo(explicitSize: 56, type: AppLogoType.dark),
                 const SizedBox(width: 14),
               ],
               Expanded(
