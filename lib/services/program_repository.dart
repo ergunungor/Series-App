@@ -28,8 +28,15 @@ class ProgramRepository {
     }).toList();
   }
 
+  // yeni:
   static Future<ActiveProgram?> fetchActiveProgram(String userId) async {
     final programs = await fetchPrograms(userId);
     return programs.isEmpty ? null : programs.first;
+  }
+
+  static Future<void> deleteProgram(String programId) async {
+    final client = Supabase.instance.client;
+    await client.from('workouts').delete().eq('program_id', programId);
+    await client.from('programs').delete().eq('id', programId);
   }
 }

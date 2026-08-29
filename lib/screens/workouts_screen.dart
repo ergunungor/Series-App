@@ -7,6 +7,7 @@ import '../theme/app_typography.dart';
 import '../widgets/app_top_bar.dart';
 import '../models/workout_history.dart';
 import '../services/workout_history_repository.dart';
+import '../widgets/app_confirm_dialog.dart';
 
 class WorkoutsScreen extends StatefulWidget {
   const WorkoutsScreen({super.key});
@@ -45,6 +46,17 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     }
   }
 
+  Future<bool> _confirmDeleteSession(WorkoutHistorySession session) async {
+    return showAppConfirmDialog(
+      context: context,
+      title: 'Kaydı Sil',
+      message:
+          '"${session.workoutName}" antrenman kaydını silmek istediğine emin misin? Bu işlem geri alınamaz.',
+      confirmLabel: 'Sil',
+      isDestructive: true,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -62,19 +74,91 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                         ? const Center(child: CircularProgressIndicator())
                         : _sessions.isEmpty
                         ? const _EmptyHistory()
+                        // yeni:
                         : ListView.separated(
                           itemCount: _sessions.length,
                           separatorBuilder:
                               (_, __) => const SizedBox(height: 12),
                           itemBuilder: (context, index) {
                             final session = _sessions[index];
-                            return _HistoryCard(
-                              session: session,
-                              onTap:
-                                  () => context.push(
-                                    '/workout-history-detail',
-                                    extra: session,
-                                  ),
+                            return Dismissible(
+                              // key: completedAt + workoutId, çünkü aynı
+                              // antrenmanın birden fazla geçmiş kaydı olabilir
+                              // (aynı isim, farklı tarih) — sadece workoutId
+                              // yeterli olmazdı, çakışma yaratırdı.
+                              key: ValueKey(
+                                '${session.workoutId}_${session.completedAt.toIso8601String()}',
+                              ),
+                              direction: DismissDirection.endToStart,
+                              confirmDismiss:
+                                  (_) => _confirmDeleteSession(session),
+                              onDismissed: (_) {
+                                final removedIndex = index;
+                                setState(
+                                  () => _sessions.removeAt(removedIndex),
+                                );
+
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '"${session.workoutName}" kaydı silindi',
+                                        ),
+                                        backgroundColor:
+                                            AppColors.brandTertiary,
+                                        behavior: SnackBarBehavior.floating,
+                                        duration: const Duration(seconds: 3),
+                                        action: SnackBarAction(
+                                          label: 'Geri Al',
+                                          textColor: Colors.white,
+                                          onPressed: () {
+                                            setState(
+                                              () => _sessions.insert(
+                                                removedIndex,
+                                                session,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    )
+                                    .closed
+                                    .then((reason) async {
+                                      if (reason == SnackBarClosedReason.action)
+                                        return;
+                                      try {
+                                        await WorkoutHistoryRepository.deleteSession(
+                                          session,
+                                        );
+                                      } catch (error) {
+                                        debugPrint(
+                                          'Antrenman kaydı silme hatası: $error',
+                                        );
+                                      }
+                                    });
+                              },
+                              background: Container(
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              child: _HistoryCard(
+                                session: session,
+                                onTap:
+                                    () => context.push(
+                                      '/workout-history-detail',
+                                      extra: session,
+                                    ),
+                              ),
                             );
                           },
                         ),

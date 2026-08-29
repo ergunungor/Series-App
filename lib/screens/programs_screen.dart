@@ -6,6 +6,7 @@ import '../theme/app_typography.dart';
 import '../models/program.dart';
 import '../services/program_repository.dart';
 import '../widgets/add_program_sheet.dart';
+import '../widgets/app_confirm_dialog.dart';
 
 class ProgramsScreen extends StatefulWidget {
   const ProgramsScreen({super.key});
@@ -24,6 +25,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     _fetch();
   }
 
+  // yeni:
   Future<void> _fetch() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
@@ -42,6 +44,21 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
       debugPrint('Program çekme hatası: $error');
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // Kaydırma onaylandığında çağrılır: önce kullanıcıya emin misin diye sorar,
+  // "evet" derse true döner (Dismissible bu true'ya göre kartı ekrandan
+  // kaldırır), "hayır" derse false döner (kart geri yerine kayar, hiçbir
+  // şey silinmez).
+  Future<bool> _confirmDeleteProgram(ActiveProgram program) async {
+    return showAppConfirmDialog(
+      context: context,
+      title: 'Programı Sil',
+      message:
+          '"${program.name}" programını silmek istediğine emin misin? Bu işlem geri alınamaz.',
+      confirmLabel: 'Sil',
+      isDestructive: true,
+    );
   }
 
   @override
@@ -77,31 +94,110 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                             if (created == true) _fetch();
                           },
                         )
+                        // yeni:
                         : ListView.separated(
                           itemCount: _programs.length,
                           separatorBuilder:
                               (_, __) => const SizedBox(height: 12),
-                          itemBuilder:
-                              (context, index) => _ProgramCard(
-                                program: _programs[index],
+                          itemBuilder: (context, index) {
+                            final program = _programs[index];
+                            return Dismissible(
+                              // key: her item'ı benzersiz tanımlıyor, Flutter
+                              // silme animasyonunu doğru öğeye uygulayabilsin
+                              // diye. program.id kullanmak, listede sıralama
+                              // değişse bile doğru kartı takip etmesini sağlar.
+                              key: ValueKey(program.id),
+                              direction: DismissDirection.endToStart,
+                              confirmDismiss:
+                                  (_) => _confirmDeleteProgram(program),
+                              // yeni:
+                              onDismissed: (_) {
+                                final removedIndex = index;
+                                setState(
+                                  () => _programs.removeAt(removedIndex),
+                                );
+
+                                // showSnackBar bir controller döner; onun .closed
+                                // future'ı SnackBar kapandığında, "hangi sebeple
+                                // kapandığını" (action/timeout/swipe) veriyor.
+                                // Kullanıcı "Geri Al"a bastıysa reason == action
+                                // oluyor — o zaman gerçek silme hiç yapılmıyor.
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '"${program.name}" silindi',
+                                        ),
+                                        backgroundColor:
+                                            AppColors.brandTertiary,
+                                        behavior: SnackBarBehavior.floating,
+                                        duration: const Duration(seconds: 3),
+                                        action: SnackBarAction(
+                                          label: 'Geri Al',
+                                          textColor: Colors.white,
+                                          onPressed: () {
+                                            setState(
+                                              () => _programs.insert(
+                                                removedIndex,
+                                                program,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    )
+                                    .closed
+                                    .then((reason) async {
+                                      if (reason == SnackBarClosedReason.action)
+                                        return;
+                                      // Süre doldu, geri alınmadı — şimdi gerçekten sil.
+                                      try {
+                                        await ProgramRepository.deleteProgram(
+                                          program.id,
+                                        );
+                                      } catch (error) {
+                                        debugPrint(
+                                          'Program silme hatası: $error',
+                                        );
+                                      }
+                                    });
+                              },
+                              background: Container(
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              child: _ProgramCard(
+                                program: program,
                                 onTap:
                                     () => context.push(
                                       '/program-detail',
-                                      extra: _programs[index],
+                                      extra: program,
                                     ),
                               ),
+                            );
+                          },
                         ),
               ),
             ],
           ),
         ),
       ),
+      // yeni:
       floatingActionButton: FloatingActionButton(
         onPressed:
             () => showAddProgramSheet(
               context: context,
               onCreateWithAi: () async {
-                Navigator.pop(context); // Bottom sheet'i kapatır
                 final created = await context.push<bool>('/onboarding-survey');
                 if (created == true)
                   _fetch(); // Anket bittiğinde çalışan _fetch() fonksiyonunu tetikler

@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 class Logistics(BaseModel):
-    location: str
+    location: List[str]
     days_per_week: int
     max_duration_min: int
 

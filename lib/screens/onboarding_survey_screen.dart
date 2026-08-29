@@ -328,28 +328,33 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     },
   );
 
+  // yeni:
   Widget _locationStep() => SurveyStepScaffold(
     currentStep: _currentStep,
     totalSteps: totalSteps,
-    question: 'Nerede antrenman yapacaksın?',
+    question: 'Nerede antrenman yapacaksın? (birden fazla seçebilirsin)',
     onBack: _goBack,
     content: Wrap(
       spacing: 12,
       runSpacing: 12,
       children:
-          _locationOptions
-              .map(
-                (o) => SelectableChip(
-                  label: o,
-                  isSelected: _data.logistics.location == o,
-                  onTap: () => setState(() => _data.logistics.location = o),
-                ),
-              )
-              .toList(),
+          _locationOptions.map((o) {
+            final isSelected = _data.logistics.location.contains(o);
+            return SelectableChip(
+              label: o,
+              isSelected: isSelected,
+              onTap:
+                  () => setState(() {
+                    isSelected
+                        ? _data.logistics.location.remove(o)
+                        : _data.logistics.location.add(o);
+                  }),
+            );
+          }).toList(),
     ),
     onNext: () {
-      if (_data.logistics.location == null) {
-        _showError('Lütfen bir yer seç.');
+      if (_data.logistics.location.isEmpty) {
+        _showError('Lütfen en az bir yer seç.');
         return;
       }
       _goNext();

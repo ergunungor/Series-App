@@ -1,13 +1,13 @@
 class LogisticsData {
-  String? location;
+  List<String> location;
   int daysPerWeek;
   int maxDurationMin;
 
   LogisticsData({
-    this.location,
+    List<String>? location,
     this.daysPerWeek = 3,
     this.maxDurationMin = 45,
-  });
+  }) : location = location ?? [];
 
   Map<String, dynamic> toJson() => {
     'location': location,

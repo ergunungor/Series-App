@@ -39,7 +39,20 @@ class WorkoutHistoryRepository {
             )
             .toList();
 
+    // yeni:
     result.sort((a, b) => b.completedAt.compareTo(a.completedAt));
     return result;
+  }
+
+  static Future<void> deleteSession(WorkoutHistorySession session) async {
+    // Bir "seans" aslında exercise_logs'ta aynı workout_id + completed_at'e
+    // sahip birden fazla satır (her set kendi satırı). İkisini birlikte
+    // eşleştirerek sadece bu seansın satırlarını siliyoruz, başka bir
+    // seansı (aynı antrenmanın farklı bir tekrarını) yanlışlıkla silmiyoruz.
+    await Supabase.instance.client
+        .from('exercise_logs')
+        .delete()
+        .eq('workout_id', session.workoutId)
+        .eq('completed_at', session.completedAt.toIso8601String());
   }
 }

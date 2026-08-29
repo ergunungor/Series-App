@@ -23,7 +23,7 @@ def generate_workout_program(data: UserOnboardingData):
     - Ana Hedef: {data.primary_goal}
     - Odaklanmak İstediği Alanlar: {interests_str}
     - Sağlık Kısıtlamaları/Sakatlıklar: {restrictions_str}
-    - Antrenman Yeri: {data.logistics.location}
+    - Antrenman Yeri: {", ".join(data.logistics.location)}
     - Haftalık Gün Sayısı: {data.logistics.days_per_week} gün
     - Maksimum Süre: {data.logistics.max_duration_min} dakika
     - Zihinsel Engel: {data.mental_blocker or 'Yok'}
