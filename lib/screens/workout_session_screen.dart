@@ -10,6 +10,7 @@ import '../models/program.dart';
 import '../models/set_log.dart';
 import '../services/exercise_log_repository.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../models/workout_history.dart';
 
 class WorkoutSessionScreen extends StatefulWidget {
   final WorkoutDay workout;
@@ -32,9 +33,11 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   Timer? _restTimer;
   Timer? _elapsedTimer;
 
+  // yeni:
   final _repsController = TextEditingController();
   final _weightController = TextEditingController();
   final List<SetLog> _logs = [];
+  Map<String, LoggedSet> _lastPerformance = {};
 
   WorkoutExercise get _currentExercise =>
       widget.workout.exercises[_exerciseIndex];
@@ -45,6 +48,24 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!_isPaused && mounted) setState(() => _elapsedSeconds++);
     });
+    _fetchLastPerformance();
+  }
+
+  Future<void> _fetchLastPerformance() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    try {
+      final performance = await ExerciseLogRepository.fetchLastPerformance(
+        userId: user.id,
+        exerciseNames: widget.workout.exercises.map((e) => e.name).toList(),
+      );
+      if (mounted) setState(() => _lastPerformance = performance);
+    } catch (error) {
+      debugPrint('Önceki performans çekme hatası: $error');
+      // Sessizce geçiyoruz — bu tamamen opsiyonel bir bilgi, hata olursa
+      // input'lar sadece varsayılan "Tekrar"/"Ağırlık" placeholder'ını
+      // gösterir, antrenman akışını hiçbir şekilde engellemez.
+    }
   }
 
   @override
@@ -168,6 +189,13 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     }
     if (mounted) context.go('/home');
   }
+
+  String _formatWeight(double weight) {
+    return weight % 1 == 0 ? weight.toInt().toString() : weight.toString();
+  }
+
+  LoggedSet? get _lastPerformanceForCurrentSet =>
+      _lastPerformance['${_currentExercise.name}|${_setIndex + 1}'];
 
   String _nextPreviewLabel() {
     if (_setIndex + 1 < _currentExercise.sets) {
@@ -346,6 +374,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                           const SizedBox(height: 24),
                           // yeni:
                           const Spacer(),
+                          // yeni:
                           SizedBox(
                             width: 72,
                             height: 34,
@@ -358,7 +387,13 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                               ),
                               decoration: InputDecoration(
                                 isDense: true,
-                                hintText: 'Tekrar',
+                                // Önceki seansta bu set için değer girilmişse
+                                // onu placeholder olarak gösteriyoruz (opsiyonel
+                                // ipucu); yoksa sade "Tekrar" yazısı kalıyor.
+                                hintText:
+                                    _lastPerformanceForCurrentSet != null
+                                        ? '${_lastPerformanceForCurrentSet!.repsPerformed}'
+                                        : 'Tekrar',
                                 hintStyle: AppTypography.body12Regular.copyWith(
                                   color: Colors.white70,
                                 ),
@@ -392,7 +427,13 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                               ),
                               decoration: InputDecoration(
                                 isDense: true,
-                                hintText: 'Ağırlık',
+                                hintText:
+                                    _lastPerformanceForCurrentSet != null
+                                        ? _formatWeight(
+                                          _lastPerformanceForCurrentSet!
+                                              .weightUsed,
+                                        )
+                                        : 'Ağırlık',
                                 hintStyle: AppTypography.body12Regular.copyWith(
                                   color: Colors.white70,
                                 ),

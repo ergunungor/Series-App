@@ -7,6 +7,7 @@ import '../models/program.dart';
 import '../services/program_repository.dart';
 import '../widgets/add_program_sheet.dart';
 import '../widgets/app_confirm_dialog.dart';
+import '../widgets/app_logo.dart';
 
 class ProgramsScreen extends StatefulWidget {
   const ProgramsScreen({super.key});
@@ -19,13 +20,16 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   List<ActiveProgram> _programs = [];
   bool _isLoading = true;
 
+  // Seçim modu state'i: hangi kartların işaretli olduğunu tutuyoruz.
+  bool _isSelectionMode = false;
+  final Set<String> _selectedIds = {};
+
   @override
   void initState() {
     super.initState();
     _fetch();
   }
 
-  // yeni:
   Future<void> _fetch() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
@@ -46,10 +50,6 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     }
   }
 
-  // Kaydırma onaylandığında çağrılır: önce kullanıcıya emin misin diye sorar,
-  // "evet" derse true döner (Dismissible bu true'ya göre kartı ekrandan
-  // kaldırır), "hayır" derse false döner (kart geri yerine kayar, hiçbir
-  // şey silinmez).
   Future<bool> _confirmDeleteProgram(ActiveProgram program) async {
     return showAppConfirmDialog(
       context: context,
@@ -61,23 +61,147 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     );
   }
 
+  void _enterSelectionMode(String id) {
+    setState(() {
+      _isSelectionMode = true;
+      _selectedIds.add(id);
+    });
+  }
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+      // Son seçili öğe de kaldırılırsa seçim modundan otomatik çık.
+      if (_selectedIds.isEmpty) _isSelectionMode = false;
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _isSelectionMode = false;
+      _selectedIds.clear();
+    });
+  }
+
+  void _selectAll() {
+    setState(() => _selectedIds.addAll(_programs.map((p) => p.id)));
+  }
+
+  Future<void> _deleteSelected() async {
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Programları Sil',
+      message:
+          '${_selectedIds.length} programı silmek istediğine emin misin? Bu işlem geri alınamaz.',
+      confirmLabel: 'Sil',
+      isDestructive: true,
+    );
+    if (!confirmed) return;
+
+    final idsToDelete = Set<String>.from(_selectedIds);
+    setState(() {
+      _programs.removeWhere((p) => idsToDelete.contains(p.id));
+      _isSelectionMode = false;
+      _selectedIds.clear();
+    });
+
+    for (final id in idsToDelete) {
+      try {
+        await ProgramRepository.deleteProgram(id);
+      } catch (error) {
+        debugPrint('Program silme hatası ($id): $error');
+      }
+    }
+  }
+
+  Widget _buildHeader() {
+    if (_isSelectionMode) {
+      return Row(
+        children: [
+          IconButton(
+            onPressed: _exitSelectionMode,
+            icon: Icon(Icons.close, color: AppColors.brandTertiary),
+          ),
+          Expanded(
+            child: Text(
+              '${_selectedIds.length} seçili',
+              style: AppTypography.heading2.copyWith(
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert, color: AppColors.brandTertiary),
+            onSelected: (value) {
+              if (value == 'select_all') _selectAll();
+              if (value == 'delete') _deleteSelected();
+            },
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem(
+                    value: 'select_all',
+                    child: Text('Tümünü Seç'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'share',
+                    enabled: false,
+                    child: Text('Paylaş (yakında)'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Text('Sil', style: TextStyle(color: Colors.red)),
+                  ),
+                ],
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            'Programlarım',
+            style: AppTypography.heading1.copyWith(
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        PopupMenuButton<String>(
+          icon: Icon(Icons.more_vert, color: AppColors.brandTertiary),
+          onSelected: (value) {
+            if (value == 'select' && _programs.isNotEmpty) {
+              setState(() => _isSelectionMode = true);
+            }
+          },
+          itemBuilder:
+              (context) => [
+                PopupMenuItem(
+                  value: 'select',
+                  enabled: _programs.isNotEmpty,
+                  child: const Text('Seç'),
+                ),
+              ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      // yeni (standart FAB):
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Programlarım',
-                style: AppTypography.heading1.copyWith(
-                  color: AppColors.textPrimary,
-                ),
-              ),
+              _buildHeader(),
               const SizedBox(height: 20),
               Expanded(
                 child:
@@ -85,8 +209,6 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                         ? const Center(child: CircularProgressIndicator())
                         : _programs.isEmpty
                         ? _EmptyState(
-                          // ESKİ: onCreate: () => context.push('/onboarding-survey'),
-                          // DÜZELTME:
                           onCreate: () async {
                             final created = await context.push<bool>(
                               '/onboarding-survey',
@@ -94,34 +216,38 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                             if (created == true) _fetch();
                           },
                         )
-                        // yeni:
                         : ListView.separated(
                           itemCount: _programs.length,
                           separatorBuilder:
                               (_, __) => const SizedBox(height: 12),
                           itemBuilder: (context, index) {
                             final program = _programs[index];
+                            final isSelected = _selectedIds.contains(
+                              program.id,
+                            );
+
+                            // Seçim modundayken kaydırarak silmeyi kapatıyoruz
+                            // (checkbox ile seçip toplu silmek daha tutarlı;
+                            // ikisi bir aradayken kafa karıştırırdı).
+                            if (_isSelectionMode) {
+                              return _ProgramCard(
+                                program: program,
+                                isSelectionMode: true,
+                                isSelected: isSelected,
+                                onTap: () => _toggleSelection(program.id),
+                              );
+                            }
+
                             return Dismissible(
-                              // key: her item'ı benzersiz tanımlıyor, Flutter
-                              // silme animasyonunu doğru öğeye uygulayabilsin
-                              // diye. program.id kullanmak, listede sıralama
-                              // değişse bile doğru kartı takip etmesini sağlar.
                               key: ValueKey(program.id),
                               direction: DismissDirection.endToStart,
                               confirmDismiss:
                                   (_) => _confirmDeleteProgram(program),
-                              // yeni:
                               onDismissed: (_) {
                                 final removedIndex = index;
                                 setState(
                                   () => _programs.removeAt(removedIndex),
                                 );
-
-                                // showSnackBar bir controller döner; onun .closed
-                                // future'ı SnackBar kapandığında, "hangi sebeple
-                                // kapandığını" (action/timeout/swipe) veriyor.
-                                // Kullanıcı "Geri Al"a bastıysa reason == action
-                                // oluyor — o zaman gerçek silme hiç yapılmıyor.
                                 ScaffoldMessenger.of(context)
                                     .showSnackBar(
                                       SnackBar(
@@ -150,7 +276,6 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                                     .then((reason) async {
                                       if (reason == SnackBarClosedReason.action)
                                         return;
-                                      // Süre doldu, geri alınmadı — şimdi gerçekten sil.
                                       try {
                                         await ProgramRepository.deleteProgram(
                                           program.id,
@@ -178,11 +303,15 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                               ),
                               child: _ProgramCard(
                                 program: program,
+                                isSelectionMode: false,
+                                isSelected: false,
                                 onTap:
                                     () => context.push(
                                       '/program-detail',
                                       extra: program,
                                     ),
+                                onLongPress:
+                                    () => _enterSelectionMode(program.id),
                               ),
                             );
                           },
@@ -192,31 +321,44 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
           ),
         ),
       ),
-      // yeni:
-      floatingActionButton: FloatingActionButton(
-        onPressed:
-            () => showAddProgramSheet(
-              context: context,
-              onCreateWithAi: () async {
-                final created = await context.push<bool>('/onboarding-survey');
-                if (created == true)
-                  _fetch(); // Anket bittiğinde çalışan _fetch() fonksiyonunu tetikler
-              },
-              onImportProgram: () {},
-            ),
-        backgroundColor: AppColors.brandTertiary,
-        elevation: 4,
-        child: const Icon(Icons.add, color: Colors.white, size: 26),
-      ),
+      floatingActionButton:
+          _isSelectionMode
+              ? null
+              : FloatingActionButton(
+                onPressed:
+                    () => showAddProgramSheet(
+                      context: context,
+                      onCreateWithAi: () async {
+                        final created = await context.push<bool>(
+                          '/onboarding-survey',
+                        );
+                        if (created == true) _fetch();
+                      },
+                      onImportProgram: () {},
+                    ),
+                backgroundColor: AppColors.brandTertiary,
+                elevation: 4,
+                child: const Icon(Icons.add, color: Colors.white, size: 26),
+              ),
     );
   }
 }
 
+// yeni:
 class _ProgramCard extends StatelessWidget {
   final ActiveProgram program;
+  final bool isSelectionMode;
+  final bool isSelected;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
-  const _ProgramCard({required this.program, required this.onTap});
+  const _ProgramCard({
+    required this.program,
+    required this.isSelectionMode,
+    required this.isSelected,
+    required this.onTap,
+    this.onLongPress,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -225,76 +367,66 @@ class _ProgramCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            border: Border.all(color: AppColors.brandSecondary),
+            border: Border.all(
+              color:
+                  isSelected
+                      ? AppColors.brandPrimary
+                      : AppColors.brandSecondary,
+              width: isSelected ? 2 : 1,
+            ),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
             children: [
+              if (isSelectionMode) ...[
+                Icon(
+                  isSelected ? Icons.check_circle : Icons.circle_outlined,
+                  color:
+                      isSelected
+                          ? AppColors.brandPrimary
+                          : AppColors.textTertiary,
+                ),
+                const SizedBox(width: 12),
+              ] else ...[
+                // Marka logosunu küçük bir daire içinde göstererek kartın
+                // "bir program" olduğunu görsel olarak da anlatıyoruz —
+                const AppLogo(size: AppLogoSize.small, type: AppLogoType.dark),
+                const SizedBox(width: 14),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       program.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTypography.heading3.copyWith(
-                        color: AppColors.textPrimary,
+                      style: AppTypography.body16Medium.copyWith(
+                        color: AppColors.brandPrimary,
                       ),
                     ),
-                    if (program.description.isNotEmpty) ...[
-                      const SizedBox(height: 6),
+                    if (!isSelectionMode) ...[
+                      const SizedBox(height: 2),
                       Text(
-                        program.description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                        'Programa git',
                         style: AppTypography.body14Regular.copyWith(
                           color: AppColors.textTertiary,
                         ),
                       ),
                     ],
-                    const SizedBox(height: 10),
-                    Text(
-                      '${program.workouts.length} Antrenman Günü',
-                      style: AppTypography.body12Medium.copyWith(
-                        color: AppColors.brandPrimary,
-                      ),
-                    ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(Icons.chevron_right, color: AppColors.textTertiary),
+              if (!isSelectionMode)
+                Icon(Icons.chevron_right, color: AppColors.textTertiary),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AddProgramFab extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _AddProgramFab({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.brandTertiary,
-      shape: const CircleBorder(),
-      elevation: 4,
-      shadowColor: Colors.black.withOpacity(0.3),
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: const Padding(
-          padding: EdgeInsets.all(18),
-          child: Icon(Icons.add, color: Colors.white, size: 26),
         ),
       ),
     );

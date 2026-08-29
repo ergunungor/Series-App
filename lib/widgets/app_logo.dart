@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-enum AppLogoSize { medium, large }
+enum AppLogoSize { small, medium, large }
 
 enum AppLogoType { light, dark }
 
@@ -17,7 +17,11 @@ class AppLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double dimension = size == AppLogoSize.large ? 180 : 112;
+    final double dimension = switch (size) {
+      AppLogoSize.large => 180,
+      AppLogoSize.medium => 112,
+      AppLogoSize.small => 56,
+    };
     return SvgPicture.asset(
       'assets/images/series_logo.svg',
       width: dimension,

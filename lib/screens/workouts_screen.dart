@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
-import '../widgets/app_top_bar.dart';
 import '../models/workout_history.dart';
 import '../services/workout_history_repository.dart';
 import '../widgets/app_confirm_dialog.dart';
@@ -19,6 +18,14 @@ class WorkoutsScreen extends StatefulWidget {
 class _WorkoutsScreenState extends State<WorkoutsScreen> {
   List<WorkoutHistorySession> _sessions = [];
   bool _isLoading = true;
+
+  bool _isSelectionMode = false;
+  final Set<String> _selectedKeys = {};
+
+  // Programs ekranında id vardı, burada seans için tek bir "id" yok —
+  // workoutId + completedAt'in birleşimini benzersiz anahtar olarak kullanıyoruz.
+  String _keyOf(WorkoutHistorySession s) =>
+      '${s.workoutId}_${s.completedAt.toIso8601String()}';
 
   @override
   void initState() {
@@ -57,6 +64,136 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     );
   }
 
+  void _enterSelectionMode(String key) {
+    setState(() {
+      _isSelectionMode = true;
+      _selectedKeys.add(key);
+    });
+  }
+
+  void _toggleSelection(String key) {
+    setState(() {
+      if (_selectedKeys.contains(key)) {
+        _selectedKeys.remove(key);
+      } else {
+        _selectedKeys.add(key);
+      }
+      if (_selectedKeys.isEmpty) _isSelectionMode = false;
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _isSelectionMode = false;
+      _selectedKeys.clear();
+    });
+  }
+
+  void _selectAll() {
+    setState(() => _selectedKeys.addAll(_sessions.map(_keyOf)));
+  }
+
+  Future<void> _deleteSelected() async {
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Kayıtları Sil',
+      message:
+          '${_selectedKeys.length} antrenman kaydını silmek istediğine emin misin? Bu işlem geri alınamaz.',
+      confirmLabel: 'Sil',
+      isDestructive: true,
+    );
+    if (!confirmed) return;
+
+    final sessionsToDelete =
+        _sessions.where((s) => _selectedKeys.contains(_keyOf(s))).toList();
+    setState(() {
+      _sessions.removeWhere((s) => _selectedKeys.contains(_keyOf(s)));
+      _isSelectionMode = false;
+      _selectedKeys.clear();
+    });
+
+    for (final session in sessionsToDelete) {
+      try {
+        await WorkoutHistoryRepository.deleteSession(session);
+      } catch (error) {
+        debugPrint('Antrenman kaydı silme hatası: $error');
+      }
+    }
+  }
+
+  Widget _buildHeader() {
+    if (_isSelectionMode) {
+      return Row(
+        children: [
+          IconButton(
+            onPressed: _exitSelectionMode,
+            icon: Icon(Icons.close, color: AppColors.brandTertiary),
+          ),
+          Expanded(
+            child: Text(
+              '${_selectedKeys.length} seçili',
+              style: AppTypography.heading2.copyWith(
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          PopupMenuButton<String>(
+            icon: Icon(Icons.more_vert, color: AppColors.brandTertiary),
+            onSelected: (value) {
+              if (value == 'select_all') _selectAll();
+              if (value == 'delete') _deleteSelected();
+            },
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem(
+                    value: 'select_all',
+                    child: Text('Tümünü Seç'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'share',
+                    enabled: false,
+                    child: Text('Paylaş (yakında)'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Text('Sil', style: TextStyle(color: Colors.red)),
+                  ),
+                ],
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            'Antrenmanlarım',
+            style: AppTypography.heading1.copyWith(
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        PopupMenuButton<String>(
+          icon: Icon(Icons.more_vert, color: AppColors.brandTertiary),
+          onSelected: (value) {
+            if (value == 'select' && _sessions.isNotEmpty) {
+              setState(() => _isSelectionMode = true);
+            }
+          },
+          itemBuilder:
+              (context) => [
+                PopupMenuItem(
+                  value: 'select',
+                  enabled: _sessions.isNotEmpty,
+                  child: const Text('Seç'),
+                ),
+              ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -66,7 +203,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Column(
             children: [
-              const AppTopBar(),
+              _buildHeader(),
               const SizedBox(height: 28),
               Expanded(
                 child:
@@ -74,21 +211,26 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                         ? const Center(child: CircularProgressIndicator())
                         : _sessions.isEmpty
                         ? const _EmptyHistory()
-                        // yeni:
                         : ListView.separated(
                           itemCount: _sessions.length,
                           separatorBuilder:
                               (_, __) => const SizedBox(height: 12),
                           itemBuilder: (context, index) {
                             final session = _sessions[index];
+                            final key = _keyOf(session);
+                            final isSelected = _selectedKeys.contains(key);
+
+                            if (_isSelectionMode) {
+                              return _HistoryCard(
+                                session: session,
+                                isSelectionMode: true,
+                                isSelected: isSelected,
+                                onTap: () => _toggleSelection(key),
+                              );
+                            }
+
                             return Dismissible(
-                              // key: completedAt + workoutId, çünkü aynı
-                              // antrenmanın birden fazla geçmiş kaydı olabilir
-                              // (aynı isim, farklı tarih) — sadece workoutId
-                              // yeterli olmazdı, çakışma yaratırdı.
-                              key: ValueKey(
-                                '${session.workoutId}_${session.completedAt.toIso8601String()}',
-                              ),
+                              key: ValueKey(key),
                               direction: DismissDirection.endToStart,
                               confirmDismiss:
                                   (_) => _confirmDeleteSession(session),
@@ -97,7 +239,6 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                                 setState(
                                   () => _sessions.removeAt(removedIndex),
                                 );
-
                                 ScaffoldMessenger.of(context)
                                     .showSnackBar(
                                       SnackBar(
@@ -153,11 +294,14 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                               ),
                               child: _HistoryCard(
                                 session: session,
+                                isSelectionMode: false,
+                                isSelected: false,
                                 onTap:
                                     () => context.push(
                                       '/workout-history-detail',
                                       extra: session,
                                     ),
+                                onLongPress: () => _enterSelectionMode(key),
                               ),
                             );
                           },
@@ -213,9 +357,18 @@ class _EmptyHistory extends StatelessWidget {
 
 class _HistoryCard extends StatelessWidget {
   final WorkoutHistorySession session;
+  final bool isSelectionMode;
+  final bool isSelected;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
-  const _HistoryCard({required this.session, required this.onTap});
+  const _HistoryCard({
+    required this.session,
+    required this.isSelectionMode,
+    required this.isSelected,
+    required this.onTap,
+    this.onLongPress,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -229,30 +382,48 @@ class _HistoryCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(20),
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            border: Border.all(color: AppColors.brandSecondary),
+            border: Border.all(
+              color:
+                  isSelected
+                      ? AppColors.brandPrimary
+                      : AppColors.brandSecondary,
+              width: isSelected ? 2 : 1,
+            ),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  shape: BoxShape.circle,
+              if (isSelectionMode) ...[
+                Icon(
+                  isSelected ? Icons.check_circle : Icons.circle_outlined,
+                  color:
+                      isSelected
+                          ? AppColors.brandPrimary
+                          : AppColors.textTertiary,
                 ),
-                child: Icon(
-                  Icons.check_circle,
-                  color: AppColors.brandPrimary,
-                  size: 22,
+                const SizedBox(width: 12),
+              ] else ...[
+                Container(
+                  width: 44,
+                  height: 44,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.check_circle,
+                    color: AppColors.brandPrimary,
+                    size: 22,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -282,7 +453,8 @@ class _HistoryCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: AppColors.textTertiary),
+              if (!isSelectionMode)
+                Icon(Icons.chevron_right, color: AppColors.textTertiary),
             ],
           ),
         ),
