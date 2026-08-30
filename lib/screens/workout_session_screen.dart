@@ -61,9 +61,8 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     setState(() => _isLoadingGif = true);
     try {
       // YENİ: İsim ve talimat kelimelerini karşılaştırarak nokta atışı çeken metot
-      final apiData = await _exerciseService.fetchExerciseByInstructionMatch(
-        _currentExercise.name,
-        apiKeyword: _currentExercise.apiKeyword,
+      final apiData = await _exerciseService.fetchExerciseById(
+        _currentExercise.id,
       );
 
       if (mounted) {
