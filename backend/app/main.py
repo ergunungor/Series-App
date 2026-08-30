@@ -26,7 +26,9 @@ app.add_middleware(
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
+@app.get("/")
+def root():
+    return {"status": "online", "message": "Backend is running!"}
 @app.post("/api/generate-program")
 async def create_program(user_data: UserOnboardingData):
     try:
