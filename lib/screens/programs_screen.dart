@@ -8,6 +8,7 @@ import '../services/program_repository.dart';
 import '../widgets/add_program_sheet.dart';
 import '../widgets/app_confirm_dialog.dart';
 import '../widgets/app_logo.dart';
+import '../widgets/active_badge.dart';
 
 class ProgramsScreen extends StatefulWidget {
   const ProgramsScreen({super.key});
@@ -16,9 +17,11 @@ class ProgramsScreen extends StatefulWidget {
   State<ProgramsScreen> createState() => _ProgramsScreenState();
 }
 
+// yeni:
 class _ProgramsScreenState extends State<ProgramsScreen> {
   List<ActiveProgram> _programs = [];
   bool _isLoading = true;
+  String? _activeProgramId;
 
   // Seçim modu state'i: hangi kartların işaretli olduğunu tutuyoruz.
   bool _isSelectionMode = false;
@@ -38,9 +41,11 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     }
     try {
       final programs = await ProgramRepository.fetchPrograms(user.id);
+      final activeId = await ProgramRepository.fetchActiveProgramId(user.id);
       if (mounted) {
         setState(() {
           _programs = programs;
+          _activeProgramId = activeId;
           _isLoading = false;
         });
       }
@@ -233,6 +238,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                               return _ProgramCard(
                                 program: program,
                                 isSelectionMode: true,
+                                isActive: program.id == _activeProgramId,
                                 isSelected: isSelected,
                                 onTap: () => _toggleSelection(program.id),
                               );
@@ -301,10 +307,12 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                                   color: Colors.white,
                                 ),
                               ),
+                              // yeni:
                               child: _ProgramCard(
                                 program: program,
                                 isSelectionMode: false,
                                 isSelected: false,
+                                isActive: program.id == _activeProgramId,
                                 onTap:
                                     () => context.push(
                                       '/program-detail',
@@ -344,11 +352,11 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   }
 }
 
-// yeni:
 class _ProgramCard extends StatelessWidget {
   final ActiveProgram program;
   final bool isSelectionMode;
   final bool isSelected;
+  final bool isActive;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
 
@@ -356,6 +364,7 @@ class _ProgramCard extends StatelessWidget {
     required this.program,
     required this.isSelectionMode,
     required this.isSelected,
+    required this.isActive,
     required this.onTap,
     this.onLongPress,
   });
@@ -398,28 +407,48 @@ class _ProgramCard extends StatelessWidget {
                 const AppLogo(explicitSize: 56, type: AppLogoType.dark),
                 const SizedBox(width: 14),
               ],
+              // yeni:
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      program.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.body16Medium.copyWith(
-                        color: AppColors.brandPrimary,
-                      ),
-                    ),
-                    if (!isSelectionMode) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        'Programa git',
-                        style: AppTypography.body14Regular.copyWith(
-                          color: AppColors.textTertiary,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            program.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.body16Medium.copyWith(
+                              color: AppColors.brandPrimary,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+
+                        // Sadece bu program aktif olarak işaretlenmişse
+                        // (profiles.active_program_id ile eşleşiyorsa) rozeti
+                        // gösteriyoruz — diğer tüm kartlarda hiç yer kaplamıyor.
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    Row(
+                      children: [
+                        if (!isSelectionMode) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Programa git',
+                            style: AppTypography.body14Regular.copyWith(
+                              color: AppColors.textTertiary,
+                            ),
+                          ),
+                          if (isActive) ...[
+                            const SizedBox(width: 8),
+                            const ActiveBadge(),
+                          ],
+                        ],
+                      ],
+                    ),
                   ],
                 ),
               ),

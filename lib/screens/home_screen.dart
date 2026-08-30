@@ -13,6 +13,7 @@ import '../services/program_repository.dart';
 import '../services/workout_history_repository.dart';
 import '../widgets/app_button.dart';
 import '../widgets/app_confirm_dialog.dart';
+import '../widgets/select_active_program_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -214,8 +215,27 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: AppColors.brandPrimary,
                       ),
                     ),
+                    // yeni:
                     IconButton(
-                      onPressed: () => context.go('/programs'),
+                      onPressed: () async {
+                        final user = Supabase.instance.client.auth.currentUser;
+                        if (user == null) return;
+                        final allPrograms =
+                            await ProgramRepository.fetchPrograms(user.id);
+                        if (!context.mounted) return;
+                        final selected = await showSelectActiveProgramSheet(
+                          context: context,
+                          programs: allPrograms,
+                          currentActiveId: _activeProgram?.id,
+                        );
+                        if (selected != null) {
+                          await ProgramRepository.setActiveProgram(
+                            user.id,
+                            selected.id,
+                          );
+                          _fetchActiveProgram(); // hem kartı hem haftalık performansı tazeler
+                        }
+                      },
                       icon: Icon(
                         Icons.swap_horiz,
                         size: 20,
@@ -249,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Row(
                         children: [
                           const AppLogo(
-                            explicitSize: 56,
+                            explicitSize: 44,
                             type: AppLogoType.dark,
                           ),
                           const SizedBox(width: 12),

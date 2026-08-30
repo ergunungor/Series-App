@@ -28,10 +28,35 @@ class ProgramRepository {
     }).toList();
   }
 
-  // yeni:
+  static Future<String?> fetchActiveProgramId(String userId) async {
+    final row =
+        await Supabase.instance.client
+            .from('profiles')
+            .select('active_program_id')
+            .eq('id', userId)
+            .single();
+    return row['active_program_id'] as String?;
+  }
+
+  static Future<void> setActiveProgram(String userId, String programId) async {
+    await Supabase.instance.client
+        .from('profiles')
+        .update({'active_program_id': programId})
+        .eq('id', userId);
+  }
+
   static Future<ActiveProgram?> fetchActiveProgram(String userId) async {
     final programs = await fetchPrograms(userId);
-    return programs.isEmpty ? null : programs.first;
+    if (programs.isEmpty) return null;
+
+    final activeId = await fetchActiveProgramId(userId);
+    if (activeId != null) {
+      final match = programs.where((p) => p.id == activeId);
+      if (match.isNotEmpty) return match.first;
+    }
+    // Henüz seçim yapılmamışsa (veya seçili program silinmişse) en son
+    // oluşturulana geri dönüyoruz — eski davranış, güvenli varsayılan.
+    return programs.first;
   }
 
   static Future<void> deleteProgram(String programId) async {
