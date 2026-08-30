@@ -1,25 +1,34 @@
 class WorkoutExercise {
+  final String id;
   final String name;
   final int sets;
   final String reps;
   final int restSeconds;
   final String? notes;
+  final String?
+  apiKeyword; // YENİ: API'de nokta atışı arama yapacağımız İngilizce standart isim/anahtar
 
   WorkoutExercise({
+    required this.id,
     required this.name,
     required this.sets,
     required this.reps,
     required this.restSeconds,
     this.notes,
+    this.apiKeyword,
   });
 
   factory WorkoutExercise.fromJson(Map<String, dynamic> json) =>
       WorkoutExercise(
+        id: json['id']?.toString() ?? '',
         name: json['name'] as String? ?? '',
         sets: (json['sets'] as num?)?.toInt() ?? 0,
         reps: json['reps']?.toString() ?? '',
         restSeconds: (json['rest_seconds'] as num?)?.toInt() ?? 0,
         notes: json['notes'] as String?,
+        apiKeyword:
+            json['api_keyword'] as String? ??
+            json['name'], // Eğer gelmezse normal ismi baz alır
       );
 }
 

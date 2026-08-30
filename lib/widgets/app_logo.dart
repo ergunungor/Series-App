@@ -27,7 +27,7 @@ class AppLogo extends StatelessWidget {
           AppLogoSize.small => 32,
         };
     return SvgPicture.asset(
-      'assets/images/series_logo.svg',
+      'assets/images/logo.svg',
       width: dimension,
       height: dimension,
       colorFilter:
