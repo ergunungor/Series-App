@@ -140,6 +140,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
             ),
           ),
           PopupMenuButton<String>(
+            color: Colors.white,
             icon: Icon(Icons.more_vert, color: AppColors.brandTertiary),
             onSelected: (value) {
               if (value == 'select_all') _selectAll();
@@ -149,7 +150,10 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                 (context) => [
                   const PopupMenuItem(
                     value: 'select_all',
-                    child: Text('Tümünü Seç'),
+                    child: Text(
+                      'Tümünü Seç',
+                      style: TextStyle(color: AppColors.brandPrimary),
+                    ),
                   ),
                   const PopupMenuItem(
                     value: 'share',
@@ -177,6 +181,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
           ),
         ),
         PopupMenuButton<String>(
+          color: Colors.white,
           icon: Icon(Icons.more_vert, color: AppColors.brandTertiary),
           onSelected: (value) {
             if (value == 'select' && _programs.isNotEmpty) {
@@ -188,7 +193,10 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                 PopupMenuItem(
                   value: 'select',
                   enabled: _programs.isNotEmpty,
-                  child: const Text('Seç'),
+                  child: const Text(
+                    'Seç',
+                    style: TextStyle(color: AppColors.brandPrimary),
+                  ),
                 ),
               ],
         ),

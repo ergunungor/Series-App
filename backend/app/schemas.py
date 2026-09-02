@@ -3,6 +3,7 @@ from typing import List, Optional
 
 class Logistics(BaseModel):
     location: List[str]
+    equipment: Optional[List[str]] = []
     days_per_week: int
     max_duration_min: int
 

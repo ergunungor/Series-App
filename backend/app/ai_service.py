@@ -47,6 +47,7 @@ def generate_workout_program(data: UserOnboardingData):
     - Odaklanmak İstediği Alanlar: {interests_str}
     - Sağlık Kısıtlamaları/Sakatlıklar: {restrictions_str}
     - Antrenman Yeri: {", ".join(data.logistics.location)}
+    - Evdeki Ekipmanlar: {", ".join(data.logistics.equipment) if data.logistics.equipment else "Yok"}
     - Haftalık Gün Sayısı: {data.logistics.days_per_week} gün
     - Maksimum Süre: {data.logistics.max_duration_min} dakika
     - Zihinsel Engel: {data.mental_blocker or 'Yok'}
@@ -55,7 +56,10 @@ def generate_workout_program(data: UserOnboardingData):
     
     ÇOK ÖNEMLİ KURAL (KATI KISITLAMA):
     Kullanacağın tüm egzersizleri SADECE aşağıdaki JSON listesinden (Katalogdan) seçeceksin. 
-    Kendi kafandan, başka bir kaynaktan veya listede olmayan hiçbir egzersizi KESİNLİKLE uydurma. Kullanıcının alet durumuna (equipment) dikkat ederek seçim yap.
+    Kendi kafandan, başka bir kaynaktan veya listede olmayan hiçbir egzersizi KESİNLİKLE uydurma. Kullanıcının alet durumuna dikkat ederek seçim yap.
+    
+    ÖZEL DURUM (SANIYELİ SETLER):
+    Plank, statik tutuşlar veya dayanıklılık hareketleri gibi zamana dayalı egzersizlerde "reps" yerine "duration_seconds" (örneğin 45 saniye için 45) alanı kullanabilirsin. Normal tekrar bazlı hareketlerde ise "reps" (örn: "8-12") kullanmaya devam et.
     
     KULLANABİLECEĞİN EGZERSİZLER LİSTESİ (KATALOG):
     {ai_catalog_str}
@@ -75,8 +79,18 @@ def generate_workout_program(data: UserOnboardingData):
               "name": "Barbell Bench Press",
               "sets": 3,
               "reps": "8-12",
+              "duration_seconds": null,
               "rest_seconds": 60,
               "notes": "Formuna dikkat et"
+            }},
+            {{
+              "id": "0456", 
+              "name": "Plank",
+              "sets": 3,
+              "reps": null,
+              "duration_seconds": 45,
+              "rest_seconds": 45,
+              "notes": "Core bölgesini sıkı tut"
             }}
           ]
         }}

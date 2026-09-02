@@ -85,11 +85,29 @@ class AppRouter {
         path: '/onboarding-survey',
         builder: (context, state) => const OnboardingSurveyScreen(),
       ),
+      // workout-session rotası için:
+      GoRoute(
+        path: '/workout-session',
+        builder: (context, state) {
+          final workout = state.extra as WorkoutDay?;
+          if (workout == null) {
+            // Eğer tarayıcı yenilendiyse veya extra kaybolduysa ana sayfaya düş
+            return const HomeScreen();
+          }
+          return WorkoutSessionScreen(workout: workout);
+        },
+      ),
+
+      // program-detail rotası için:
       GoRoute(
         path: '/program-detail',
-        builder:
-            (context, state) =>
-                ProgramDetailScreen(program: state.extra as ActiveProgram),
+        builder: (context, state) {
+          final program = state.extra as ActiveProgram?;
+          if (program == null) {
+            return const ProgramsScreen();
+          }
+          return ProgramDetailScreen(program: program);
+        },
       ),
       GoRoute(
         path: '/workout-day-detail',

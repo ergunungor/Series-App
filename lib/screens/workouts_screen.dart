@@ -138,6 +138,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
             ),
           ),
           PopupMenuButton<String>(
+            color: Colors.white,
             icon: Icon(Icons.more_vert, color: AppColors.brandTertiary),
             onSelected: (value) {
               if (value == 'select_all') _selectAll();
@@ -147,12 +148,18 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                 (context) => [
                   const PopupMenuItem(
                     value: 'select_all',
-                    child: Text('Tümünü Seç'),
+                    child: Text(
+                      'Tümünü Seç',
+                      style: TextStyle(color: AppColors.brandPrimary),
+                    ),
                   ),
                   const PopupMenuItem(
                     value: 'share',
                     enabled: false,
-                    child: Text('Paylaş (yakında)'),
+                    child: Text(
+                      'Paylaş (yakında)',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
                   ),
                   const PopupMenuItem(
                     value: 'delete',
@@ -175,6 +182,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           ),
         ),
         PopupMenuButton<String>(
+          color: Colors.white,
           icon: Icon(Icons.more_vert, color: AppColors.brandTertiary),
           onSelected: (value) {
             if (value == 'select' && _sessions.isNotEmpty) {
@@ -186,7 +194,10 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                 PopupMenuItem(
                   value: 'select',
                   enabled: _sessions.isNotEmpty,
-                  child: const Text('Seç'),
+                  child: const Text(
+                    'Seç',
+                    style: TextStyle(color: AppColors.brandPrimary),
+                  ),
                 ),
               ],
         ),
@@ -196,9 +207,12 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).padding.bottom + 104;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
+        bottom: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Column(
@@ -209,102 +223,142 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                 child:
                     _isLoading
                         ? const Center(child: CircularProgressIndicator())
-                        : _sessions.isEmpty
-                        ? const _EmptyHistory()
-                        : ListView.separated(
-                          itemCount: _sessions.length,
-                          separatorBuilder:
-                              (_, __) => const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final session = _sessions[index];
-                            final key = _keyOf(session);
-                            final isSelected = _selectedKeys.contains(key);
-
-                            if (_isSelectionMode) {
-                              return _HistoryCard(
-                                session: session,
-                                isSelectionMode: true,
-                                isSelected: isSelected,
-                                onTap: () => _toggleSelection(key),
-                              );
-                            }
-
-                            return Dismissible(
-                              key: ValueKey(key),
-                              direction: DismissDirection.endToStart,
-                              confirmDismiss:
-                                  (_) => _confirmDeleteSession(session),
-                              onDismissed: (_) {
-                                final removedIndex = index;
-                                setState(
-                                  () => _sessions.removeAt(removedIndex),
-                                );
-                                ScaffoldMessenger.of(context)
-                                    .showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          '"${session.workoutName}" kaydı silindi',
+                        : RefreshIndicator(
+                          color: AppColors.brandPrimary,
+                          backgroundColor: Colors.white,
+                          onRefresh: _fetch,
+                          child:
+                              _sessions.isEmpty
+                                  ? SingleChildScrollView(
+                                    physics:
+                                        const AlwaysScrollableScrollPhysics(
+                                          parent: BouncingScrollPhysics(),
                                         ),
-                                        backgroundColor:
-                                            AppColors.brandTertiary,
-                                        behavior: SnackBarBehavior.floating,
-                                        duration: const Duration(seconds: 3),
-                                        action: SnackBarAction(
-                                          label: 'Geri Al',
-                                          textColor: Colors.white,
-                                          onPressed: () {
-                                            setState(
-                                              () => _sessions.insert(
-                                                removedIndex,
-                                                session,
-                                              ),
-                                            );
-                                          },
+                                    padding: EdgeInsets.fromLTRB(
+                                      0,
+                                      40,
+                                      0,
+                                      bottomInset,
+                                    ),
+                                    child: const _EmptyHistory(),
+                                  )
+                                  : ListView.separated(
+                                    physics:
+                                        const AlwaysScrollableScrollPhysics(
+                                          parent: BouncingScrollPhysics(),
                                         ),
-                                      ),
-                                    )
-                                    .closed
-                                    .then((reason) async {
-                                      if (reason == SnackBarClosedReason.action)
-                                        return;
-                                      try {
-                                        await WorkoutHistoryRepository.deleteSession(
-                                          session,
-                                        );
-                                      } catch (error) {
-                                        debugPrint(
-                                          'Antrenman kaydı silme hatası: $error',
+                                    padding: EdgeInsets.fromLTRB(
+                                      0,
+                                      0,
+                                      0,
+                                      bottomInset,
+                                    ),
+                                    itemCount: _sessions.length,
+                                    separatorBuilder:
+                                        (_, __) => const SizedBox(height: 12),
+                                    itemBuilder: (context, index) {
+                                      final session = _sessions[index];
+                                      final key = _keyOf(session);
+                                      final isSelected = _selectedKeys.contains(
+                                        key,
+                                      );
+
+                                      if (_isSelectionMode) {
+                                        return _HistoryCard(
+                                          session: session,
+                                          isSelectionMode: true,
+                                          isSelected: isSelected,
+                                          onTap: () => _toggleSelection(key),
                                         );
                                       }
-                                    });
-                              },
-                              background: Container(
-                                alignment: Alignment.centerRight,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.red,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: const Icon(
-                                  Icons.delete_outline,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              child: _HistoryCard(
-                                session: session,
-                                isSelectionMode: false,
-                                isSelected: false,
-                                onTap:
-                                    () => context.push(
-                                      '/workout-history-detail',
-                                      extra: session,
-                                    ),
-                                onLongPress: () => _enterSelectionMode(key),
-                              ),
-                            );
-                          },
+
+                                      return Dismissible(
+                                        key: ValueKey(key),
+                                        direction: DismissDirection.endToStart,
+                                        confirmDismiss:
+                                            (_) =>
+                                                _confirmDeleteSession(session),
+                                        onDismissed: (_) {
+                                          final removedIndex = index;
+                                          setState(
+                                            () => _sessions.removeAt(
+                                              removedIndex,
+                                            ),
+                                          );
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    '"${session.workoutName}" kaydı silindi',
+                                                  ),
+                                                  backgroundColor:
+                                                      AppColors.brandTertiary,
+                                                  behavior:
+                                                      SnackBarBehavior.floating,
+                                                  duration: const Duration(
+                                                    seconds: 3,
+                                                  ),
+                                                  action: SnackBarAction(
+                                                    label: 'Geri Al',
+                                                    textColor: Colors.white,
+                                                    onPressed: () {
+                                                      setState(
+                                                        () => _sessions.insert(
+                                                          removedIndex,
+                                                          session,
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
+                                                ),
+                                              )
+                                              .closed
+                                              .then((reason) async {
+                                                if (reason ==
+                                                    SnackBarClosedReason.action)
+                                                  return;
+                                                try {
+                                                  await WorkoutHistoryRepository.deleteSession(
+                                                    session,
+                                                  );
+                                                } catch (error) {
+                                                  debugPrint(
+                                                    'Antrenman kaydı silme hatası: $error',
+                                                  );
+                                                }
+                                              });
+                                        },
+                                        background: Container(
+                                          alignment: Alignment.centerRight,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 24,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red,
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.delete_outline,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        child: _HistoryCard(
+                                          session: session,
+                                          isSelectionMode: false,
+                                          isSelected: false,
+                                          onTap:
+                                              () => context.push(
+                                                '/workout-history-detail',
+                                                extra: session,
+                                              ),
+                                          onLongPress:
+                                              () => _enterSelectionMode(key),
+                                        ),
+                                      );
+                                    },
+                                  ),
                         ),
               ),
             ],

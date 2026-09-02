@@ -8,6 +8,7 @@ import '../widgets/survey_step_scaffold.dart';
 import '../widgets/selectable_chip.dart';
 import '../models/onboarding_data.dart';
 import '../services/program_service.dart';
+import '../widgets/app_confirm_dialog.dart';
 
 class OnboardingSurveyScreen extends StatefulWidget {
   const OnboardingSurveyScreen({super.key});
@@ -27,6 +28,16 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
 
   // yeni:
   static const int totalSteps = 9;
+
+  static const List<String> _equipmentOptions = [
+    'Sadece Vücut Ağırlığı',
+    'Dambıl',
+    'Barfiks Demiri',
+    'Direnç Bandı',
+    'Kettlebell',
+    'Atlama İpi',
+  ];
+
   static const List<String> _experienceOptions = [
     'Başlangıç',
     'Orta',
@@ -102,6 +113,51 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _handleSurveyExitOrBack() async {
+    // 1. Eğer anketin ilk sorusunda değilse, bir önceki soruya dön:
+    if (_currentStep > 0) {
+      _goBack();
+      return;
+    }
+
+    // 2. İlk sorudaysa çıkmak için onay iste:
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Anketten Çık',
+      message:
+          'Program oluşturma anketinden çıkmak istediğine emin misin? Girdiğin bilgiler kaybolacak.',
+      confirmLabel: 'Çık',
+      isDestructive: true,
+    );
+
+    if (confirmed && mounted) {
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/home');
+      }
+    }
+  }
+
+  Future<void> _handleCloseSurvey() async {
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Anketten Çık',
+      message:
+          'Program oluşturma anketinden çıkmak istediğine emin misin? Girdiğin bilgiler kaybolacak.',
+      confirmLabel: 'Çık',
+      isDestructive: true,
+    );
+
+    if (confirmed && mounted) {
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/home');
+      }
+    }
+  }
+
   Future<void> _submit() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
@@ -163,22 +219,38 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: PageView(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
-        children: [
-          _ageStep(),
-          _experienceStep(),
-          _goalStep(),
-          _interestsStep(),
-          _restrictionsStep(),
-          _locationStep(),
-          _daysPerWeekStep(),
-          _durationStep(),
-          _blockerStep(),
-        ],
+    return PopScope(
+      canPop: false, // Donanım/Tarayıcı geri tuşunu kilitler
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleSurveyExitOrBack();
+      },
+      child: GestureDetector(
+        // Soldan sağa kaydırma jestini yakalar (Swipe-to-back)
+        onHorizontalDragEnd: (details) {
+          if (details.primaryVelocity != null &&
+              details.primaryVelocity! > 250) {
+            _handleSurveyExitOrBack();
+          }
+        },
+        child: Scaffold(
+          backgroundColor: AppColors.background,
+          body: PageView(
+            controller: _pageController,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _ageStep(),
+              _experienceStep(),
+              _goalStep(),
+              _interestsStep(),
+              _restrictionsStep(),
+              _locationStep(),
+              _daysPerWeekStep(),
+              _durationStep(),
+              _blockerStep(),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -187,6 +259,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     currentStep: _currentStep,
     totalSteps: totalSteps,
     question: 'Kaç yaşındasın?',
+    onExit: _handleCloseSurvey,
     content: AppInput(
       hintText: 'Yaşın',
       controller: _ageController,
@@ -205,6 +278,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     currentStep: _currentStep,
     totalSteps: totalSteps,
     question: 'Antrenman tecrüben ne seviyede?',
+    onExit: _handleCloseSurvey,
     onBack: _goBack,
     content: Wrap(
       spacing: 12,
@@ -233,6 +307,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     currentStep: _currentStep,
     totalSteps: totalSteps,
     question: 'Ana hedefin ne?',
+    onExit: _handleCloseSurvey,
     onBack: _goBack,
     content: Wrap(
       spacing: 12,
@@ -261,6 +336,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     currentStep: _currentStep,
     totalSteps: totalSteps,
     question: 'Hangi bölgelere odaklanmak istersin?',
+    onExit: _handleCloseSurvey,
     onBack: _goBack,
     content: Wrap(
       spacing: 12,
@@ -293,6 +369,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     currentStep: _currentStep,
     totalSteps: totalSteps,
     question: 'Sağlık kısıtlaman veya sakatlığın var mı?',
+    onExit: _handleCloseSurvey,
     onBack: _goBack,
     content: Wrap(
       spacing: 12,
@@ -328,29 +405,76 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     },
   );
 
-  // yeni:
   Widget _locationStep() => SurveyStepScaffold(
     currentStep: _currentStep,
     totalSteps: totalSteps,
     question: 'Nerede antrenman yapacaksın? (birden fazla seçebilirsin)',
+    onExit: _handleCloseSurvey,
     onBack: _goBack,
-    content: Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children:
-          _locationOptions.map((o) {
-            final isSelected = _data.logistics.location.contains(o);
-            return SelectableChip(
-              label: o,
-              isSelected: isSelected,
-              onTap:
-                  () => setState(() {
-                    isSelected
-                        ? _data.logistics.location.remove(o)
-                        : _data.logistics.location.add(o);
-                  }),
-            );
-          }).toList(),
+    content: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children:
+              _locationOptions.map((o) {
+                final isSelected = _data.logistics.location.contains(o);
+                return SelectableChip(
+                  label: o,
+                  isSelected: isSelected,
+                  onTap:
+                      () => setState(() {
+                        if (isSelected) {
+                          _data.logistics.location.remove(o);
+                        } else {
+                          _data.logistics.location.add(o);
+                        }
+                      }),
+                );
+              }).toList(),
+        ),
+        if (_data.logistics.location.contains('Ev')) ...[
+          const SizedBox(height: 32),
+          Text(
+            'Evde hangi ekipmanların var?',
+            style: AppTypography.heading2.copyWith(
+              color: AppColors.textPrimary,
+              fontSize: 18,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children:
+                _equipmentOptions.map((o) {
+                  // Not: OnboardingData modelinde logistics.equipment listesinin
+                  // tanımlı olması gerekir.
+                  final isSelected = _data.logistics.equipment.contains(o);
+                  return SelectableChip(
+                    label: o,
+                    isSelected: isSelected,
+                    onTap:
+                        () => setState(() {
+                          if (isSelected) {
+                            _data.logistics.equipment.remove(o);
+                          } else {
+                            if (o == 'Sadece Vücut Ağırlığı') {
+                              _data.logistics.equipment.clear();
+                            } else {
+                              _data.logistics.equipment.remove(
+                                'Sadece Vücut Ağırlığı',
+                              );
+                            }
+                            _data.logistics.equipment.add(o);
+                          }
+                        }),
+                  );
+                }).toList(),
+          ),
+        ],
+      ],
     ),
     onNext: () {
       if (_data.logistics.location.isEmpty) {
@@ -360,11 +484,11 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
       _goNext();
     },
   );
-
   Widget _daysPerWeekStep() => SurveyStepScaffold(
     currentStep: _currentStep,
     totalSteps: totalSteps,
     question: 'Haftada kaç gün antrenman yapmak istersin?',
+    onExit: _handleCloseSurvey,
     onBack: _goBack,
     content: Column(
       children: [
@@ -390,6 +514,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     currentStep: _currentStep,
     totalSteps: totalSteps,
     question: 'Antrenman başına maksimum kaç dakika ayırabilirsin?',
+    onExit: _handleCloseSurvey,
     onBack: _goBack,
     content: Column(
       children: [
@@ -415,6 +540,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     currentStep: _currentStep,
     totalSteps: totalSteps,
     question: 'Seni antrenmandan alıkoyan bir şey var mı? (opsiyonel)',
+    onExit: _handleCloseSurvey,
     onBack: _goBack,
     nextLabel: 'Programımı Oluştur',
     content: AppInput(

@@ -94,6 +94,21 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     }
   }
 
+  Future<void> _handleExitConfirm() async {
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Antrenmandan Çık',
+      message:
+          'Antrenmanı sonlandırmak istediğine emin misin? Kaydedilmemiş setler kaybolabilir.',
+      confirmLabel: 'Çık',
+      isDestructive: true,
+    );
+
+    if (confirmed && mounted) {
+      context.pop();
+    }
+  }
+
   @override
   void dispose() {
     _restTimer?.cancel();
@@ -208,6 +223,8 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     _elapsedTimer?.cancel();
     setState(() => _isFinishing = true);
     final user = Supabase.instance.client.auth.currentUser;
+    bool success = false;
+
     if (user != null) {
       try {
         await ExerciseLogRepository.saveSessionLogs(
@@ -216,11 +233,47 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
           workoutName: widget.workout.name,
           logs: _logs,
         );
+        success = true;
       } catch (error) {
         debugPrint('Set logları kaydedilemedi: $error');
       }
     }
-    if (mounted) context.go('/home');
+
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.brandPrimary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          margin: const EdgeInsets.all(16),
+          content: Row(
+            children: [
+              const Icon(
+                Icons.check_circle_outline,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Harika iş! Antrenman başarıyla kaydedildi.',
+                  style: AppTypography.body14Medium.copyWith(
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+
+    context.go('/workouts');
   }
 
   String _formatWeight(double weight) {
@@ -298,7 +351,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   Widget build(BuildContext context) {
     if (_isFinishing) {
       return Scaffold(
-        backgroundColor: AppColors.textPrimary,
+        backgroundColor: AppColors.brandPrimary,
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -315,7 +368,23 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
       );
     }
 
-    return _isResting ? _buildRestView() : _buildExerciseView();
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        _handleExitConfirm();
+      },
+      child: GestureDetector(
+        // Soldan sağa doğru parmak kaydırma hareketini (Swipe-to-back) yakalar
+        onHorizontalDragEnd: (details) {
+          if (details.primaryVelocity != null &&
+              details.primaryVelocity! > 250) {
+            _handleExitConfirm();
+          }
+        },
+        child: _isResting ? _buildRestView() : _buildExerciseView(),
+      ),
+    );
   }
 
   Widget _buildExerciseView() {
@@ -330,7 +399,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
               children: [
                 // 1. ÜST BAR (Timer ve Bitir Butonu)
                 _buildSessionBar(Colors.white),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 // 2. ÜST BEYAZ KART (Hareket Adı ve 180x180 GIF Alanı)
                 Container(
@@ -361,7 +430,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // 180x180 Sabit GIF / Yüklenme Alanı (Gri kutu tamamen kaldırıldı)
+                      // 180x180 Sabit GIF / Yüklenme Alanı
                       SizedBox(
                         width: 180,
                         height: 180,
@@ -380,7 +449,6 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                                       : ClipRRect(
                                         borderRadius: BorderRadius.circular(12),
                                         child: Image.network(
-                                          // YENİ: Modelin içindeki hazır linki basıyoruz
                                           _apiExerciseInfo!.gifUrl,
                                           width: 180,
                                           height: 180,
@@ -417,6 +485,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                     ],
                   ),
                 ),
+
                 const SizedBox(height: 16),
 
                 // 3. ALT BEYAZ KART (Set, Bilgi ve Düzgün Hizalanmış Inputlar)
@@ -442,6 +511,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
+                          // Sol Taraf: Set: 1/3
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -460,10 +530,19 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                               ),
                             ],
                           ),
-                          Text(
-                            '${_currentExercise.sets} SET ${_currentExercise.reps} TEKRAR',
-                            style: AppTypography.body16Medium.copyWith(
-                              color: AppColors.brandPrimary,
+                          const SizedBox(
+                            width: 12,
+                          ), // İki alan arasına güvenlik boşluğu
+                          // Sağ Taraf: Uzun gelirse alt satıra geçecek olan metin
+                          Expanded(
+                            child: Text(
+                              '${_currentExercise.sets} SET ${_currentExercise.reps} TEKRAR',
+                              textAlign:
+                                  TextAlign.right, // Sağa yaslı durması için
+                              softWrap: true, // Alt satıra geçmeyi aktif eder
+                              style: AppTypography.body18Medium.copyWith(
+                                color: AppColors.brandPrimary,
+                              ),
                             ),
                           ),
                         ],

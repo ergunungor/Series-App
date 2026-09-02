@@ -1,16 +1,20 @@
 class LogisticsData {
   List<String> location;
+  List<String> equipment; // Yeni eklenen alan
   int daysPerWeek;
   int maxDurationMin;
 
   LogisticsData({
     List<String>? location,
+    List<String>? equipment, // Constructor'a eklendi
     this.daysPerWeek = 3,
     this.maxDurationMin = 45,
-  }) : location = location ?? [];
+  }) : location = location ?? [],
+       equipment = equipment ?? []; // Varsayılan boş liste ataması
 
   Map<String, dynamic> toJson() => {
     'location': location,
+    'equipment': equipment, // JSON çıktısına eklendi
     'days_per_week': daysPerWeek,
     'max_duration_min': maxDurationMin,
   };

@@ -17,14 +17,20 @@ class WorkoutHistoryRepository {
     for (final row in (rows as List)) {
       final workoutId = row['workout_id'].toString();
       final completedAtStr = row['completed_at'] as String;
-      final key = '$workoutId|$completedAtStr';
+      final parsedDate = DateTime.parse(completedAtStr);
+
+      // Milisaniye/saniye farklarını yutmak için dakikaya kadar olan kısmı anahtar yapıyoruz:
+      final minuteKey =
+          '${parsedDate.year}-${parsedDate.month}-${parsedDate.day}_${parsedDate.hour}:${parsedDate.minute}';
+      final key = '$workoutId|$minuteKey';
 
       setsBySession
           .putIfAbsent(key, () => [])
           .add(LoggedSet.fromJson(row as Map<String, dynamic>));
       nameBySession[key] = row['workout_name'] as String? ?? 'Antrenman';
       workoutIdBySession[key] = workoutId;
-      dateBySession[key] = DateTime.parse(completedAtStr);
+      // İlk gelen (en güncel) tarihi seans tarihi olarak saklıyoruz:
+      dateBySession.putIfAbsent(key, () => parsedDate);
     }
 
     final result =
@@ -39,20 +45,24 @@ class WorkoutHistoryRepository {
             )
             .toList();
 
-    // yeni:
     result.sort((a, b) => b.completedAt.compareTo(a.completedAt));
     return result;
   }
 
   static Future<void> deleteSession(WorkoutHistorySession session) async {
-    // Bir "seans" aslında exercise_logs'ta aynı workout_id + completed_at'e
-    // sahip birden fazla satır (her set kendi satırı). İkisini birlikte
-    // eşleştirerek sadece bu seansın satırlarını siliyoruz, başka bir
-    // seansı (aynı antrenmanın farklı bir tekrarını) yanlışlıkla silmiyoruz.
+    // Dakika toleransı ile silme: o dakikadaki tüm setleri siler
+    final startWindow =
+        session.completedAt
+            .subtract(const Duration(minutes: 1))
+            .toIso8601String();
+    final endWindow =
+        session.completedAt.add(const Duration(minutes: 1)).toIso8601String();
+
     await Supabase.instance.client
         .from('exercise_logs')
         .delete()
         .eq('workout_id', session.workoutId)
-        .eq('completed_at', session.completedAt.toIso8601String());
+        .gte('completed_at', startWindow)
+        .lte('completed_at', endWindow);
   }
 }

@@ -128,193 +128,210 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _handleRefresh() async {
+    await Future.wait([_fetchUserData(), _fetchActiveProgram()]);
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Cihazın kendi alt çentik boşluğu (iOS Home Indicator vb.) + BottomNav payı (80px) + nefes payı (24px)
+    final bottomInset = MediaQuery.of(context).padding.bottom + 136;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const AppTopBar(),
-              const SizedBox(height: 28),
-              Text(
-                'Hoş Geldin, $_firstName',
-                style: AppTypography.heading1.copyWith(
-                  color: AppColors.brandPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Sıradaki antrenman:',
-                style: AppTypography.body18Medium.copyWith(
-                  color: AppColors.textTertiary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (_isLoadingProgram)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 40),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_activeProgram == null ||
-                  _activeProgram!.workouts.isEmpty)
-                _NoProgramCard(
-                  onCreate: () => context.push('/onboarding-survey'),
-                )
-              else
-                WorkoutCard(
-                  nextWorkoutName: _activeProgram!.workouts.first.name,
-                  onStartTap: () async {
-                    final workout = _activeProgram!.workouts.first;
-                    final confirmed = await showAppConfirmDialog(
-                      context: context,
-                      title: 'Antrenmanı Başlat',
-                      message:
-                          '"${workout.name}" antrenmanına başlamak istiyor musunuz?',
-                      confirmLabel: 'Başla',
-                    );
-                    if (confirmed && context.mounted) {
-                      context.push('/workout-player', extra: workout);
-                    }
-                  },
-                ),
-              if (_activeProgram != null) ...[
-                const SizedBox(height: 32),
-                Row(
-                  children: [
-                    Text(
-                      'Haftalık Performans',
-                      style: AppTypography.body16Medium.copyWith(
-                        color: AppColors.brandTertiary,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '($_weeklyCompleted/$_weeklyTotal)',
-                      style: AppTypography.body16Regular.copyWith(
-                        color: AppColors.brandSecondary,
-                      ),
-                    ),
-                  ],
+        bottom:
+            false, // Alt padding'i biz dinamik yönettiğimiz için SafeArea'nın altını serbest bırakıyoruz
+        child: RefreshIndicator(
+          color: AppColors.brandPrimary,
+          backgroundColor: Colors.white,
+          onRefresh: _handleRefresh,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const AppTopBar(),
+                const SizedBox(height: 28),
+                Text(
+                  'Hoş Geldin, $_firstName',
+                  style: AppTypography.heading1.copyWith(
+                    color: AppColors.brandPrimary,
+                  ),
                 ),
                 const SizedBox(height: 8),
-                GradientProgressBar(
-                  value:
-                      _weeklyTotal == 0 ? 0 : _weeklyCompleted / _weeklyTotal,
+                Text(
+                  'Sıradaki antrenman:',
+                  style: AppTypography.body18Medium.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
                 ),
-                const SizedBox(height: 32),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Aktif Program',
-                      style: AppTypography.heading3.copyWith(
-                        color: AppColors.brandPrimary,
-                      ),
-                    ),
-                    // yeni:
-                    IconButton(
-                      onPressed: () async {
-                        final user = Supabase.instance.client.auth.currentUser;
-                        if (user == null) return;
-                        final allPrograms =
-                            await ProgramRepository.fetchPrograms(user.id);
-                        if (!context.mounted) return;
-                        final selected = await showSelectActiveProgramSheet(
-                          context: context,
-                          programs: allPrograms,
-                          currentActiveId: _activeProgram?.id,
-                        );
-                        if (selected != null) {
-                          await ProgramRepository.setActiveProgram(
-                            user.id,
-                            selected.id,
-                          );
-                          _fetchActiveProgram(); // hem kartı hem haftalık performansı tazeler
-                        }
-                      },
-                      icon: Icon(
-                        Icons.swap_horiz,
-                        size: 20,
-                        color: AppColors.brandTertiary,
-                      ),
-                      tooltip: 'Programı değiştir',
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  child: InkWell(
-                    onTap:
-                        () => context.push(
-                          '/program-detail',
-                          extra: _activeProgram,
+                const SizedBox(height: 16),
+                if (_isLoadingProgram)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_activeProgram == null ||
+                    _activeProgram!.workouts.isEmpty)
+                  _NoProgramCard(
+                    onCreate: () => context.push('/onboarding-survey'),
+                  )
+                else
+                  WorkoutCard(
+                    nextWorkoutName: _activeProgram!.workouts.first.name,
+                    onStartTap: () async {
+                      final workout = _activeProgram!.workouts.first;
+                      final confirmed = await showAppConfirmDialog(
+                        context: context,
+                        title: 'Antrenmanı Başlat',
+                        message:
+                            '"${workout.name}" antrenmanına başlamak istiyor musunuz?',
+                        confirmLabel: 'Başla',
+                      );
+                      if (confirmed && context.mounted) {
+                        context.push('/workout-player', extra: workout);
+                      }
+                    },
+                  ),
+                if (_activeProgram != null) ...[
+                  const SizedBox(height: 32),
+                  Row(
+                    children: [
+                      Text(
+                        'Haftalık Performans',
+                        style: AppTypography.body16Medium.copyWith(
+                          color: AppColors.brandTertiary,
                         ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '($_weeklyCompleted/$_weeklyTotal)',
+                        style: AppTypography.body16Regular.copyWith(
+                          color: AppColors.brandSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  GradientProgressBar(
+                    value:
+                        _weeklyTotal == 0 ? 0 : _weeklyCompleted / _weeklyTotal,
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Aktif Program',
+                        style: AppTypography.heading3.copyWith(
+                          color: AppColors.brandPrimary,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () async {
+                          final user =
+                              Supabase.instance.client.auth.currentUser;
+                          if (user == null) return;
+                          final allPrograms =
+                              await ProgramRepository.fetchPrograms(user.id);
+                          if (!context.mounted) return;
+                          final selected = await showSelectActiveProgramSheet(
+                            context: context,
+                            programs: allPrograms,
+                            currentActiveId: _activeProgram?.id,
+                          );
+                          if (selected != null) {
+                            await ProgramRepository.setActiveProgram(
+                              user.id,
+                              selected.id,
+                            );
+                            _fetchActiveProgram();
+                          }
+                        },
+                        icon: Icon(
+                          Icons.swap_horiz,
+                          size: 20,
+                          color: AppColors.brandTertiary,
+                        ),
+                        tooltip: 'Programı değiştir',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Material(
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.brandSecondary),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          const AppLogo(
-                            explicitSize: 44,
-                            type: AppLogoType.dark,
+                    child: InkWell(
+                      onTap:
+                          () => context.push(
+                            '/program-detail',
+                            extra: _activeProgram,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _activeProgram!.name,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTypography.body18Medium.copyWith(
-                                    color: AppColors.brandTertiary,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      'Programa git',
-                                      style: AppTypography.body16Regular
-                                          .copyWith(
-                                            color: AppColors.textTertiary,
-                                          ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Icon(
-                                      Icons.chevron_right,
-                                      size: 20,
-                                      color: AppColors.textTertiary,
-                                    ),
-                                  ],
-                                ),
-                              ],
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.brandSecondary),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const AppLogo(
+                              explicitSize: 44,
+                              type: AppLogoType.dark,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _activeProgram!.name,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTypography.body18Medium.copyWith(
+                                      color: AppColors.brandTertiary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'Programa git',
+                                        style: AppTypography.body16Regular
+                                            .copyWith(
+                                              color: AppColors.textTertiary,
+                                            ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Icon(
+                                        Icons.chevron_right,
+                                        size: 20,
+                                        color: AppColors.textTertiary,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
