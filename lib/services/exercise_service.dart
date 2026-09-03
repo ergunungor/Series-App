@@ -25,10 +25,8 @@ class ExerciseService {
         (exercise) => exercise.id == id,
       );
 
-      debugPrint('🎯 KUSURSUZ EŞLEŞME: $id -> ${matchedExercise.name}');
       return matchedExercise;
     } catch (e) {
-      debugPrint('⚠️ Egzersiz bulunamadı (ID: $id): $e');
       return null;
     }
   }

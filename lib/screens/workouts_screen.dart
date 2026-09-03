@@ -7,6 +7,9 @@ import '../theme/app_typography.dart';
 import '../models/workout_history.dart';
 import '../services/workout_history_repository.dart';
 import '../widgets/app_confirm_dialog.dart';
+import '../widgets/app_confirm_dialog.dart';
+
+final ValueNotifier<bool> workoutRefreshNotifier = ValueNotifier(false);
 
 class WorkoutsScreen extends StatefulWidget {
   const WorkoutsScreen({super.key});
@@ -31,6 +34,15 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
   void initState() {
     super.initState();
     _fetch();
+    // 2. TETİKLEYİCİYİ DİNLE
+    workoutRefreshNotifier.addListener(_fetch);
+  }
+
+  @override
+  void dispose() {
+    // 3. DİNLEYİCİYİ TEMİZLE
+    workoutRefreshNotifier.removeListener(_fetch);
+    super.dispose();
   }
 
   Future<void> _fetch() async {
@@ -214,7 +226,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
       body: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
           child: Column(
             children: [
               _buildHeader(),
@@ -439,7 +451,7 @@ class _HistoryCard extends StatelessWidget {
         onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             border: Border.all(
               color:

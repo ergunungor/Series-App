@@ -13,6 +13,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../models/workout_history.dart';
 import '../models/exercise.dart';
 import '../services/exercise_service.dart';
+import '../screens/workouts_screen.dart'; // workoutRefreshNotifier'ı kullanabilmek için
 
 class WorkoutSessionScreen extends StatefulWidget {
   final WorkoutDay workout;
@@ -130,8 +131,41 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
 
   void _confirmSet() {
     if (_isPaused) return;
-    final reps = int.tryParse(_repsController.text) ?? 0;
-    final weight = double.tryParse(_weightController.text) ?? 0;
+
+    // 1. Varsayılan tekrar sayısını bul (Programdaki hedeften al)
+    int defaultReps = 1;
+    final repsStr = _currentExercise.reps.toString();
+    final match = RegExp(r'\d+').firstMatch(repsStr);
+    if (match != null) {
+      defaultReps = int.tryParse(match.group(0)!) ?? 1;
+    }
+
+    double defaultWeight = 0.0;
+
+    // 2. Geçmiş performans varsa öncelikle onu varsayılan yap
+    if (_lastPerformanceForCurrentSet != null) {
+      if (_lastPerformanceForCurrentSet!.repsPerformed > 0) {
+        defaultReps = _lastPerformanceForCurrentSet!.repsPerformed;
+      }
+      defaultWeight = _lastPerformanceForCurrentSet!.weightUsed;
+    }
+
+    // 3. Kullanıcı girdilerini temizle ve formata uygun hale getir
+    final inputReps = _repsController.text.trim();
+    final inputWeight = _weightController.text.trim().replaceAll(',', '.');
+
+    // 4. Kutu boşsa varsayılanı, doluysa girilen değeri al (en az 1 tekrar garantile)
+    final parsedReps = int.tryParse(inputReps);
+    final reps =
+        inputReps.isEmpty
+            ? defaultReps
+            : ((parsedReps != null && parsedReps > 0)
+                ? parsedReps
+                : defaultReps);
+
+    final parsedWeight = double.tryParse(inputWeight);
+    final weight =
+        inputWeight.isEmpty ? defaultWeight : (parsedWeight ?? defaultWeight);
 
     _logs.add(
       SetLog(
@@ -153,10 +187,10 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
       setState(() {
         _exerciseIndex++;
         _setIndex = 0;
-        _apiExerciseInfo = null; // YENİ EKLENDİ: Eski görseli ekrandan kaldır
+        _apiExerciseInfo = null;
       });
       _startRest(justFinished.restSeconds);
-      _fetchCurrentExerciseGif(); // YENİ EKLENDİ: Arka planda yeni görseli çekmeye başla
+      _fetchCurrentExerciseGif();
     } else {
       _finishWorkout();
     }
@@ -240,8 +274,10 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     }
 
     if (!mounted) return;
-
     if (success) {
+      // YENİ EKLENEN SATIR: WorkoutsScreen'e "verileri yenile" sinyali gönder
+      workoutRefreshNotifier.value = !workoutRefreshNotifier.value;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.brandPrimary,
@@ -488,7 +524,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
 
                 const SizedBox(height: 16),
 
-                // 3. ALT BEYAZ KART (Set, Bilgi ve Düzgün Hizalanmış Inputlar)
+                // 3. ALT BEYAZ KART (Set solda ortalı, yazı ve kutular sağda altlı üstlü)
                 Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
@@ -502,145 +538,157 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                       ),
                     ],
                   ),
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 24,
+                  ),
+                  child: Row(
+                    crossAxisAlignment:
+                        CrossAxisAlignment
+                            .center, // Sol ve sağı dikeyde tam ortalar
                     children: [
-                      // Üst Satır: Set Bilgisi ve Set/Tekrar Özeti
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                      // SOL TARAF: Set 1/3
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Sol Taraf: Set: 1/3
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Set:',
-                                style: AppTypography.body14Regular.copyWith(
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${_setIndex + 1}/${_currentExercise.sets}',
-                                style: AppTypography.heading1.copyWith(
-                                  color: AppColors.brandPrimary,
-                                ),
-                              ),
-                            ],
+                          Text(
+                            'Set:',
+                            style: AppTypography.body14Regular.copyWith(
+                              color: Colors.grey[600],
+                            ),
                           ),
-                          const SizedBox(
-                            width: 12,
-                          ), // İki alan arasına güvenlik boşluğu
-                          // Sağ Taraf: Uzun gelirse alt satıra geçecek olan metin
-                          Expanded(
-                            child: Text(
-                              '${_currentExercise.sets} SET ${_currentExercise.reps} TEKRAR',
-                              textAlign:
-                                  TextAlign.right, // Sağa yaslı durması için
-                              softWrap: true, // Alt satıra geçmeyi aktif eder
-                              style: AppTypography.body18Medium.copyWith(
-                                color: AppColors.brandPrimary,
-                              ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${_setIndex + 1}/${_currentExercise.sets}',
+                            style: AppTypography.heading1.copyWith(
+                              color: AppColors.brandPrimary,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 20),
 
-                      // Alt Satır: Input Alanları (Tam Hizalı)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                      const Spacer(), // Arayı maksimum açar, sağ bloğu sağa iter
+                      // SAĞ TARAF: Altlı Üstlü Yapı
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment:
+                            CrossAxisAlignment.end, // İçeriği sağa yasla
                         children: [
-                          // TEKRAR TextField
-                          SizedBox(
-                            width: 110,
-                            height: 44,
-                            child: TextField(
-                              controller: _repsController,
-                              textAlign: TextAlign.center,
-                              keyboardType: TextInputType.number,
-                              style: AppTypography.body14Medium.copyWith(
-                                color: Colors.grey[800],
-                              ),
-                              decoration: InputDecoration(
-                                isDense: true,
-                                hintText:
-                                    _lastPerformanceForCurrentSet != null
-                                        ? '${_lastPerformanceForCurrentSet!.repsPerformed}'
-                                        : 'TEKRAR',
-                                hintStyle: AppTypography.body14Medium.copyWith(
-                                  color: Colors.grey[400],
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 12,
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                  borderSide: BorderSide(
-                                    color: Colors.grey[300]!,
-                                    width: 1.5,
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                  borderSide: BorderSide(
-                                    color: AppColors.brandPrimary,
-                                    width: 1.5,
-                                  ),
-                                ),
-                              ),
+                          // 1. Üstteki Yazı
+                          Text(
+                            '${_currentExercise.sets} SET ${_currentExercise.reps} TEKRAR',
+                            style: AppTypography.heading3.copyWith(
+                              color: AppColors.brandPrimary,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          // AĞIRLIK TextField
-                          SizedBox(
-                            width: 110,
-                            height: 44,
-                            child: TextField(
-                              controller: _weightController,
-                              textAlign: TextAlign.center,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
+
+                          const SizedBox(
+                            height: 24,
+                          ), // Yazı ile kutular arası boşluk
+                          // 2. Alttaki Kutular
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // TEKRAR TextField
+                              SizedBox(
+                                width: 95, // Genişlikleri iyice azalttık
+                                child: TextField(
+                                  controller: _repsController,
+                                  textAlign: TextAlign.center,
+                                  keyboardType: TextInputType.number,
+                                  style: AppTypography.body14Medium.copyWith(
+                                    color: Colors.grey[800],
                                   ),
-                              style: AppTypography.body14Medium.copyWith(
-                                color: Colors.grey[800],
+                                  decoration: InputDecoration(
+                                    labelText: 'TEKRAR',
+                                    labelStyle: AppTypography.body12Medium
+                                        .copyWith(color: Colors.grey[500]),
+                                    floatingLabelAlignment:
+                                        FloatingLabelAlignment.center,
+                                    floatingLabelBehavior:
+                                        FloatingLabelBehavior.always,
+                                    isDense: true,
+                                    hintText:
+                                        _lastPerformanceForCurrentSet != null
+                                            ? '${_lastPerformanceForCurrentSet!.repsPerformed} (önceki)'
+                                            : _currentExercise.reps.toString(),
+                                    hintStyle: AppTypography.body12Medium
+                                        .copyWith(color: Colors.grey[400]),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                      vertical: 8,
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(30),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey[300]!,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(30),
+                                      borderSide: BorderSide(
+                                        color: AppColors.brandPrimary,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
-                              decoration: InputDecoration(
-                                isDense: true,
-                                hintText:
-                                    _lastPerformanceForCurrentSet != null
-                                        ? _formatWeight(
-                                          _lastPerformanceForCurrentSet!
-                                              .weightUsed,
-                                        )
-                                        : 'AĞIRLIK',
-                                hintStyle: AppTypography.body14Medium.copyWith(
-                                  color: Colors.grey[400],
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 12,
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                  borderSide: BorderSide(
-                                    color: Colors.grey[300]!,
-                                    width: 1.5,
+                              const SizedBox(
+                                width: 8,
+                              ), // Kutular arası boşluğu da kıstık
+                              // AĞIRLIK TextField
+                              SizedBox(
+                                width: 95, // Genişlikleri iyice azalttık
+                                child: TextField(
+                                  controller: _weightController,
+                                  textAlign: TextAlign.center,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
+                                  style: AppTypography.body14Medium.copyWith(
+                                    color: Colors.grey[800],
                                   ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                  borderSide: BorderSide(
-                                    color: AppColors.brandPrimary,
-                                    width: 1.5,
+                                  decoration: InputDecoration(
+                                    labelText: 'AĞIRLIK (KG)',
+                                    labelStyle: AppTypography.body12Medium
+                                        .copyWith(color: Colors.grey[500]),
+                                    floatingLabelAlignment:
+                                        FloatingLabelAlignment.center,
+                                    floatingLabelBehavior:
+                                        FloatingLabelBehavior.always,
+                                    isDense: true,
+                                    hintText:
+                                        _lastPerformanceForCurrentSet != null
+                                            ? '${_formatWeight(_lastPerformanceForCurrentSet!.weightUsed)} (önceki)'
+                                            : '0',
+                                    hintStyle: AppTypography.body12Medium
+                                        .copyWith(color: Colors.grey[400]),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                      vertical: 8,
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(30),
+                                      borderSide: BorderSide(
+                                        color: Colors.grey[300]!,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(30),
+                                      borderSide: BorderSide(
+                                        color: AppColors.brandPrimary,
+                                        width: 1.5,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
