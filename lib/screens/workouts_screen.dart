@@ -7,7 +7,6 @@ import '../theme/app_typography.dart';
 import '../models/workout_history.dart';
 import '../services/workout_history_repository.dart';
 import '../widgets/app_confirm_dialog.dart';
-import '../widgets/app_confirm_dialog.dart';
 
 final ValueNotifier<bool> workoutRefreshNotifier = ValueNotifier(false);
 

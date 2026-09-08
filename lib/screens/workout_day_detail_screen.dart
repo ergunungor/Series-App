@@ -57,6 +57,14 @@ class WorkoutDayDetailScreen extends StatelessWidget {
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final exercise = workout.exercises[index];
+
+                    // YENİ: Süre varsa süreyi, yoksa tekrarı değişkene atıyoruz
+                    final String repsOrDuration =
+                        (exercise.durationSeconds != null &&
+                                exercise.durationSeconds! > 0)
+                            ? '${exercise.durationSeconds}sn'
+                            : '${exercise.reps ?? ""}';
+
                     return Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -100,13 +108,15 @@ class WorkoutDayDetailScreen extends StatelessWidget {
                                   children: [
                                     _MetaChip(
                                       icon: Icons.repeat,
+                                      // YENİ: Akıllı değişkenimizi buraya koyuyoruz
                                       label:
-                                          '${exercise.sets} Set x ${exercise.reps}',
+                                          '${exercise.sets} Set x $repsOrDuration',
                                     ),
                                     _MetaChip(
                                       icon: Icons.timer_outlined,
+                                      // YENİ: restSeconds null gelirse diye varsayılan 60sn ekledik
                                       label:
-                                          '${exercise.restSeconds}sn dinlenme',
+                                          '${exercise.restSeconds ?? 60}sn dinlenme',
                                     ),
                                   ],
                                 ),

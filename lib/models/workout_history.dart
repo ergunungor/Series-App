@@ -3,12 +3,14 @@ class LoggedSet {
   final int setNumber;
   final int repsPerformed;
   final double weightUsed;
+  final String? instructions;
 
   LoggedSet({
     required this.exerciseName,
     required this.setNumber,
     required this.repsPerformed,
     required this.weightUsed,
+    this.instructions,
   });
 
   factory LoggedSet.fromJson(Map<String, dynamic> json) => LoggedSet(
@@ -16,6 +18,7 @@ class LoggedSet {
     setNumber: (json['set_number'] as num?)?.toInt() ?? 0,
     repsPerformed: (json['reps_performed'] as num?)?.toInt() ?? 0,
     weightUsed: (json['weight_used'] as num?)?.toDouble() ?? 0,
+    instructions: json['instructions'] as String?,
   );
 }
 

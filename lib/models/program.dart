@@ -1,35 +1,49 @@
 class WorkoutExercise {
-  final String id;
+  final String id; // Backend'den gelmeyen durumlarda boş string olabilir
   final String name;
   final int sets;
-  final String reps;
-  final int restSeconds;
+  final dynamic reps;
+  final int? durationSeconds;
+  final int? restSeconds;
   final String? notes;
-  final String?
-  apiKeyword; // YENİ: API'de nokta atışı arama yapacağımız İngilizce standart isim/anahtar
+  final String? instructions; // EKLENEN YENİ ALAN
 
   WorkoutExercise({
     required this.id,
     required this.name,
     required this.sets,
     required this.reps,
-    required this.restSeconds,
+    this.durationSeconds,
+    this.restSeconds,
     this.notes,
-    this.apiKeyword,
+    this.instructions, // CONSTRUCTOR'A EKLENDİ
   });
 
-  factory WorkoutExercise.fromJson(Map<String, dynamic> json) =>
-      WorkoutExercise(
-        id: json['id']?.toString() ?? '',
-        name: json['name'] as String? ?? '',
-        sets: (json['sets'] as num?)?.toInt() ?? 0,
-        reps: json['reps']?.toString() ?? '',
-        restSeconds: (json['rest_seconds'] as num?)?.toInt() ?? 0,
-        notes: json['notes'] as String?,
-        apiKeyword:
-            json['api_keyword'] as String? ??
-            json['name'], // Eğer gelmezse normal ismi baz alır
-      );
+  factory WorkoutExercise.fromJson(Map<String, dynamic> json) {
+    return WorkoutExercise(
+      id: json['id']?.toString() ?? '',
+      name: json['name'] ?? '',
+      sets: json['sets'] ?? 1,
+      reps: json['reps'] ?? '',
+      durationSeconds: json['duration_seconds'],
+      restSeconds: json['rest_seconds'],
+      notes: json['notes'],
+      instructions: json['instructions'], // JSON'DAN OKUMA EKLENDİ
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'sets': sets,
+      'reps': reps,
+      'duration_seconds': durationSeconds,
+      'rest_seconds': restSeconds,
+      'notes': notes,
+      'instructions': instructions, // JSON'A YAZMA EKLENDİ
+    };
+  }
 }
 
 class WorkoutDay {

@@ -13,7 +13,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../models/workout_history.dart';
 import '../models/exercise.dart';
 import '../services/exercise_service.dart';
-import '../screens/workouts_screen.dart'; // workoutRefreshNotifier'ı kullanabilmek için
+import 'workouts_screen.dart'; // workoutRefreshNotifier'ı kullanabilmek için
+import '../widgets/exercise_timer_widget.dart';
 
 class WorkoutSessionScreen extends StatefulWidget {
   final WorkoutDay workout;
@@ -47,6 +48,40 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
 
   WorkoutExercise get _currentExercise =>
       widget.workout.exercises[_exerciseIndex];
+
+  int _getExerciseDuration(WorkoutExercise exercise) {
+    // 1. Doğrudan durationSeconds varsa
+    if (exercise.durationSeconds != null && exercise.durationSeconds! > 0) {
+      return exercise.durationSeconds!;
+    }
+
+    // 2. Reps metninde süre geçiyorsa
+    final repsText = exercise.reps?.toString().toLowerCase() ?? '';
+    if (repsText.contains('sn') ||
+        repsText.contains('sec') ||
+        repsText.contains('saniye') ||
+        repsText.contains('s')) {
+      final match = RegExp(r'\d+').firstMatch(repsText);
+      return match != null
+          ? int.parse(match.group(0)!)
+          : 30; // Sayı bulunamazsa varsayılan 30 sn
+    } else if (repsText.contains('dk') ||
+        repsText.contains('min') ||
+        repsText.contains('dakika')) {
+      final match = RegExp(r'\d+').firstMatch(repsText);
+      return match != null ? int.parse(match.group(0)!) * 60 : 60;
+    }
+
+    // 3. Eğer hareketin adında (name) "plank" veya "hold" geçiyor ama süre belirtilmemişse varsayılan 30 sn verelim ki timer çıksın
+    final nameLower = exercise.name.toLowerCase();
+    if (nameLower.contains('plank') ||
+        nameLower.contains('hold') ||
+        nameLower.contains('static')) {
+      return 30;
+    }
+
+    return 0;
+  }
 
   @override
   void initState() {
@@ -182,14 +217,16 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
 
     if (_setIndex + 1 < justFinished.sets) {
       setState(() => _setIndex++);
-      _startRest(justFinished.restSeconds);
+      // EĞER REST SECONDS BOŞ GELİRSE VARSAYILAN OLARAK 60 SANİYE MOLA VER
+      _startRest(justFinished.restSeconds ?? 60);
     } else if (_exerciseIndex + 1 < widget.workout.exercises.length) {
       setState(() {
         _exerciseIndex++;
         _setIndex = 0;
         _apiExerciseInfo = null;
       });
-      _startRest(justFinished.restSeconds);
+      // BURAYA DA ?? 60 EKLİYORUZ
+      _startRest(justFinished.restSeconds ?? 60);
       _fetchCurrentExerciseGif();
     } else {
       _finishWorkout();
@@ -438,6 +475,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                 const SizedBox(height: 16),
 
                 // 2. ÜST BEYAZ KART (Hareket Adı ve 180x180 GIF Alanı)
+                // 2. ÜST BEYAZ KART (Hareket Adı, Metin/GIF ve Opsiyonel Timer)
                 Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
@@ -466,65 +504,62 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // 180x180 Sabit GIF / Yüklenme Alanı
-                      SizedBox(
-                        width: 180,
-                        height: 180,
-                        child: Center(
-                          child:
-                              _isLoadingGif
-                                  ? const CircularProgressIndicator(
-                                    color: AppColors.brandPrimary,
-                                  )
-                                  : (_apiExerciseInfo == null
-                                      ? Icon(
-                                        Icons.fitness_center,
-                                        size: 50,
-                                        color: Colors.grey[400],
-                                      )
-                                      : ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: Image.network(
-                                          _apiExerciseInfo!.gifUrl,
-                                          width: 180,
-                                          height: 180,
-                                          fit: BoxFit.cover,
-                                          loadingBuilder: (
-                                            context,
-                                            child,
-                                            loadingProgress,
-                                          ) {
-                                            if (loadingProgress == null)
-                                              return child;
-                                            return const Center(
-                                              child: CircularProgressIndicator(
-                                                color: AppColors.brandPrimary,
-                                              ),
-                                            );
-                                          },
-                                          errorBuilder: (
-                                            context,
-                                            error,
-                                            stackTrace,
-                                          ) {
-                                            debugPrint('❌ GIF Hatası: $error');
-                                            return Icon(
-                                              Icons.broken_image,
-                                              size: 50,
-                                              color: Colors.grey[400],
-                                            );
-                                          },
-                                        ),
-                                      )),
+                      // -- GIF VEYA TALİMAT METNİ ALANI --
+                      // NOT: _currentExercise.instructions kısmını senin backend/Flutter modelindeki değişken adına göre değiştirebilirsin.
+                      if (_currentExercise.instructions != null &&
+                          _currentExercise.instructions!.isNotEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            _currentExercise.instructions!,
+                            style: AppTypography.body14Regular.copyWith(
+                              color: AppColors.textPrimary,
+                              height: 1.5,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        )
+                      else
+                        // Orijinal 180x180 GIF Yükleme Alanı
+                        SizedBox(
+                          width: 180,
+                          height: 180,
+                          child: Center(
+                            child:
+                                _isLoadingGif
+                                    ? const CircularProgressIndicator(
+                                      color: AppColors.brandPrimary,
+                                    )
+                                    : (_apiExerciseInfo == null
+                                        ? Icon(
+                                          Icons.fitness_center,
+                                          size: 50,
+                                          color: Colors.grey[400],
+                                        )
+                                        : ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          child: Image.network(
+                                            _apiExerciseInfo!.gifUrl,
+                                            width: 180,
+                                            height: 180,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        )),
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 16),
 
-                // 3. ALT BEYAZ KART (Set solda ortalı, yazı ve kutular sağda altlı üstlü)
+                // 3. ALT BEYAZ KART (Süreli hareketse Timer, normal hareketse Tekrar/Ağırlık kutuları)
                 Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
@@ -542,158 +577,188 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                     horizontal: 20,
                     vertical: 24,
                   ),
-                  child: Row(
-                    crossAxisAlignment:
-                        CrossAxisAlignment
-                            .center, // Sol ve sağı dikeyde tam ortalar
-                    children: [
-                      // SOL TARAF: Set 1/3
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Set:',
-                            style: AppTypography.body14Regular.copyWith(
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${_setIndex + 1}/${_currentExercise.sets}',
-                            style: AppTypography.heading1.copyWith(
-                              color: AppColors.brandPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const Spacer(), // Arayı maksimum açar, sağ bloğu sağa iter
-                      // SAĞ TARAF: Altlı Üstlü Yapı
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment:
-                            CrossAxisAlignment.end, // İçeriği sağa yasla
-                        children: [
-                          // 1. Üstteki Yazı
-                          Text(
-                            '${_currentExercise.sets} SET ${_currentExercise.reps} TEKRAR',
-                            style: AppTypography.heading3.copyWith(
-                              color: AppColors.brandPrimary,
-                            ),
-                          ),
-
-                          const SizedBox(
-                            height: 24,
-                          ), // Yazı ile kutular arası boşluk
-                          // 2. Alttaki Kutular
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
+                  child:
+                      _getExerciseDuration(_currentExercise) > 0
+                          ? Column(
                             children: [
-                              // TEKRAR TextField
-                              SizedBox(
-                                width: 95, // Genişlikleri iyice azalttık
-                                child: TextField(
-                                  controller: _repsController,
-                                  textAlign: TextAlign.center,
-                                  keyboardType: TextInputType.number,
-                                  style: AppTypography.body14Medium.copyWith(
-                                    color: Colors.grey[800],
-                                  ),
-                                  decoration: InputDecoration(
-                                    labelText: 'TEKRAR',
-                                    labelStyle: AppTypography.body12Medium
-                                        .copyWith(color: Colors.grey[500]),
-                                    floatingLabelAlignment:
-                                        FloatingLabelAlignment.center,
-                                    floatingLabelBehavior:
-                                        FloatingLabelBehavior.always,
-                                    isDense: true,
-                                    hintText:
-                                        _lastPerformanceForCurrentSet != null
-                                            ? '${_lastPerformanceForCurrentSet!.repsPerformed} (önceki)'
-                                            : _currentExercise.reps.toString(),
-                                    hintStyle: AppTypography.body12Medium
-                                        .copyWith(color: Colors.grey[400]),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                      vertical: 8,
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                      borderSide: BorderSide(
-                                        color: Colors.grey[300]!,
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                      borderSide: BorderSide(
-                                        color: AppColors.brandPrimary,
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                  ),
+                              Text(
+                                'SÜRELİ HAREKET',
+                                style: AppTypography.body12Medium.copyWith(
+                                  color: Colors.grey[500],
+                                  letterSpacing: 1.2,
                                 ),
                               ),
-                              const SizedBox(
-                                width: 8,
-                              ), // Kutular arası boşluğu da kıstık
-                              // AĞIRLIK TextField
-                              SizedBox(
-                                width: 95, // Genişlikleri iyice azalttık
-                                child: TextField(
-                                  controller: _weightController,
-                                  textAlign: TextAlign.center,
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                        decimal: true,
-                                      ),
-                                  style: AppTypography.body14Medium.copyWith(
-                                    color: Colors.grey[800],
-                                  ),
-                                  decoration: InputDecoration(
-                                    labelText: 'AĞIRLIK (KG)',
-                                    labelStyle: AppTypography.body12Medium
-                                        .copyWith(color: Colors.grey[500]),
-                                    floatingLabelAlignment:
-                                        FloatingLabelAlignment.center,
-                                    floatingLabelBehavior:
-                                        FloatingLabelBehavior.always,
-                                    isDense: true,
-                                    hintText:
-                                        _lastPerformanceForCurrentSet != null
-                                            ? '${_formatWeight(_lastPerformanceForCurrentSet!.weightUsed)} (önceki)'
-                                            : '0',
-                                    hintStyle: AppTypography.body12Medium
-                                        .copyWith(color: Colors.grey[400]),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                      vertical: 8,
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                      borderSide: BorderSide(
-                                        color: Colors.grey[300]!,
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                      borderSide: BorderSide(
-                                        color: AppColors.brandPrimary,
-                                        width: 1.5,
-                                      ),
-                                    ),
-                                  ),
+                              const SizedBox(height: 12),
+                              // Burada bağımsız timer widget'ımızı çalıştırıyoruz
+                              ExerciseTimerWidget(
+                                durationSeconds: _getExerciseDuration(
+                                  _currentExercise,
                                 ),
                               ),
                             ],
+                          )
+                          : Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // SOL TARAF: Set 1/3
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Set:',
+                                    style: AppTypography.body14Regular.copyWith(
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${_setIndex + 1}/${_currentExercise.sets}',
+                                    style: AppTypography.heading1.copyWith(
+                                      color: AppColors.brandPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Spacer(),
+                              // SAĞ TARAF: Tekrar ve Ağırlık Kutuları
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${_currentExercise.sets} SET ${_currentExercise.reps} TEKRAR',
+                                    style: AppTypography.heading3.copyWith(
+                                      color: AppColors.brandPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 95,
+                                        child: TextField(
+                                          controller: _repsController,
+                                          textAlign: TextAlign.center,
+                                          keyboardType: TextInputType.number,
+                                          style: AppTypography.body14Medium
+                                              .copyWith(
+                                                color: Colors.grey[800],
+                                              ),
+                                          decoration: InputDecoration(
+                                            labelText: 'TEKRAR',
+                                            labelStyle: AppTypography
+                                                .body12Medium
+                                                .copyWith(
+                                                  color: Colors.grey[500],
+                                                ),
+                                            floatingLabelAlignment:
+                                                FloatingLabelAlignment.center,
+                                            floatingLabelBehavior:
+                                                FloatingLabelBehavior.always,
+                                            isDense: true,
+                                            hintText:
+                                                _lastPerformanceForCurrentSet !=
+                                                        null
+                                                    ? '${_lastPerformanceForCurrentSet!.repsPerformed} (önceki)'
+                                                    : _currentExercise.reps
+                                                        .toString(),
+                                            hintStyle: AppTypography
+                                                .body12Medium
+                                                .copyWith(
+                                                  color: Colors.grey[400],
+                                                ),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 4,
+                                                  vertical: 8,
+                                                ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(30),
+                                              borderSide: BorderSide(
+                                                color: Colors.grey[300]!,
+                                                width: 1.5,
+                                              ),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(30),
+                                              borderSide: BorderSide(
+                                                color: AppColors.brandPrimary,
+                                                width: 1.5,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      SizedBox(
+                                        width: 95,
+                                        child: TextField(
+                                          controller: _weightController,
+                                          textAlign: TextAlign.center,
+                                          keyboardType:
+                                              const TextInputType.numberWithOptions(
+                                                decimal: true,
+                                              ),
+                                          style: AppTypography.body14Medium
+                                              .copyWith(
+                                                color: Colors.grey[800],
+                                              ),
+                                          decoration: InputDecoration(
+                                            labelText: 'AĞIRLIK (KG)',
+                                            labelStyle: AppTypography
+                                                .body12Medium
+                                                .copyWith(
+                                                  color: Colors.grey[500],
+                                                ),
+                                            floatingLabelAlignment:
+                                                FloatingLabelAlignment.center,
+                                            floatingLabelBehavior:
+                                                FloatingLabelBehavior.always,
+                                            isDense: true,
+                                            hintText:
+                                                _lastPerformanceForCurrentSet !=
+                                                        null
+                                                    ? '${_formatWeight(_lastPerformanceForCurrentSet!.weightUsed)} (önceki)'
+                                                    : '0',
+                                            hintStyle: AppTypography
+                                                .body12Medium
+                                                .copyWith(
+                                                  color: Colors.grey[400],
+                                                ),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                  horizontal: 4,
+                                                  vertical: 8,
+                                                ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(30),
+                                              borderSide: BorderSide(
+                                                color: Colors.grey[300]!,
+                                                width: 1.5,
+                                              ),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(30),
+                                              borderSide: BorderSide(
+                                                color: AppColors.brandPrimary,
+                                                width: 1.5,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
                 ),
                 const SizedBox(height: 24),
 

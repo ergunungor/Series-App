@@ -348,9 +348,19 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                         final created = await context.push<bool>(
                           '/onboarding-survey',
                         );
-                        if (created == true) _fetch();
+                        if (created == true)
+                          _fetch(); // _fetch burada çalışır çünkü bu dosyanın içinde tanımlı
                       },
-                      onImportProgram: () {},
+                      onImportProgram: () async {
+                        // Navigator.pop silindi
+                        final created = await context.push<bool>(
+                          '/import-program',
+                        );
+
+                        if (created == true) {
+                          _fetch();
+                        }
+                      },
                     ),
                 backgroundColor: AppColors.brandTertiary,
                 elevation: 4,

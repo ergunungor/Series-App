@@ -16,6 +16,7 @@ import '../models/program.dart';
 import '../screens/workout_day_detail_screen.dart';
 import '../screens/workout_history_detail_screen.dart';
 import '../models/workout_history.dart';
+import '../screens/import_program_screen.dart';
 
 class AppRouter {
   static final router = GoRouter(
@@ -108,6 +109,10 @@ class AppRouter {
           }
           return ProgramDetailScreen(program: program);
         },
+      ),
+      GoRoute(
+        path: '/import-program',
+        builder: (context, state) => const ImportProgramScreen(),
       ),
       GoRoute(
         path: '/workout-day-detail',

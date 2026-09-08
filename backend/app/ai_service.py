@@ -58,9 +58,10 @@ def generate_workout_program(data: UserOnboardingData):
     Kullanacağın tüm egzersizleri SADECE aşağıdaki JSON listesinden (Katalogdan) seçeceksin. 
     Kendi kafandan, başka bir kaynaktan veya listede olmayan hiçbir egzersizi KESİNLİKLE uydurma. Kullanıcının alet durumuna dikkat ederek seçim yap.
     
-    ÖZEL DURUM (SANIYELİ SETLER):
-    Plank, statik tutuşlar veya dayanıklılık hareketleri gibi zamana dayalı egzersizlerde "reps" yerine "duration_seconds" (örneğin 45 saniye için 45) alanı kullanabilirsin. Normal tekrar bazlı hareketlerde ise "reps" (örn: "8-12") kullanmaya devam et.
-    
+    ZORUNLU KURAL (SANIYELİ SETLER & CORE):
+    Eğer programda Plank, Wall Sit, statik tutuşlar, kardiyo interval süreleri veya saniyeye dayalı herhangi bir hareket varsa, "reps" alanını KESİNLİKLE `null` yap ve "duration_seconds" alanına saniye cinsinden değeri mutlaka yaz (Örn: 45 saniye için duration_seconds: 45, reps: null). Bunu atlama!
+    Dinlenme süresi (rest_seconds) ile hareketin süresini (duration_seconds) birbirine karıştırma. Eğer hareket statik bir tutuşsa (plank gibi), süresini duration_seconds alanına yaz; reps alanına veya dinlenme süresine yazma.
+
     KULLANABİLECEĞİN EGZERSİZLER LİSTESİ (KATALOG):
     {ai_catalog_str}
 
@@ -103,8 +104,9 @@ def generate_workout_program(data: UserOnboardingData):
         generation_config={"response_mime_type": "application/json"} #[cite: 3]
     )
     
-    clean_text = response.text.strip() #[cite: 3]
-    return json.loads(clean_text) #[cite: 3]
+    clean_text = response.text.strip()
+    raw_data = json.loads(clean_text)
+    return sanitize_program_data(raw_data)
 
 def save_generated_program(supabase_client, user_id: str, generated_program: dict):
     """
@@ -154,8 +156,7 @@ def parse_program_from_input(text: str = None, file_bytes: bytes = None, mime_ty
     - Programda ne yazıyorsa onu kullan, egzersiz uydurma.
     - Her egzersiz için "instructions" alanına, o hareketin nasıl yapılacağını
       anlatan kısa (1-2 cümle) bir talimat yaz.
-    - Zamana dayalı (plank gibi) hareketlerde "reps" yerine "duration_seconds"
-      kullan, normal hareketlerde "reps" kullan (ikisi birden olmaz).
+    - ÇOK ÖNEMLİ (SÜRE BAZLI HAREKETLER): Eğer hareketin yanında "sn", "saniye", "sec", "dk", "dakika" gibi süre belirten bir ifade varsa, "reps" alanını KESİNLİKLE `null` yap ve süreyi saniyeye çevirerek "duration_seconds" alanına yaz (Örn: 30 sn -> duration_seconds: 30, reps: null). Süre yoksa normal hareketlerde "reps" kullan.
     - Eğer verilen içerik bir antrenman/egzersiz programı DEĞİLSE, SADECE
       şu JSON'u dön: {"error": "not_a_program"}
 
@@ -204,4 +205,28 @@ def parse_program_from_input(text: str = None, file_bytes: bytes = None, mime_ty
     if result.get("error") == "not_a_program":
         raise ValueError("Yüklenen içerik bir antrenman programına benzemiyor.")
 
-    return result
+    return sanitize_program_data(result)
+
+import re
+
+def sanitize_program_data(data: dict):
+    for workout in data.get("workouts", []):
+        for exercise in workout.get("exercises", []):
+            reps = exercise.get("reps")
+            dur = exercise.get("duration_seconds")
+            
+            # Reps içinde 'sn', 'saniye' vb. varsa duration_seconds'a taşı
+            if not dur and reps and isinstance(reps, str):
+                reps_lower = reps.lower()
+                if any(kw in reps_lower for kw in ["sn", "saniye", "sec"]):
+                    match = re.search(r'\d+', reps_lower)
+                    if match:
+                        exercise["duration_seconds"] = int(match.group())
+                        exercise["reps"] = None
+                        
+            # Plank veya hold içeren hareketlerde süre yoksa varsayılan 30 sn ata
+            name_lower = exercise.get("name", "").lower()
+            if ("plank" in name_lower or "hold" in name_lower) and not exercise.get("duration_seconds") and not exercise.get("reps"):
+                exercise["duration_seconds"] = 30
+                
+    return data

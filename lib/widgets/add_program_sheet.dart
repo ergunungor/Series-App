@@ -52,8 +52,7 @@ Future<void> showAddProgramSheet({
             _SheetOption(
               icon: Icons.file_upload_outlined,
               title: 'Program Yükle',
-              subtitle: 'Yakında',
-              enabled: false,
+              subtitle: 'Kendi programını yükle ve takibini kolaylaştır',
               onTap: () {
                 Navigator.of(context).pop();
                 onImportProgram();
