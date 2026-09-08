@@ -16,3 +16,7 @@ class UserOnboardingData(BaseModel):
     health_restrictions: List[str]
     logistics: Logistics
     mental_blocker: Optional[str] = None
+
+class SaveProgramRequest(BaseModel):
+    user_id: str
+    program: dict

@@ -1,11 +1,11 @@
-# yeni:
 import os
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
 from supabase import create_client, Client
 from dotenv import load_dotenv
-from .schemas import UserOnboardingData
-from .ai_service import generate_workout_program
+from .schemas import UserOnboardingData, SaveProgramRequest
+from .ai_service import generate_workout_program, save_generated_program, parse_program_from_input
 
 # .env dosyasındaki gizli anahtarları yüklüyoruz
 load_dotenv()
@@ -34,39 +34,61 @@ async def create_program(user_data: UserOnboardingData):
     try:
         # 1. AI servisine veriyi gönder ve JSON formatında programı al
         generated_program = generate_workout_program(user_data)
-        
-        # 2. 'programs' tablosuna ana programı kaydet
-        program_insert = supabase.table('programs').insert({
-            "user_id": user_data.user_id,
-            "name": generated_program.get("program_name", "Özel Program"),
-            "description": generated_program.get("description", "")
-        }).execute()
-        
-        # Supabase'in oluşturduğu benzersiz Program ID'sini alıyoruz
-        program_id = program_insert.data[0]['id']
-        
-        # 3. 'workouts' tablosuna antrenman günlerini ve egzersizleri kaydet
-        workouts_data = []
-        for workout in generated_program.get("workouts", []):
-            workouts_data.append({
-                "program_id": program_id,
-                "day_number": workout.get("day_number"),
-                "name": workout.get("name"),
-                "estimated_duration_min": workout.get("estimated_duration_min"),
-                "exercises": workout.get("exercises", []) # Bu kısım JSONB olarak tablona yazılacak
-            })
-            
-        # Günleri tek bir sorguyla (batch insert) veritabanına yolluyoruz
-        if workouts_data:
-            supabase.table('workouts').insert(workouts_data).execute()
-        
+
+        # 2. Programı Supabase'e kaydet (artık ortak fonksiyon üzerinden)
+        program_id = save_generated_program(supabase, user_data.user_id, generated_program)
+
         return {
             "status": "success",
             "message": "Program başarıyla oluşturuldu ve Supabase'e kaydedildi.",
             "program_id": program_id,
             "data": generated_program
         }
-        
+
     except Exception as e:
         print(f"API Hatası: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/parse-program")
+async def parse_program(
+    text: Optional[str] = Form(None),
+    file: Optional[UploadFile] = File(None),
+):
+    if not text and not file:
+        raise HTTPException(status_code=400, detail="Metin veya dosya göndermelisin.")
+
+    try:
+        file_bytes = await file.read() if file else None
+        mime_type = file.content_type if file else None
+
+        parsed_program = parse_program_from_input(
+            text=text,
+            file_bytes=file_bytes,
+            mime_type=mime_type,
+        )
+
+        return {
+            "status": "success",
+            "data": parsed_program,
+        }
+
+    except ValueError as e:
+        # parse_program_from_input'un bilerek fırlattığı, kullanıcıya
+        # gösterilebilecek hatalar (örn. "bu bir program değil").
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        print(f"Parse API Hatası: {str(e)}")
+        raise HTTPException(status_code=500, detail="Program analiz edilirken bir hata oluştu.")
+
+@app.post("/api/save-program")
+async def save_program(request: SaveProgramRequest):
+    try:
+        program_id = save_generated_program(supabase, request.user_id, request.program)
+        return {
+            "status": "success",
+            "message": "Program başarıyla kaydedildi.",
+            "program_id": program_id,
+        }
+    except Exception as e:
+        print(f"Save API Hatası: {str(e)}")
+        raise HTTPException(status_code=500, detail="Program kaydedilirken bir hata oluştu.")

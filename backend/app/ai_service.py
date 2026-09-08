@@ -105,3 +105,103 @@ def generate_workout_program(data: UserOnboardingData):
     
     clean_text = response.text.strip() #[cite: 3]
     return json.loads(clean_text) #[cite: 3]
+
+def save_generated_program(supabase_client, user_id: str, generated_program: dict):
+    """
+    Gemini'nin ürettiği program JSON'unu Supabase'e (programs + workouts
+    tablolarına) yazar. Hem anket akışı hem de (bir sonraki adımda ekleyeceğimiz)
+    dosya/metin yükleme akışı bu fonksiyonu ortak kullanacak.
+    """
+    program_insert = supabase_client.table('programs').insert({
+        "user_id": user_id,
+        "name": generated_program.get("program_name", "Özel Program"),
+        "description": generated_program.get("description", "")
+    }).execute()
+
+    program_id = program_insert.data[0]['id']
+
+    workouts_data = []
+    for workout in generated_program.get("workouts", []):
+        workouts_data.append({
+            "program_id": program_id,
+            "day_number": workout.get("day_number"),
+            "name": workout.get("name"),
+            "estimated_duration_min": workout.get("estimated_duration_min"),
+            "exercises": workout.get("exercises", [])
+        })
+
+    if workouts_data:
+        supabase_client.table('workouts').insert(workouts_data).execute()
+
+    return program_id
+
+def parse_program_from_input(text: str = None, file_bytes: bytes = None, mime_type: str = None):
+    """
+    Kullanıcının yüklediği bir antrenman programını (serbest metin veya
+    görsel/PDF) Gemini'ye gönderip bizim JSON şemamıza dönüştürür.
+
+    generate_workout_program'dan farkı: exercises.json kataloğuna kısıtlama
+    YOK (kullanıcının programındaki egzersizler ne ise onlar kullanılıyor),
+    bunun yerine her egzersiz için "instructions" (yapılış talimatı) üretiliyor
+    — çünkü bu egzersizler kataloğumuzda olmayabilir, GIF eşleştiremeyiz.
+    """
+    prompt = """
+    Sen bir fitness programı analiz uzmanısın. Sana verilen antrenman
+    programını (metin, görsel veya PDF olabilir) analiz et ve aşağıdaki
+    JSON formatına dönüştür.
+
+    KURALLAR:
+    - Programda ne yazıyorsa onu kullan, egzersiz uydurma.
+    - Her egzersiz için "instructions" alanına, o hareketin nasıl yapılacağını
+      anlatan kısa (1-2 cümle) bir talimat yaz.
+    - Zamana dayalı (plank gibi) hareketlerde "reps" yerine "duration_seconds"
+      kullan, normal hareketlerde "reps" kullan (ikisi birden olmaz).
+    - Eğer verilen içerik bir antrenman/egzersiz programı DEĞİLSE, SADECE
+      şu JSON'u dön: {"error": "not_a_program"}
+
+    Yanıtını SADECE aşağıdaki JSON formatında ver, markdown veya ekstra
+    metin EKLEME:
+    {
+      "program_name": "Programın ismi (yoksa uygun bir isim öner)",
+      "description": "2 cümlelik açıklama",
+      "workouts": [
+        {
+          "day_number": 1,
+          "name": "Gün adı",
+          "estimated_duration_min": 45,
+          "exercises": [
+            {
+              "name": "Egzersiz adı",
+              "sets": 3,
+              "reps": "8-12",
+              "duration_seconds": null,
+              "rest_seconds": 60,
+              "instructions": "Kısa yapılış talimatı",
+              "notes": null
+            }
+          ]
+        }
+      ]
+    }
+    """
+
+    if text:
+        prompt += f"\n\nKULLANICININ YAZDIĞI PROGRAM:\n{text}"
+        content = [prompt]
+    elif file_bytes and mime_type:
+        content = [prompt, {"mime_type": mime_type, "data": file_bytes}]
+    else:
+        raise ValueError("Ne metin ne dosya verildi.")
+
+    response = model.generate_content(
+        content,
+        generation_config={"response_mime_type": "application/json"}
+    )
+
+    clean_text = response.text.strip()
+    result = json.loads(clean_text)
+
+    if result.get("error") == "not_a_program":
+        raise ValueError("Yüklenen içerik bir antrenman programına benzemiyor.")
+
+    return result
