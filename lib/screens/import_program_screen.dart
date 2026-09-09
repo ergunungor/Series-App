@@ -6,7 +6,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/app_colors.dart';
 import '../services/program_import_service.dart';
-import '../theme/app_typography.dart';
 
 class ImportProgramScreen extends StatefulWidget {
   const ImportProgramScreen({super.key});

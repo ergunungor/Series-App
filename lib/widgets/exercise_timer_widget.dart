@@ -5,8 +5,13 @@ import '../theme/app_typography.dart';
 
 class ExerciseTimerWidget extends StatefulWidget {
   final int durationSeconds;
+  final VoidCallback? onComplete; // YENİ: Süre bitince çalışacak fonksiyon
 
-  const ExerciseTimerWidget({super.key, required this.durationSeconds});
+  const ExerciseTimerWidget({
+    super.key,
+    required this.durationSeconds,
+    this.onComplete,
+  });
 
   @override
   State<ExerciseTimerWidget> createState() => _ExerciseTimerWidgetState();
@@ -26,7 +31,6 @@ class _ExerciseTimerWidgetState extends State<ExerciseTimerWidget> {
   @override
   void didUpdateWidget(covariant ExerciseTimerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Yeni bir harekete geçildiğinde süreyi otomatik güncelle
     if (oldWidget.durationSeconds != widget.durationSeconds) {
       _resetTimer();
     }
@@ -38,6 +42,10 @@ class _ExerciseTimerWidgetState extends State<ExerciseTimerWidget> {
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (_remainingSeconds > 0) {
           setState(() => _remainingSeconds--);
+          // YENİ: Süre tam bittiği an ana ekrana ses çalması için sinyal gönderiyoruz
+          if (_remainingSeconds == 0) {
+            widget.onComplete?.call();
+          }
         } else {
           _stopTimer();
         }

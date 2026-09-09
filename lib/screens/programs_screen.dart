@@ -289,8 +289,10 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                                     )
                                     .closed
                                     .then((reason) async {
-                                      if (reason == SnackBarClosedReason.action)
+                                      if (reason ==
+                                          SnackBarClosedReason.action) {
                                         return;
+                                      }
                                       try {
                                         await ProgramRepository.deleteProgram(
                                           program.id,
@@ -349,8 +351,9 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                         final created = await context.push<bool>(
                           '/onboarding-survey',
                         );
-                        if (created == true)
-                          _fetch(); // _fetch burada çalışır çünkü bu dosyanın içinde tanımlı
+                        if (created == true) {
+                          _fetch();
+                        } // _fetch burada çalışır çünkü bu dosyanın içinde tanımlı
                       },
                       onImportProgram: () async {
                         // Navigator.pop silindi

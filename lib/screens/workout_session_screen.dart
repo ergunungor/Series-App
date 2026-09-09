@@ -15,6 +15,7 @@ import '../models/exercise.dart';
 import '../services/exercise_service.dart';
 import 'workouts_screen.dart'; // workoutRefreshNotifier'ı kullanabilmek için
 import '../widgets/exercise_timer_widget.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class WorkoutSessionScreen extends StatefulWidget {
   final WorkoutDay workout;
@@ -45,6 +46,24 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   final ExerciseService _exerciseService = ExerciseService();
   Exercise? _apiExerciseInfo;
   bool _isLoadingGif = false;
+
+  // Ses oynatıcıları
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
+  void _playBell() async {
+    // Aynı anda birden fazla tetiklenirse sesi baştan başlatır
+    await _audioPlayer.play(
+      AssetSource('sounds/bell.mp3'),
+      mode: PlayerMode.lowLatency,
+    );
+  }
+
+  void _playFinish() async {
+    await _audioPlayer.play(
+      AssetSource('sounds/finish.mp3'),
+      mode: PlayerMode.lowLatency,
+    );
+  }
 
   WorkoutExercise get _currentExercise =>
       widget.workout.exercises[_exerciseIndex];
@@ -91,6 +110,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     });
     _fetchLastPerformance();
     _fetchCurrentExerciseGif();
+    _playBell();
   }
 
   Future<void> _fetchCurrentExerciseGif() async {
@@ -160,13 +180,136 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     return '$minutes:$seconds';
   }
 
+  void _showExerciseListSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.65,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              // Çekme Çubuğu (Drag Handle)
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(45),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Antrenman Akışı',
+                style: AppTypography.heading2.copyWith(
+                  color: AppColors.brandPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Liste
+              Expanded(
+                child: ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 8,
+                  ),
+                  itemCount:
+                      widget
+                          .workout
+                          .exercises
+                          .length, // widget.workout içinden çekiyoruz
+                  itemBuilder: (context, index) {
+                    final exercise = widget.workout.exercises[index];
+                    final isCompleted = index < _exerciseIndex;
+                    final isCurrent = index == _exerciseIndex;
+
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color:
+                              isCompleted
+                                  ? AppColors.brandPrimary
+                                  : (isCurrent
+                                      ? AppColors.brandTertiary
+                                      : Colors.grey.shade200),
+                        ),
+                        child: Icon(
+                          isCompleted ? Icons.check : Icons.fitness_center,
+                          size: 16,
+                          color:
+                              isCompleted || isCurrent
+                                  ? Colors.white
+                                  : Colors.grey.shade500,
+                        ),
+                      ),
+                      title: Text(
+                        exercise.name, // Hareketin ismi
+                        style: AppTypography.body16Medium.copyWith(
+                          color:
+                              isCompleted
+                                  ? Colors.grey.shade400
+                                  : AppColors.textPrimary,
+                          decoration:
+                              isCompleted ? TextDecoration.lineThrough : null,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '${exercise.sets} Set x ${exercise.reps}', // Set ve tekrar sayıları
+                        style: AppTypography.body14Regular.copyWith(
+                          color: Colors.grey.shade400,
+                        ),
+                      ),
+                      trailing:
+                          isCurrent
+                              ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.brandTertiary.withOpacity(
+                                    0.1,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  'Şu an',
+                                  style: AppTypography.body12Medium.copyWith(
+                                    color: AppColors.brandTertiary,
+                                  ),
+                                ),
+                              )
+                              : null,
+                      onTap: () => Navigator.pop(context),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _togglePause() {
     setState(() => _isPaused = !_isPaused);
   }
 
   void _confirmSet() {
     if (_isPaused) return;
-
+    _playBell();
     // 1. Varsayılan tekrar sayısını bul (Programdaki hedeften al)
     int defaultReps = 1;
     final repsStr = _currentExercise.reps.toString();
@@ -236,6 +379,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   void _startRest(int seconds) {
     final duration = seconds > 0 ? seconds : 30;
     _restTimer?.cancel();
+    _playBell();
     setState(() {
       _isResting = true;
       _remainingSeconds = duration;
@@ -257,6 +401,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
 
   void _skipRest() {
     _restTimer?.cancel();
+    _playBell();
     setState(() => _isResting = false);
   }
 
@@ -291,7 +436,9 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
 
   Future<void> _finishWorkout() async {
     _restTimer?.cancel();
+
     _elapsedTimer?.cancel();
+    _playFinish();
     setState(() => _isFinishing = true);
     final user = Supabase.instance.client.auth.currentUser;
     bool success = false;
@@ -378,12 +525,19 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Sol Taraf: Timer
+        // Sol Taraf: Liste İkonu ve Timer
         Align(
           alignment: Alignment.centerLeft,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              IconButton(
+                onPressed: _showExerciseListSheet,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36),
+                icon: Icon(Icons.format_list_bulleted, size: 24, color: color),
+              ),
+              const SizedBox(width: 4),
               Icon(Icons.timer_outlined, size: 18, color: color),
               const SizedBox(width: 6),
               Text(
@@ -394,11 +548,8 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
           ),
         ),
 
-        // Orta: Logo (Eğer kırmızının üstüne beyaz gelmesini istiyorsan type'ı light yap)
-        const AppLogo(
-          explicitSize: 56, // Varsa minimal bir boyut tercih et
-          type: AppLogoType.dark,
-        ),
+        // Orta: Logo
+        const AppLogo(explicitSize: 56, type: AppLogoType.dark),
 
         // Sağ Taraf: Duraklat ve Bitir
         Align(
@@ -602,6 +753,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                                 durationSeconds: _getExerciseDuration(
                                   _currentExercise,
                                 ),
+                                onComplete: _playBell,
                               ),
                             ],
                           )
