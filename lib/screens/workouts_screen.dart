@@ -7,6 +7,7 @@ import '../theme/app_typography.dart';
 import '../models/workout_history.dart';
 import '../services/workout_history_repository.dart';
 import '../widgets/app_confirm_dialog.dart';
+import 'package:lottie/lottie.dart';
 
 final ValueNotifier<bool> workoutRefreshNotifier = ValueNotifier(false);
 
@@ -234,142 +235,112 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                 child:
                     _isLoading
                         ? const Center(child: CircularProgressIndicator())
+                        : _sessions.isEmpty
+                        ? const _EmptyHistory()
                         : RefreshIndicator(
                           color: AppColors.brandPrimary,
                           backgroundColor: Colors.white,
                           onRefresh: _fetch,
-                          child:
-                              _sessions.isEmpty
-                                  ? SingleChildScrollView(
-                                    physics:
-                                        const AlwaysScrollableScrollPhysics(
-                                          parent: BouncingScrollPhysics(),
-                                        ),
-                                    padding: EdgeInsets.fromLTRB(
-                                      0,
-                                      40,
-                                      0,
-                                      bottomInset,
-                                    ),
-                                    child: const _EmptyHistory(),
-                                  )
-                                  : ListView.separated(
-                                    physics:
-                                        const AlwaysScrollableScrollPhysics(
-                                          parent: BouncingScrollPhysics(),
-                                        ),
-                                    padding: EdgeInsets.fromLTRB(
-                                      0,
-                                      0,
-                                      0,
-                                      bottomInset,
-                                    ),
-                                    itemCount: _sessions.length,
-                                    separatorBuilder:
-                                        (_, __) => const SizedBox(height: 12),
-                                    itemBuilder: (context, index) {
-                                      final session = _sessions[index];
-                                      final key = _keyOf(session);
-                                      final isSelected = _selectedKeys.contains(
-                                        key,
-                                      );
+                          child: ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
+                            padding: EdgeInsets.fromLTRB(0, 0, 0, bottomInset),
+                            itemCount: _sessions.length,
+                            separatorBuilder:
+                                (_, __) => const SizedBox(height: 12),
+                            itemBuilder: (context, index) {
+                              final session = _sessions[index];
+                              final key = _keyOf(session);
+                              final isSelected = _selectedKeys.contains(key);
 
-                                      if (_isSelectionMode) {
-                                        return _HistoryCard(
-                                          session: session,
-                                          isSelectionMode: true,
-                                          isSelected: isSelected,
-                                          onTap: () => _toggleSelection(key),
-                                        );
-                                      }
+                              if (_isSelectionMode) {
+                                return _HistoryCard(
+                                  session: session,
+                                  isSelectionMode: true,
+                                  isSelected: isSelected,
+                                  onTap: () => _toggleSelection(key),
+                                );
+                              }
 
-                                      return Dismissible(
-                                        key: ValueKey(key),
-                                        direction: DismissDirection.endToStart,
-                                        confirmDismiss:
-                                            (_) =>
-                                                _confirmDeleteSession(session),
-                                        onDismissed: (_) {
-                                          final removedIndex = index;
-                                          setState(
-                                            () => _sessions.removeAt(
-                                              removedIndex,
-                                            ),
-                                          );
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    '"${session.workoutName}" kaydı silindi',
-                                                  ),
-                                                  backgroundColor:
-                                                      AppColors.brandTertiary,
-                                                  behavior:
-                                                      SnackBarBehavior.floating,
-                                                  duration: const Duration(
-                                                    seconds: 3,
-                                                  ),
-                                                  action: SnackBarAction(
-                                                    label: 'Geri Al',
-                                                    textColor: Colors.white,
-                                                    onPressed: () {
-                                                      setState(
-                                                        () => _sessions.insert(
-                                                          removedIndex,
-                                                          session,
-                                                        ),
-                                                      );
-                                                    },
-                                                  ),
+                              return Dismissible(
+                                key: ValueKey(key),
+                                direction: DismissDirection.endToStart,
+                                confirmDismiss:
+                                    (_) => _confirmDeleteSession(session),
+                                onDismissed: (_) {
+                                  final removedIndex = index;
+                                  setState(
+                                    () => _sessions.removeAt(removedIndex),
+                                  );
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            '"${session.workoutName}" kaydı silindi',
+                                          ),
+                                          backgroundColor:
+                                              AppColors.brandTertiary,
+                                          behavior: SnackBarBehavior.floating,
+                                          duration: const Duration(seconds: 3),
+                                          action: SnackBarAction(
+                                            label: 'Geri Al',
+                                            textColor: Colors.white,
+                                            onPressed: () {
+                                              setState(
+                                                () => _sessions.insert(
+                                                  removedIndex,
+                                                  session,
                                                 ),
-                                              )
-                                              .closed
-                                              .then((reason) async {
-                                                if (reason ==
-                                                    SnackBarClosedReason.action)
-                                                  return;
-                                                try {
-                                                  await WorkoutHistoryRepository.deleteSession(
-                                                    session,
-                                                  );
-                                                } catch (error) {
-                                                  debugPrint(
-                                                    'Antrenman kaydı silme hatası: $error',
-                                                  );
-                                                }
-                                              });
-                                        },
-                                        background: Container(
-                                          alignment: Alignment.centerRight,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 24,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.red,
-                                            borderRadius: BorderRadius.circular(
-                                              20,
-                                            ),
-                                          ),
-                                          child: const Icon(
-                                            Icons.delete_outline,
-                                            color: Colors.white,
+                                              );
+                                            },
                                           ),
                                         ),
-                                        child: _HistoryCard(
-                                          session: session,
-                                          isSelectionMode: false,
-                                          isSelected: false,
-                                          onTap:
-                                              () => context.push(
-                                                '/workout-history-detail',
-                                                extra: session,
-                                              ),
-                                          onLongPress:
-                                              () => _enterSelectionMode(key),
-                                        ),
-                                      );
-                                    },
+                                      )
+                                      .closed
+                                      .then((reason) async {
+                                        if (reason ==
+                                            SnackBarClosedReason.action)
+                                          return;
+                                        try {
+                                          await WorkoutHistoryRepository.deleteSession(
+                                            session,
+                                          );
+                                        } catch (error) {
+                                          debugPrint(
+                                            'Antrenman kaydı silme hatası: $error',
+                                          );
+                                        }
+                                      });
+                                },
+                                background: Container(
+                                  alignment: Alignment.centerRight,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
                                   ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                child: _HistoryCard(
+                                  session: session,
+                                  isSelectionMode: false,
+                                  isSelected: false,
+                                  onTap:
+                                      () => context.push(
+                                        '/workout-history-detail',
+                                        extra: session,
+                                      ),
+                                  onLongPress: () => _enterSelectionMode(key),
+                                ),
+                              );
+                            },
+                          ),
                         ),
               ),
             ],
@@ -389,26 +360,23 @@ class _EmptyHistory extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 96,
-            height: 96,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
-              border: Border.all(color: AppColors.brandSecondary),
-            ),
-            child: Icon(Icons.history, size: 40, color: AppColors.brandPrimary),
+          Lottie.asset(
+            'assets/gifs/no_result_calender.json',
+            width: 160,
+            height: 160,
+            repeat: true,
           ),
           const SizedBox(height: 20),
           Text(
             'Henüz tamamlanmış antrenman yok',
+            textAlign: TextAlign.center,
             style: AppTypography.heading2.copyWith(
               color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Bir antrenman tamamladığında burada görünecek.',
+            'Bir antrenman tamamladığında\nburada görünecek.',
             textAlign: TextAlign.center,
             style: AppTypography.body14Regular.copyWith(
               color: AppColors.textTertiary,

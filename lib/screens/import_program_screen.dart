@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import '../theme/app_colors.dart';
 import '../services/program_import_service.dart';
+import '../theme/app_typography.dart';
 
 class ImportProgramScreen extends StatefulWidget {
   const ImportProgramScreen({super.key});
@@ -292,9 +293,9 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
                       children: [
                         IconButton(
                           icon: Icon(
-                            Icons.add_photo_alternate_outlined,
+                            Icons.add,
                             color: AppColors.brandTertiary,
-                            size: 28,
+                            size: 32,
                           ),
                           onPressed: _isLoading ? null : _showPickerOptions,
                         ),
@@ -312,11 +313,15 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
                               height: 1.4,
                             ),
                             decoration: InputDecoration(
-                              hintText:
-                                  'Antrenman programını buraya yapıştır...',
+                              hintText: 'Programını buraya yapıştır...',
+                              hintMaxLines: 1, // Metni zorla tek satırda tutar
                               hintStyle: TextStyle(
-                                fontSize: 15,
+                                fontSize:
+                                    14, // 15 yerine 14 yaptık ki ikonların arasına daha rahat sığsın
                                 color: Colors.grey.shade400,
+                                overflow:
+                                    TextOverflow
+                                        .ellipsis, // Yine de sığmazsa aşağı kaymak yerine sonuna ... koyar
                               ),
                               border: InputBorder.none,
                               isDense: true,

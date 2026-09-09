@@ -8,12 +8,12 @@ import '../widgets/app_logo.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/program.dart';
-import '../models/workout_history.dart';
 import '../services/program_repository.dart';
 import '../services/workout_history_repository.dart';
 import '../widgets/app_button.dart';
 import '../widgets/app_confirm_dialog.dart';
 import '../widgets/select_active_program_sheet.dart';
+import 'package:lottie/lottie.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,12 +23,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _firstName = 'İsim';
+  String _firstName = '';
   bool _isLoading = true;
   ActiveProgram? _activeProgram;
   bool _isLoadingProgram = true;
   int _weeklyCompleted = 0;
   int _weeklyTotal = 0;
+  int _nextWorkoutIndex = 0;
 
   @override
   void initState() {
@@ -92,6 +93,10 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _weeklyCompleted = doneThisWeek.length;
           _weeklyTotal = program.workouts.length;
+          // Eğer 3 günlük programı tamamladıysa (completed=3), modulo % 3 = 0 olur (başa döner).
+          // Eğer 1 antrenman yaptıysa, 1 % 3 = 1 olur (ikinci antrenman).
+          _nextWorkoutIndex =
+              _weeklyTotal == 0 ? 0 : (_weeklyCompleted % _weeklyTotal);
         });
       }
     } catch (error) {
@@ -182,9 +187,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   )
                 else
                   WorkoutCard(
-                    nextWorkoutName: _activeProgram!.workouts.first.name,
+                    nextWorkoutName:
+                        _activeProgram!.workouts[_nextWorkoutIndex].name,
                     onStartTap: () async {
-                      final workout = _activeProgram!.workouts.first;
+                      final workout =
+                          _activeProgram!.workouts[_nextWorkoutIndex];
                       final confirmed = await showAppConfirmDialog(
                         context: context,
                         title: 'Antrenmanı Başlat',
@@ -348,26 +355,58 @@ class _NoProgramCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: AppColors.brandPrimary),
-        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.brandPrimary.withOpacity(0.2)),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            'Henüz aktif bir programın yok.',
-            style: AppTypography.body16Medium.copyWith(
-              color: AppColors.textPrimary,
-            ),
+          // Sevimli Hayalet GIF'i
+          Lottie.asset(
+            'assets/gifs/empty.json',
+            width: 120,
+            height: 120,
+            fit:
+                BoxFit
+                    .contain, // Animasyonun kesilmemesi için contain kullanıyoruz
           ),
           const SizedBox(height: 16),
-          AppButton(
-            text: 'Program Oluştur',
-            showIcon: false,
-            onPressed: onCreate,
+          Text(
+            'Buralar biraz ıssız...',
+            style: AppTypography.heading3.copyWith(
+              color: AppColors.brandPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Henüz aktif bir programın yok.\nHadi hemen bir tane oluşturalım!',
+            textAlign: TextAlign.center,
+            style: AppTypography.body14Regular.copyWith(
+              color: AppColors.textTertiary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: onCreate,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.brandTertiary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: Text(
+                'Program Oluştur',
+                style: AppTypography.body16Medium.copyWith(color: Colors.white),
+              ),
+            ),
           ),
         ],
       ),

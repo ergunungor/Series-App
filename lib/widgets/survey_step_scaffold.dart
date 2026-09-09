@@ -69,7 +69,7 @@ class SurveyStepScaffold extends StatelessWidget {
             Text(
               question,
               style: AppTypography.heading2.copyWith(
-                color: AppColors.brandPrimary,
+                color: AppColors.brandTertiary,
               ),
             ),
             const SizedBox(height: 24),
@@ -85,7 +85,7 @@ class SurveyStepScaffold extends StatelessWidget {
                         onPressed: onBack,
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(
-                            color: AppColors.brandPrimary,
+                            color: AppColors.brandTertiary,
                             width: 1.5,
                           ),
                           shape: RoundedRectangleBorder(
@@ -97,14 +97,14 @@ class SurveyStepScaffold extends StatelessWidget {
                           children: [
                             const Icon(
                               Icons.chevron_left,
-                              color: AppColors.brandPrimary,
+                              color: AppColors.brandTertiary,
                               size: 20,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               'Geri',
                               style: AppTypography.body16Medium.copyWith(
-                                color: AppColors.brandPrimary,
+                                color: AppColors.brandTertiary,
                               ),
                             ),
                           ],
@@ -120,7 +120,7 @@ class SurveyStepScaffold extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: onNext,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.brandPrimary,
+                        backgroundColor: AppColors.brandTertiary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -129,19 +129,25 @@ class SurveyStepScaffold extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            nextLabel,
-                            style: AppTypography.body16Medium.copyWith(
-                              color: Colors.white,
+                          Flexible(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                nextLabel,
+                                style: AppTypography.body16Medium.copyWith(
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          if (nextLabel == 'İleri')
+                          if (nextLabel == 'İleri') ...[
+                            const SizedBox(width: 4),
                             const Icon(
                               Icons.chevron_right,
                               color: Colors.white,
                               size: 20,
                             ),
+                          ],
                         ],
                       ),
                     ),

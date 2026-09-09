@@ -542,7 +542,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     question: 'Seni antrenmandan alıkoyan bir şey var mı? (opsiyonel)',
     onExit: _handleCloseSurvey,
     onBack: _goBack,
-    nextLabel: 'Programımı Oluştur',
+    nextLabel: 'Bitir',
     content: AppInput(
       hintText: 'Örn: motivasyon eksikliği, zaman yönetimi...',
       controller: _blockerController,

@@ -9,6 +9,7 @@ import '../widgets/add_program_sheet.dart';
 import '../widgets/app_confirm_dialog.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/active_badge.dart';
+import 'package:lottie/lottie.dart';
 
 class ProgramsScreen extends StatefulWidget {
   const ProgramsScreen({super.key});
@@ -491,19 +492,11 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 96,
-            height: 96,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
-              border: Border.all(color: AppColors.brandSecondary),
-            ),
-            child: Icon(
-              Icons.auto_awesome,
-              size: 40,
-              color: AppColors.brandPrimary,
-            ),
+          Lottie.asset(
+            'assets/gifs/ghosty.json',
+            width: 160,
+            height: 160,
+            repeat: true,
           ),
           const SizedBox(height: 20),
           Text(

@@ -357,6 +357,14 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
       _lastPerformance['${_currentExercise.name}|${_setIndex + 1}'];
 
   String _nextPreviewLabel() {
+    // Mola ekranındayken _exerciseIndex ve _setIndex zaten BİR SONRAKİ
+    // değere güncellenmiş durumda. Bu yüzden moladayken direkt "şu anki"
+    // state'i (yani sıradaki hedefi) ekrana yazdırıyoruz.
+    if (_isResting) {
+      return '${_currentExercise.name} · Set ${_setIndex + 1}/${_currentExercise.sets}';
+    }
+
+    // Egzersiz ekranındayken (molada değilken) standart "sıradaki" hesaplaması:
     if (_setIndex + 1 < _currentExercise.sets) {
       return '${_currentExercise.name} · Set ${_setIndex + 2}/${_currentExercise.sets}';
     }
