@@ -82,7 +82,9 @@ class _ExerciseTimerWidgetState extends State<ExerciseTimerWidget> {
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.brandSecondary.withOpacity(0.5)),
+        border: Border.all(
+          color: AppColors.brandSecondary.withValues(alpha: 0.5),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -115,8 +117,8 @@ class _ExerciseTimerWidgetState extends State<ExerciseTimerWidget> {
                   decoration: BoxDecoration(
                     color:
                         _isRunning
-                            ? Colors.orange.withOpacity(0.2)
-                            : AppColors.brandPrimary.withOpacity(0.1),
+                            ? Colors.orange.withValues(alpha: 0.2)
+                            : AppColors.brandPrimary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(

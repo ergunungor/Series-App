@@ -45,7 +45,7 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.brandTertiary.withOpacity(0.1),
+                    color: AppColors.brandTertiary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -69,7 +69,7 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.brandTertiary.withOpacity(0.1),
+                    color: AppColors.brandTertiary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -93,7 +93,7 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.brandTertiary.withOpacity(0.1),
+                    color: AppColors.brandTertiary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -232,7 +232,7 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.brandTertiary.withOpacity(0.1),
+                      color: AppColors.brandTertiary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -275,7 +275,7 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
                       border: Border.all(color: Colors.grey.shade300, width: 1),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
+                          color: Colors.black.withValues(alpha: 0.02),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),

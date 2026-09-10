@@ -278,8 +278,8 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppColors.brandTertiary.withOpacity(
-                                    0.1,
+                                  color: AppColors.brandTertiary.withValues(
+                                    alpha: 0.1,
                                   ),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -642,7 +642,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -726,7 +726,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -961,8 +961,8 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                               : null,
                       icon: Icon(
                         Icons.chevron_left,
-                        color: Colors.white.withOpacity(
-                          _exerciseIndex > 0 ? 1 : 0.3,
+                        color: Colors.white.withValues(
+                          alpha: _exerciseIndex > 0 ? 1 : 0.3,
                         ),
                         size: 40,
                       ),
@@ -975,7 +975,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                         color: Colors.white,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
+                            color: Colors.black.withValues(alpha: 0.15),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -1000,10 +1000,12 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                               : null,
                       icon: Icon(
                         Icons.chevron_right,
-                        color: Colors.white.withOpacity(
-                          _exerciseIndex < widget.workout.exercises.length - 1
-                              ? 1
-                              : 0.3,
+                        color: Colors.white.withValues(
+                          alpha:
+                              _exerciseIndex <
+                                      widget.workout.exercises.length - 1
+                                  ? 1
+                                  : 0.3,
                         ),
                         size: 40,
                       ),
@@ -1043,7 +1045,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.brandPrimary.withOpacity(0.15),
+                        color: AppColors.brandPrimary.withValues(alpha: 0.15),
                         blurRadius: 14.667,
                         spreadRadius: 3.667,
                         offset: const Offset(2.2, 2.2),

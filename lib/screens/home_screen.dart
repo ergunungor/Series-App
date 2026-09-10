@@ -10,7 +10,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/program.dart';
 import '../services/program_repository.dart';
 import '../services/workout_history_repository.dart';
-import '../widgets/app_button.dart';
 import '../widgets/app_confirm_dialog.dart';
 import '../widgets/select_active_program_sheet.dart';
 import 'package:lottie/lottie.dart';
@@ -24,7 +23,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _firstName = '';
-  bool _isLoading = true;
   ActiveProgram? _activeProgram;
   bool _isLoadingProgram = true;
   int _weeklyCompleted = 0;
@@ -122,14 +120,12 @@ class _HomeScreenState extends State<HomeScreen> {
           if (mounted) {
             setState(() {
               _firstName = firstName;
-              _isLoading = false;
             });
           }
         }
       }
     } catch (error) {
       debugPrint('Veri çekme hatası: $error');
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -358,7 +354,9 @@ class _NoProgramCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: AppColors.brandPrimary.withOpacity(0.2)),
+        border: Border.all(
+          color: AppColors.brandPrimary.withValues(alpha: 0.2),
+        ),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(

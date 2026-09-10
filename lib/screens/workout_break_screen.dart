@@ -36,7 +36,7 @@ class WorkoutBreakScreen extends StatelessWidget {
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.brandPrimary.withOpacity(0.15),
+                      color: AppColors.brandPrimary.withValues(alpha: 0.15),
                       blurRadius: 14.667,
                       spreadRadius: 3.667,
                       offset: const Offset(2.2, 2.2),
@@ -76,8 +76,8 @@ class WorkoutBreakScreen extends StatelessWidget {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.brandPrimary.withOpacity(
-                                0.3,
+                              color: AppColors.brandPrimary.withValues(
+                                alpha: 0.3,
                               ), // Parlama rengi
                               blurRadius: 25,
                               spreadRadius: 2,

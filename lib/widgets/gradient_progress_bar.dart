@@ -32,7 +32,7 @@ class GradientProgressBar extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.brandPrimary.withOpacity(0.25),
+                    color: AppColors.brandPrimary.withValues(alpha: 0.25),
                     blurRadius: 10,
                     offset: const Offset(2, 2),
                   ),

@@ -300,8 +300,9 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                                       .closed
                                       .then((reason) async {
                                         if (reason ==
-                                            SnackBarClosedReason.action)
+                                            SnackBarClosedReason.action) {
                                           return;
+                                        }
                                         try {
                                           await WorkoutHistoryRepository.deleteSession(
                                             session,

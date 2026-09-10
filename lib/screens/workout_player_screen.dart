@@ -40,7 +40,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.white.withOpacity(0.25),
+                      color: Colors.white.withValues(alpha: 0.25),
                       blurRadius: 14.667,
                       spreadRadius: 3.667,
                       offset: const Offset(2.2, 2.2),
@@ -67,7 +67,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.white.withOpacity(0.25),
+                      color: Colors.white.withValues(alpha: 0.25),
                       blurRadius: 9,
                       spreadRadius: 3,
                       offset: const Offset(1, 1),
@@ -175,7 +175,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                   borderRadius: BorderRadius.circular(45),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.white.withOpacity(0.25),
+                      color: Colors.white.withValues(alpha: 0.25),
                       blurRadius: 9,
                       spreadRadius: 5,
                       offset: const Offset(1, 1),
@@ -229,7 +229,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                       // Butonun ekrandan hafif dışarı fırlaması için ufak bir gölge ekliyoruz
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
+                          color: Colors.black.withValues(alpha: 0.15),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
