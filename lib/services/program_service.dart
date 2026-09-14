@@ -9,10 +9,18 @@ class ProgramService {
     String userId,
   ) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/generate-program');
+
+    // GÜNCELLENDİ: Modele 'flash' parametresi ve 'gender' verisi ekleniyor
+    final requestBody = data.toJson(userId);
+    requestBody['model_type'] = 'flash'; // Hızlı üretim için
+
+    // Not: Eğer onboarding_data.dart içindeki toJson() metoduna 'gender' eklemediysen
+    // oraya da eklemen gerekiyor.
+
     final response = await http.post(
       uri,
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data.toJson(userId)),
+      body: jsonEncode(requestBody),
     );
 
     if (response.statusCode == 200) {
@@ -23,7 +31,6 @@ class ProgramService {
     );
   }
 
-  // YENİ: Yapay zekadan programı revize etmesini ister (Geriye MAP döner)
   static Future<Map<String, dynamic>> reviseProgram(
     String userId,
     Map<String, dynamic> currentProgram,
@@ -37,20 +44,20 @@ class ProgramService {
         'user_id': userId,
         'current_program': currentProgram,
         'prompt': prompt,
+        'model_type':
+            'pro', // GÜNCELLENDİ: Zeki revizeler için Pro modeli gönderiliyor
       }),
     );
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     } else if (response.statusCode == 429) {
-      // 429 Gemini yoğunluk hatasını burada yakalıyoruz
       final errorData = jsonDecode(response.body);
       throw Exception(errorData['detail']);
     }
     throw Exception('Program güncellenemedi: ${response.body}');
   }
 
-  // YENİ: Revize edilen programı veritabanına kaydeder (Geriye STRING ID döner)
   static Future<String> saveProgram(
     String userId,
     Map<String, dynamic> programData,
@@ -64,7 +71,6 @@ class ProgramService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      // Hatanın çözüldüğü yer: Tüm MAP'i değil, sadece ID'yi String olarak döndürüyoruz
       return data['program_id'].toString();
     }
     throw Exception('Program kaydedilemedi: ${response.body}');

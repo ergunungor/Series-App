@@ -7,8 +7,6 @@ import '../models/program.dart';
 import '../services/program_service.dart';
 import '../services/program_repository.dart';
 import '../widgets/app_button.dart';
-import '../widgets/app_input.dart';
-import 'workouts_screen.dart'; // workoutRefreshNotifier için
 
 class ProgramDetailScreen extends StatefulWidget {
   final ActiveProgram program;

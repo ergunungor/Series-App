@@ -26,8 +26,17 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
   int _currentStep = 0;
   bool _isSubmitting = false;
 
-  // yeni:
-  static const int totalSteps = 9;
+  // YENİ: Toplam adım sayısı 9'dan 10'a çıkarıldı (Cinsiyet eklendiği için)
+  static const int totalSteps = 10;
+
+  // YENİ: Cinsiyet Seçenekleri
+  static const List<String> _genderOptions = [
+    'Erkek',
+    'Kadın',
+    'Belirtmek İstemiyorum',
+  ];
+  String?
+  _selectedGender; // OnboardingData modeline "String? gender;" eklemeyi unutma.
 
   static const List<String> _equipmentOptions = [
     'Sadece Vücut Ağırlığı',
@@ -44,6 +53,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     'İleri',
     'Profesyonel/Atlet',
   ];
+
   static const List<String> _goalOptions = [
     'Kas Kütlesi',
     'Yağ Yakımı',
@@ -53,6 +63,9 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     'Esneklik & Hareketlilik',
     'Sağlık / Rehabilitasyon',
   ];
+  // YENİ: Çoklu hedef seçimi için geçici bir Set kullanıyoruz.
+  final Set<String> _selectedGoals = {};
+
   static const List<String> _interestOptions = [
     'Karın',
     'Kol',
@@ -65,6 +78,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     'Ön Kol',
     'Core / Bel',
   ];
+
   static const List<String> _restrictionOptions = [
     'Yok',
     'Diz',
@@ -76,6 +90,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     'Boyun',
     'Ayak Bileği',
   ];
+
   static const List<String> _locationOptions = [
     'Ev',
     'Spor Salonu',
@@ -83,6 +98,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     'Ofis',
     'Seyahat/Otel',
   ];
+
   @override
   void dispose() {
     _ageController.dispose();
@@ -114,13 +130,11 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
   }
 
   Future<void> _handleSurveyExitOrBack() async {
-    // 1. Eğer anketin ilk sorusunda değilse, bir önceki soruya dön:
     if (_currentStep > 0) {
       _goBack();
       return;
     }
 
-    // 2. İlk sorudaysa çıkmak için onay iste:
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Anketten Çık',
@@ -170,10 +184,9 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     int count = response['daily_ai_count'] as int? ?? 0;
     String? lastDate = response['last_ai_date'] as String?;
 
-    // Eğer tarih bugünden farklıysa (yani yeni güne geçildiyse) sayacı sıfırlanmış kabul et
     if (lastDate != today) count = 0;
 
-    return count < 5; // Günlük 5 limit
+    return count < 5;
   }
 
   Future<void> _consumeAICredit(String userId) async {
@@ -209,6 +222,11 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
             ? null
             : _blockerController.text.trim();
 
+    // YENİ: Topladığımız yeni verileri AI için hazırlanan modele gönderiyoruz.
+    // (Eğer OnboardingData içinde gender yoksa oraya String? gender; eklemeyi unutma).
+    //_data.gender = _selectedGender;
+    _data.primaryGoal = _selectedGoals.join(', ');
+
     if (_data.age == null) {
       _showError('Lütfen yaşını girdiğinden emin ol.');
       return;
@@ -216,7 +234,6 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      // 1. ADIM: Limiti Kontrol Et
       final hasCredit = await _canUseAI(user.id);
       if (!hasCredit) {
         _showError(
@@ -226,10 +243,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
         return;
       }
 
-      // 2. ADIM: Programı Oluştur
       await ProgramService.generateProgram(_data, user.id);
-
-      // 3. ADIM: Başarılı olursa krediyi düşür
       await _consumeAICredit(user.id);
 
       if (mounted) {
@@ -271,13 +285,12 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     }
 
     return PopScope(
-      canPop: false, // Donanım/Tarayıcı geri tuşunu kilitler
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         _handleSurveyExitOrBack();
       },
       child: GestureDetector(
-        // Soldan sağa kaydırma jestini yakalar (Swipe-to-back)
         onHorizontalDragEnd: (details) {
           if (details.primaryVelocity != null &&
               details.primaryVelocity! > 250) {
@@ -291,6 +304,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
             physics: const NeverScrollableScrollPhysics(),
             children: [
               _ageStep(),
+              _genderStep(), // YENİ ADIM
               _experienceStep(),
               _goalStep(),
               _interestsStep(),
@@ -319,6 +333,36 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     onNext: () {
       if (int.tryParse(_ageController.text) == null) {
         _showError('Lütfen geçerli bir yaş gir.');
+        return;
+      }
+      _goNext();
+    },
+  );
+
+  // YENİ: Cinsiyet Adımı
+  Widget _genderStep() => SurveyStepScaffold(
+    currentStep: _currentStep,
+    totalSteps: totalSteps,
+    question: 'Cinsiyetin nedir?',
+    onExit: _handleCloseSurvey,
+    onBack: _goBack,
+    content: Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children:
+          _genderOptions
+              .map(
+                (o) => SelectableChip(
+                  label: o,
+                  isSelected: _selectedGender == o,
+                  onTap: () => setState(() => _selectedGender = o),
+                ),
+              )
+              .toList(),
+    ),
+    onNext: () {
+      if (_selectedGender == null) {
+        _showError('Lütfen bir cinsiyet seç.');
         return;
       }
       _goNext();
@@ -354,10 +398,11 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     },
   );
 
+  // GÜNCELLENDİ: Çoklu Hedef Seçimi
   Widget _goalStep() => SurveyStepScaffold(
     currentStep: _currentStep,
     totalSteps: totalSteps,
-    question: 'Ana hedefin ne?',
+    question: 'Ana hedefin ne? (Birden fazla seçebilirsin)',
     onExit: _handleCloseSurvey,
     onBack: _goBack,
     content: Wrap(
@@ -368,21 +413,29 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
               .map(
                 (o) => SelectableChip(
                   label: o,
-                  isSelected: _data.primaryGoal == o,
-                  onTap: () => setState(() => _data.primaryGoal = o),
+                  isSelected: _selectedGoals.contains(o),
+                  onTap:
+                      () => setState(() {
+                        if (_selectedGoals.contains(o)) {
+                          _selectedGoals.remove(o);
+                        } else {
+                          _selectedGoals.add(o);
+                        }
+                      }),
                 ),
               )
               .toList(),
     ),
     onNext: () {
-      if (_data.primaryGoal == null) {
-        _showError('Lütfen bir hedef seç.');
+      if (_selectedGoals.isEmpty) {
+        _showError('Lütfen en az bir hedef seç.');
         return;
       }
       _goNext();
     },
   );
 
+  // GÜNCELLENDİ: "Hepsi" butonu eklendi
   Widget _interestsStep() => SurveyStepScaffold(
     currentStep: _currentStep,
     totalSteps: totalSteps,
@@ -392,20 +445,37 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     content: Wrap(
       spacing: 12,
       runSpacing: 12,
-      children:
-          _interestOptions.map((o) {
-            final isSelected = _data.specificInterests.contains(o);
-            return SelectableChip(
-              label: o,
-              isSelected: isSelected,
-              onTap:
-                  () => setState(() {
-                    isSelected
-                        ? _data.specificInterests.remove(o)
-                        : _data.specificInterests.add(o);
-                  }),
-            );
-          }).toList(),
+      children: [
+        // HEPSİ Seçeneği
+        SelectableChip(
+          label: 'Hepsi (Tüm Vücut)',
+          isSelected: _data.specificInterests.length == _interestOptions.length,
+          onTap: () {
+            setState(() {
+              if (_data.specificInterests.length == _interestOptions.length) {
+                _data.specificInterests.clear();
+              } else {
+                _data.specificInterests.clear();
+                _data.specificInterests.addAll(_interestOptions);
+              }
+            });
+          },
+        ),
+        // Diğer bölgeler
+        ..._interestOptions.map((o) {
+          final isSelected = _data.specificInterests.contains(o);
+          return SelectableChip(
+            label: o,
+            isSelected: isSelected,
+            onTap:
+                () => setState(() {
+                  isSelected
+                      ? _data.specificInterests.remove(o)
+                      : _data.specificInterests.add(o);
+                }),
+          );
+        }),
+      ],
     ),
     onNext: () {
       if (_data.specificInterests.isEmpty) {
@@ -500,8 +570,6 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
             runSpacing: 12,
             children:
                 _equipmentOptions.map((o) {
-                  // Not: OnboardingData modelinde logistics.equipment listesinin
-                  // tanımlı olması gerekir.
                   final isSelected = _data.logistics.equipment.contains(o);
                   return SelectableChip(
                     label: o,
@@ -535,6 +603,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
       _goNext();
     },
   );
+
   Widget _daysPerWeekStep() => SurveyStepScaffold(
     currentStep: _currentStep,
     totalSteps: totalSteps,
@@ -594,9 +663,35 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     onExit: _handleCloseSurvey,
     onBack: _goBack,
     nextLabel: 'Bitir',
-    content: AppInput(
-      hintText: 'Örn: motivasyon eksikliği, zaman yönetimi...',
+    // GÜNCELLENDİ: 700 Karakter limitli, çok satırlı esnek form yapısı
+    content: TextField(
       controller: _blockerController,
+      maxLength: 700, // 700 karakter limiti ve sağ altta sayaç
+      maxLines: 4, // Yazdıkça 4 satıra kadar esner
+      minLines: 2, // Başlangıçta 2 satır yüksekliğinde durur
+      keyboardType: TextInputType.multiline,
+      style: AppTypography.body16Regular.copyWith(color: AppColors.textPrimary),
+      decoration: InputDecoration(
+        hintText: 'Örn: motivasyon eksikliği, zaman yönetimi...',
+        hintStyle: AppTypography.body14Regular.copyWith(
+          color: AppColors.textTertiary,
+        ),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: AppColors.brandSecondary),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: AppColors.brandSecondary),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: AppColors.brandPrimary, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.all(16),
+      ),
     ),
     onNext: _submit,
   );
