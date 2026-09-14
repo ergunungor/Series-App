@@ -6,6 +6,9 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from .schemas import UserOnboardingData, SaveProgramRequest
 from .ai_service import generate_workout_program, save_generated_program, parse_program_from_input
+from .schemas import UserOnboardingData, SaveProgramRequest, ReviseProgramRequest # GÜNCELLENDİ
+from .ai_service import generate_workout_program, save_generated_program, parse_program_from_input, revise_workout_program # GÜNCELLENDİ
+
 
 # .env dosyasındaki gizli anahtarları yüklüyoruz
 load_dotenv()
@@ -92,3 +95,21 @@ async def save_program(request: SaveProgramRequest):
     except Exception as e:
         print(f"Save API Hatası: {str(e)}")
         raise HTTPException(status_code=500, detail="Program kaydedilirken bir hata oluştu.")
+
+@app.post("/api/revise-program")
+async def revise_program(request: ReviseProgramRequest):
+    try:
+        revised_program = revise_workout_program(request)
+        return {
+            "status": "success",
+            "data": revised_program
+        }
+    except Exception as e:
+        error_msg = str(e)
+        print(f"Revize API Hatası: {error_msg}")
+        
+        # Gemini Rate Limit (429) hatasını yakalıyoruz
+        if "429" in error_msg or "Quota exceeded" in error_msg:
+            raise HTTPException(status_code=429, detail="Yapay zeka şu an çok yoğun. Lütfen 15-20 saniye bekleyip tekrar dene.")
+            
+        raise HTTPException(status_code=500, detail="Program güncellenirken bir hata oluştu.")

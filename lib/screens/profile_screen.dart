@@ -78,13 +78,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _handleDeleteAccount() async {
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Hesabı Sil',
+      message:
+          'Hesabını ve tüm verilerini kalıcı olarak silmek istediğine emin misin? Bu işlem geri alınamaz.',
+      confirmLabel: 'Hesabımı Sil',
+      isDestructive: true,
+    );
+
+    if (confirmed) {
+      try {
+        setState(() => _isLoading = true);
+
+        // Supabase'deki RPC fonksiyonumuzu tetikliyoruz
+        await Supabase.instance.client.rpc('delete_user_account');
+
+        // Oturumu kapatıp login sayfasına atıyoruz
+        await Supabase.instance.client.auth.signOut();
+
+        if (mounted) context.go('/login');
+      } catch (e) {
+        debugPrint('Hesap silme hatası: $e');
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Hesap silinirken bir hata oluştu.')),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Süzülen alt barın yüksekliği kadar (yaklaşık 120px) dinamik bir alt boşluk yaratıyoruz
+    final bottomInset = MediaQuery.of(context).padding.bottom + 120;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
+        bottom: false, // Alt güvenli alanı kapatıyoruz ki boşluğu biz yönetelim
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset),
           child: Column(
             children: [
               const AppTopBar(),
@@ -132,27 +169,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                       const Spacer(),
+
+                      // Çıkış Yap Butonu
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
                           onPressed: _handleLogout,
-                          icon: const Icon(Icons.logout, color: Colors.red),
+                          icon: const Icon(
+                            Icons.logout,
+                            color: AppColors.textPrimary,
+                          ),
                           label: Text(
                             'Çıkış Yap',
                             style: AppTypography.body16Medium.copyWith(
-                              color: Colors.red,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.red),
+                            side: const BorderSide(
+                              color: AppColors.textTertiary,
+                            ),
                             padding: const EdgeInsets.symmetric(vertical: 15),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
+
+                      // Hesabı Sil Butonu (App Store & Play Store zorunluluğu)
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextButton.icon(
+                          onPressed: _handleDeleteAccount,
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.red,
+                          ),
+                          label: Text(
+                            'Hesabı Sil',
+                            style: AppTypography.body16Medium.copyWith(
+                              color: Colors.red,
+                            ),
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),

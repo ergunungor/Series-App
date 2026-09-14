@@ -34,6 +34,13 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _fetchUserData();
     _fetchActiveProgram();
+    programRefreshNotifier.addListener(_fetchActiveProgram);
+  }
+
+  @override
+  void dispose() {
+    programRefreshNotifier.removeListener(_fetchActiveProgram);
+    super.dispose();
   }
 
   Future<void> _fetchActiveProgram() async {
@@ -253,6 +260,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               selected.id,
                             );
                             _fetchActiveProgram();
+
+                            // HER SEFERİNDE DEĞERİ DEĞİŞTİRİYORUZ (SAYAÇ ARTIYOR)
+                            programRefreshNotifier.value++;
                           }
                         },
                         icon: Icon(

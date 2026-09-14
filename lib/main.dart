@@ -3,6 +3,7 @@ import 'theme/app_theme.dart';
 import 'router/app_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // Supabase için gerekli
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:app_links/app_links.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,6 +14,13 @@ Future<void> main() async {
     publishableKey:
         'sb_publishable_6DIZ_1cdyXAFe1EXCKy3AA_ClBEe2ah', // Kopyaladığın Anon Key
   );
+
+  final appLinks = AppLinks();
+  appLinks.uriLinkStream.listen((uri) {
+    if (uri.scheme == 'seriesfit' && uri.host == 'reset-password') {
+      AppRouter.router.go('/reset-password');
+    }
+  });
 
   runApp(const SeriesApp());
 }

@@ -23,7 +23,6 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   List<ActiveProgram> _programs = [];
   bool _isLoading = true;
   String? _activeProgramId;
-
   // Seçim modu state'i: hangi kartların işaretli olduğunu tutuyoruz.
   bool _isSelectionMode = false;
   final Set<String> _selectedIds = {};
@@ -32,6 +31,13 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   void initState() {
     super.initState();
     _fetch();
+    programRefreshNotifier.addListener(_fetch);
+  }
+
+  @override
+  void dispose() {
+    programRefreshNotifier.removeListener(_fetch);
+    super.dispose();
   }
 
   Future<void> _fetch() async {
@@ -207,11 +213,14 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Alt menü ve FAB'ın arkasında kalmaması için dinamik boşluk hesabı
+    final bottomInset = MediaQuery.of(context).padding.bottom + 120;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          padding: const EdgeInsets.only(left: 16, right: 16, top: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -231,6 +240,9 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                           },
                         )
                         : ListView.separated(
+                          // YENİ: Listeye alt ve üst boşluk eklenerek arkada kalması önlendi
+                          padding: EdgeInsets.fromLTRB(0, 0, 0, bottomInset),
+                          physics: const BouncingScrollPhysics(),
                           itemCount: _programs.length,
                           separatorBuilder:
                               (_, __) => const SizedBox(height: 12),
@@ -240,9 +252,6 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                               program.id,
                             );
 
-                            // Seçim modundayken kaydırarak silmeyi kapatıyoruz
-                            // (checkbox ile seçip toplu silmek daha tutarlı;
-                            // ikisi bir aradayken kafa karıştırırdı).
                             if (_isSelectionMode) {
                               return _ProgramCard(
                                 program: program,
@@ -318,17 +327,20 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                                   color: Colors.white,
                                 ),
                               ),
-                              // yeni:
                               child: _ProgramCard(
                                 program: program,
                                 isSelectionMode: false,
                                 isSelected: false,
                                 isActive: program.id == _activeProgramId,
-                                onTap:
-                                    () => context.push(
-                                      '/program-detail',
-                                      extra: program,
-                                    ),
+                                onTap: () async {
+                                  final result = await context.push<bool>(
+                                    '/program-detail',
+                                    extra: program,
+                                  );
+                                  if (result == true) {
+                                    _fetch();
+                                  }
+                                },
                                 onLongPress:
                                     () => _enterSelectionMode(program.id),
                               ),
@@ -340,35 +352,41 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
           ),
         ),
       ),
+
       floatingActionButton:
           _isSelectionMode
               ? null
-              : FloatingActionButton(
-                onPressed:
-                    () => showAddProgramSheet(
-                      context: context,
-                      onCreateWithAi: () async {
-                        final created = await context.push<bool>(
-                          '/onboarding-survey',
-                        );
-                        if (created == true) {
-                          _fetch();
-                        } // _fetch burada çalışır çünkü bu dosyanın içinde tanımlı
-                      },
-                      onImportProgram: () async {
-                        // Navigator.pop silindi
-                        final created = await context.push<bool>(
-                          '/import-program',
-                        );
+              : Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).padding.bottom + 95,
+                ),
+                child: FloatingActionButton(
+                  onPressed:
+                      () => showAddProgramSheet(
+                        context: context,
+                        onCreateWithAi: () async {
+                          final created = await context.push<bool>(
+                            '/onboarding-survey',
+                          );
+                          if (created == true) {
+                            _fetch();
+                          } // _fetch burada çalışır çünkü bu dosyanın içinde tanımlı
+                        },
+                        onImportProgram: () async {
+                          // Navigator.pop silindi
+                          final created = await context.push<bool>(
+                            '/import-program',
+                          );
 
-                        if (created == true) {
-                          _fetch();
-                        }
-                      },
-                    ),
-                backgroundColor: AppColors.brandTertiary,
-                elevation: 4,
-                child: const Icon(Icons.add, color: Colors.white, size: 26),
+                          if (created == true) {
+                            _fetch();
+                          }
+                        },
+                      ),
+                  backgroundColor: AppColors.brandTertiary,
+                  elevation: 4,
+                  child: const Icon(Icons.add, color: Colors.white, size: 26),
+                ),
               ),
     );
   }

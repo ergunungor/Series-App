@@ -114,13 +114,20 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   }
 
   Future<void> _fetchCurrentExerciseGif() async {
-    setState(() => _isLoadingGif = true);
+    // İstek başlamadan önce eski bilgiyi temizle ve yükleniyor bayrağını aç
+    if (mounted) {
+      setState(() {
+        _isLoadingGif = true;
+        _apiExerciseInfo = null;
+      });
+    }
+
     try {
-      // YENİ: İsim ve talimat kelimelerini karşılaştırarak nokta atışı çeken metot
       final apiData = await _exerciseService.fetchExerciseById(
         _currentExercise.id,
       );
 
+      // İstek sonuçlandığında widget hala ekrandaysa (mounted) güncelle
       if (mounted) {
         setState(() {
           _apiExerciseInfo = apiData;
@@ -128,7 +135,11 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoadingGif = false);
+      if (mounted) {
+        setState(() {
+          _isLoadingGif = false;
+        });
+      }
       debugPrint('GIF Çekme Hatası: $e');
     }
   }
@@ -408,17 +419,18 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   void _goToExercise(int newIndex) {
     if (newIndex < 0 || newIndex >= widget.workout.exercises.length) return;
     _restTimer?.cancel();
+
     setState(() {
       _exerciseIndex = newIndex;
       _setIndex = 0;
       _isResting = false;
       _repsController.clear();
       _weightController.clear();
-      // YENİ EKLENEN SATIR: Yeni harekete geçerken eski hareketin GIF'ini ekrandan temizle
-      _apiExerciseInfo = null;
+      _apiExerciseInfo = null; // Önceki hareketin bilgisini sıfırla
+      _isLoadingGif = true; // Yükleniyor durumunu tetikle
     });
 
-    // YENİ EKLENEN SATIR: State güncellendikten hemen sonra yeni hareketin GIF'ini API'den çek
+    // Hemen ardından yeni hareketin verisini çek
     _fetchCurrentExerciseGif();
   }
 
@@ -709,6 +721,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                                             width: 180,
                                             height: 180,
                                             fit: BoxFit.cover,
+                                            gaplessPlayback: true,
                                           ),
                                         )),
                           ),

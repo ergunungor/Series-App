@@ -24,10 +24,10 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
         return Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
           decoration: const BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -35,15 +35,25 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
               Container(
                 width: 40,
                 height: 4,
-                margin: const EdgeInsets.only(bottom: 20),
+                margin: const EdgeInsets.only(bottom: 24),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(45),
                 ),
               ),
+              Text(
+                'Program Ekle',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
               ListTile(
+                contentPadding: EdgeInsets.zero,
                 leading: Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: AppColors.brandTertiary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
@@ -66,8 +76,9 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
                 },
               ),
               ListTile(
+                contentPadding: EdgeInsets.zero,
                 leading: Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: AppColors.brandTertiary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
@@ -90,8 +101,9 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
                 },
               ),
               ListTile(
+                contentPadding: EdgeInsets.zero,
                 leading: Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: AppColors.brandTertiary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
@@ -126,7 +138,7 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
       final pickedFile = await picker.pickImage(
         source: source,
         imageQuality: 80,
-      ); // API'yi yormamak için kalite %80
+      );
       if (pickedFile != null) {
         _sendMessage(file: File(pickedFile.path));
       }
@@ -210,197 +222,225 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: AppColors.brandTertiary),
+          icon: Icon(
+            Icons.arrow_back_ios_new,
+            color: AppColors.brandTertiary,
+            size: 20,
+          ),
           onPressed: () => context.pop(),
         ),
       ),
       body: GestureDetector(
-        onTap:
-            () =>
-                FocusScope.of(
-                  context,
-                ).unfocus(), // Ekrana tıklayınca klavyeyi kapatır
+        onTap: () => FocusScope.of(context).unfocus(),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // 1. Dekoratif İkon (Boşluğu Doldurur ve Estetik Katar)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.brandTertiary.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.auto_awesome,
-                      color: AppColors.brandTertiary,
-                      size: 36,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 10),
 
-                  // 2. Başlık ve Alt Başlık
-                  Text(
-                    'Program Yükle',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.brandTertiary,
-                      letterSpacing: -0.5,
-                    ),
+                // 1. MODERNLEŞTİRİLDİ: Daha şık, hafif gölgeli ve soft AI İkon Alanı
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.brandTertiary.withValues(alpha: 0.12),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Programınızı yapıştırın veya yükleyin,\nyapay zeka ile takip edilebilir\nbir forma dönüştürelim.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 15,
-                      height: 1.5,
-                      fontWeight: FontWeight.w400,
-                      color: AppColors.textTertiary,
-                    ),
+                  child: Icon(
+                    Icons.auto_awesome,
+                    color: AppColors.brandTertiary,
+                    size: 32,
                   ),
-                  const SizedBox(height: 40),
+                ),
+                const SizedBox(height: 20),
 
-                  // 3. Esnek ve Büyük Input Alanı (Multiline)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.shade300, width: 1),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                Text(
+                  'Program Yükle',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.brandTertiary,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Programını yapıştır veya ekran görüntüsü yükle, yapay zeka ile hemen dijital forma dönüştürelim.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                // Metin Giriş Kutusu
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.grey.shade200, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 15,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _controller,
+                        enabled: !_isLoading,
+                        minLines: 5,
+                        maxLines: 8,
+                        keyboardType: TextInputType.multiline,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: AppColors.textPrimary,
+                          height: 1.4,
                         ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      crossAxisAlignment:
-                          CrossAxisAlignment
-                              .end, // İkonların aşağıda hizalanması için
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            Icons.add,
-                            color: AppColors.brandTertiary,
-                            size: 32,
+                        decoration: InputDecoration(
+                          hintText:
+                              'Örn:\n1. Gün: Göğüs & Biceps\n- Bench Press 4x10\n- Incline Dumbbell Press 3x12',
+                          hintStyle: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade400,
+                            height: 1.4,
                           ),
-                          onPressed: _isLoading ? null : _showPickerOptions,
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
                         ),
-                        Expanded(
-                          child: TextField(
-                            controller: _controller,
-                            enabled: !_isLoading,
-                            minLines: 1,
-                            maxLines:
-                                8, // Çoklu satır desteği! Metin uzadıkça kutu büyüyecek.
-                            keyboardType: TextInputType.multiline,
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: AppColors.textPrimary,
-                              height: 1.4,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: 'Programını buraya yapıştır...',
-                              hintMaxLines: 1, // Metni zorla tek satırda tutar
-                              hintStyle: TextStyle(
-                                fontSize:
-                                    14, // 15 yerine 14 yaptık ki ikonların arasına daha rahat sığsın
-                                color: Colors.grey.shade400,
-                                overflow:
-                                    TextOverflow
-                                        .ellipsis, // Yine de sığmazsa aşağı kaymak yerine sonuna ... koyar
+                      ),
+                      const SizedBox(height: 12),
+                      Divider(height: 1, color: Colors.grey.shade200),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton.icon(
+                            onPressed: _isLoading ? null : _showPickerOptions,
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.brandTertiary,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
                               ),
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 12,
+                            ),
+                            icon: const Icon(
+                              Icons.add_photo_alternate_outlined,
+                              size: 20,
+                            ),
+                            label: const Text(
+                              'Görsel veya Dosya Ekle',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13,
                               ),
                             ),
                           ),
-                        ),
-                        _isLoading
-                            ? Padding(
-                              padding: const EdgeInsets.all(14.0),
-                              child: SizedBox(
-                                width: 20,
-                                height: 20,
+                          _isLoading
+                              ? const SizedBox(
+                                width: 24,
+                                height: 24,
                                 child: CircularProgressIndicator(
-                                  color: AppColors.brandTertiary,
                                   strokeWidth: 2.5,
                                 ),
+                              )
+                              : ElevatedButton(
+                                onPressed: _sendMessage,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.brandTertiary,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 10,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Dönüştür',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
                               ),
-                            )
-                            : IconButton(
-                              icon: Icon(
-                                Icons.send_rounded,
-                                color: AppColors.brandTertiary,
-                                size: 26,
-                              ),
-                              onPressed: _sendMessage,
-                            ),
-                      ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                // 2. MODERNLEŞTİRİLDİ: Kırmızı/sert yerine çok daha soft, premium bilgi kartı
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: AppColors.brandSecondary.withValues(
+                      alpha: 0.15,
+                    ), // Soft arka plan
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.brandSecondary.withValues(alpha: 0.3),
                     ),
                   ),
-
-                  const SizedBox(height: 40),
-
-                  // 4. Bilgi Kartı (Boşluğu doldurmak ve kullanıcıyı yönlendirmek için)
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline,
-                              size: 20,
-                              color: AppColors.brandTertiary,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Nasıl Çalışır?',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          '• Notes uygulamasındaki programını direkt yapıştırabilirsin.\n'
-                          '• Telefonundaki program ekran görüntüsünü (+) butonuyla yükleyebilirsin.\n'
-                          '• Hareket isimleri, set ve tekrar sayıları otomatik olarak algılanıp düzene sokulur.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            height: 1.6,
-                            color: AppColors.textSecondary,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            size: 18,
+                            color: AppColors.brandPrimary,
                           ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Nasıl Çalışır?',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              color: AppColors.brandPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '• Notes uygulamasındaki programını direkt üstteki alana yapıştırabilirsin.\n'
+                        '• Telefonundaki program ekran görüntüsünü veya PDF dosyasını alt butondan yükleyebilirsin.\n'
+                        '• Hareket isimleri, set ve tekrar sayıları yapay zeka tarafından otomatik ayarlanır.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.5,
+                          color:
+                              AppColors
+                                  .textSecondary, // Sert kırmızı yerine soft metin tonu
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 32),
-                ],
-              ),
+                ),
+                const SizedBox(height: 32),
+              ],
             ),
           ),
         ),

@@ -7,7 +7,21 @@ from .schemas import UserOnboardingData
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-model = genai.GenerativeModel('gemini-3.6-flash') #[cite: 3]
+# Ana ve Yedek modelleri tanımlıyoruz
+primary_model = genai.GenerativeModel('gemini-3.6-flash')
+fallback_model = genai.GenerativeModel('gemini-3.5-flash-lite') # 1.5 yerine 3.5 Lite atandı
+
+def generate_with_fallback(content, generation_config):
+    """Önce ana modeli dener, 429 hatası alırsa yedek modele (3.5 Lite) geçer."""
+    try:
+        return primary_model.generate_content(content, generation_config=generation_config)
+    except Exception as e:
+        error_msg = str(e)
+        if "429" in error_msg or "Quota" in error_msg:
+            print("⚠️ Ana model limiti doldu! Yedek model (3.5 Flash Lite) devreye giriyor...")
+            return fallback_model.generate_content(content, generation_config=generation_config)
+        
+        raise e
 
 def get_ai_exercise_catalog():
     """
@@ -99,10 +113,10 @@ def generate_workout_program(data: UserOnboardingData):
     }}
     """
 
-    response = model.generate_content(
-        prompt,
-        generation_config={"response_mime_type": "application/json"} #[cite: 3]
-    )
+    response = generate_with_fallback(
+    prompt,
+    generation_config={"response_mime_type": "application/json"}
+)
     
     clean_text = response.text.strip()
     raw_data = json.loads(clean_text)
@@ -194,7 +208,7 @@ def parse_program_from_input(text: str = None, file_bytes: bytes = None, mime_ty
     else:
         raise ValueError("Ne metin ne dosya verildi.")
 
-    response = model.generate_content(
+    response = generate_with_fallback(
         content,
         generation_config={"response_mime_type": "application/json"}
     )
@@ -230,3 +244,35 @@ def sanitize_program_data(data: dict):
                 exercise["duration_seconds"] = 30
                 
     return data
+
+def revise_workout_program(data):
+    """
+    Kullanıcının mevcut programını ve promptunu alarak programı revize eder.
+    """
+    ai_catalog_str = get_ai_exercise_catalog()
+
+    prompt = f"""
+    Sen dünya çapında uzman bir fitness koçusun.
+    Kullanıcının mevcut antrenman programı (JSON formatında) aşağıdadır:
+    {json.dumps(data.current_program, ensure_ascii=False)}
+
+    Kullanıcının bu program üzerinde yapılmasını istediği değişiklik (Prompt):
+    "{data.prompt}"
+
+    Lütfen kullanıcının isteğini yerine getirerek programı güncelle. 
+    ÇOK ÖNEMLİ KURAL: Yeni egzersiz eklerken veya değiştirirken SADECE aşağıdaki katalogdan seçim yap:
+    {ai_catalog_str}
+
+    ZORUNLU KURAL: Süreli egzersizlerde (Plank vs.) "reps" alanını null yap ve süreyi saniye olarak "duration_seconds" alanına yaz.
+    
+    Yanıtını SADECE aşağıdaki JSON şemasında ver, başına sonuna ekstra metin ekleme.
+    """
+
+    response = generate_with_fallback(
+        prompt,
+        generation_config={"response_mime_type": "application/json"}
+    )
+    
+    clean_text = response.text.strip()
+    raw_data = json.loads(clean_text)
+    return sanitize_program_data(raw_data)

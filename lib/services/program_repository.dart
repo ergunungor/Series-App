@@ -1,5 +1,9 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/program.dart';
+import 'package:flutter/foundation.dart';
+
+// Değeri bool veya int yapıp her seferinde tersine çevireceğiz veya artıracağız
+final programRefreshNotifier = ValueNotifier<int>(0);
 
 class ProgramRepository {
   static Future<List<ActiveProgram>> fetchPrograms(String userId) async {

@@ -158,6 +158,44 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     }
   }
 
+  Future<bool> _canUseAI(String userId) async {
+    final today = DateTime.now().toIso8601String().split('T').first;
+    final response =
+        await Supabase.instance.client
+            .from('profiles')
+            .select('daily_ai_count, last_ai_date')
+            .eq('id', userId)
+            .single();
+
+    int count = response['daily_ai_count'] as int? ?? 0;
+    String? lastDate = response['last_ai_date'] as String?;
+
+    // Eğer tarih bugünden farklıysa (yani yeni güne geçildiyse) sayacı sıfırlanmış kabul et
+    if (lastDate != today) count = 0;
+
+    return count < 5; // Günlük 5 limit
+  }
+
+  Future<void> _consumeAICredit(String userId) async {
+    final today = DateTime.now().toIso8601String().split('T').first;
+    final response =
+        await Supabase.instance.client
+            .from('profiles')
+            .select('daily_ai_count, last_ai_date')
+            .eq('id', userId)
+            .single();
+
+    int count = response['daily_ai_count'] as int? ?? 0;
+    String? lastDate = response['last_ai_date'] as String?;
+
+    if (lastDate != today) count = 0;
+
+    await Supabase.instance.client
+        .from('profiles')
+        .update({'daily_ai_count': count + 1, 'last_ai_date': today})
+        .eq('id', userId);
+  }
+
   Future<void> _submit() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
@@ -178,13 +216,26 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
 
     setState(() => _isSubmitting = true);
     try {
+      // 1. ADIM: Limiti Kontrol Et
+      final hasCredit = await _canUseAI(user.id);
+      if (!hasCredit) {
+        _showError(
+          'Bugünlük ücretsiz yapay zeka limitine (5/5) ulaştın. Lütfen yarın tekrar dene.',
+        );
+        if (mounted) setState(() => _isSubmitting = false);
+        return;
+      }
+
+      // 2. ADIM: Programı Oluştur
       await ProgramService.generateProgram(_data, user.id);
+
+      // 3. ADIM: Başarılı olursa krediyi düşür
+      await _consumeAICredit(user.id);
+
       if (mounted) {
-        // Eğer bu ekrana context.push() ile gelindiyse (sağ alttaki + butonundan):
         if (context.canPop()) {
-          context.pop(true); // Geriye 'true' döndürür
+          context.pop(true);
         } else {
-          // Eğer ilk kayıt/onboarding akışından gelindiyse:
           context.go('/home');
         }
       }

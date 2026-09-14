@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import 'app_bottom_nav.dart';
 
@@ -16,12 +17,33 @@ class MainShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // yeni:
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: child,
-      bottomNavigationBar: SafeArea(
-        child: AppBottomNav(currentIndex: currentIndex, onTap: onTap),
+    // 1. iOS sistem alt çubuğunun (Home Indicator) arkayı beyaza boyamasını engeller
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarDividerColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        // 2. DİKKAT: bottomNavigationBar parametresi TAMAMEN silindi!
+        body: Stack(
+          children: [
+            // Arka Katman: Sayfanın kendisi (Aşağıya kadar tam ekran uzanır)
+            Positioned.fill(child: child),
+
+            // Ön Katman: Havada süzülen Navigator
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: AppBottomNav(currentIndex: currentIndex, onTap: onTap),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

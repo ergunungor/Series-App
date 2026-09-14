@@ -12,9 +12,13 @@ Future<void> showAddProgramSheet({
   return showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
+    isScrollControlled: true,
     builder: (context) {
+      // Süzülen alt barın ve cihazın alt çentiğinin yüksekliği kadar akıllı boşluk
+      final bottomInset = MediaQuery.of(context).padding.bottom + 110;
+
       return Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -100,7 +104,7 @@ class _SheetOption extends StatelessWidget {
                 width: 44,
                 height: 44,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white,
                 ),
@@ -127,7 +131,7 @@ class _SheetOption extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: AppColors.textTertiary),
+              const Icon(Icons.chevron_right, color: AppColors.textTertiary),
             ],
           ),
         ),

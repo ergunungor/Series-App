@@ -17,13 +17,47 @@ import '../screens/workout_day_detail_screen.dart';
 import '../screens/workout_history_detail_screen.dart';
 import '../models/workout_history.dart';
 import '../screens/import_program_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // YENİ
+import 'package:supabase_flutter/supabase_flutter.dart'; // YENİ
+import '../screens/forgot_password_screen.dart'; // YENİ
+import '../screens/reset_password_screen.dart'; // YENİ
 
 class AppRouter {
+  // YENİ: Bu bayrak sayesinde şalter sadece uygulama soğuk başlatıldığında çalışacak
+  static bool _isStartupChecked = false;
+
   static final router = GoRouter(
     initialLocation: '/',
+    redirect: (context, state) async {
+      // GÜVENLİK ŞALTERİ (Sadece 1 kez çalışır)
+      if (!_isStartupChecked) {
+        _isStartupChecked =
+            true; // Bayrağı indirdik, bir daha buraya girmeyecek
+
+        final session = Supabase.instance.client.auth.currentSession;
+        if (session != null) {
+          final prefs = await SharedPreferences.getInstance();
+          final rememberMe = prefs.getBool('remember_me') ?? false;
+
+          if (!rememberMe) {
+            await Supabase.instance.client.auth.signOut();
+
+            // Eğer açılışta değilsek ve auth ekranlarında değilsek logine at
+            if (state.matchedLocation != '/' &&
+                state.matchedLocation != '/login' &&
+                state.matchedLocation != '/register') {
+              return '/login';
+            }
+          }
+        }
+      }
+
+      return null; // Rotasına özgürce devam etsin
+    },
     routes: [
       // ── DEĞİŞMEDİ ──
       GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
+      // ... Diğer rotaların ...
       GoRoute(
         path: '/login',
         pageBuilder:
@@ -119,6 +153,17 @@ class AppRouter {
         builder:
             (context, state) =>
                 WorkoutDayDetailScreen(workout: state.extra as WorkoutDay),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        builder: (context, state) {
+          final email = state.extra as String? ?? '';
+          return ResetPasswordScreen(email: email);
+        },
       ),
       GoRoute(
         path: '/workout-history-detail',

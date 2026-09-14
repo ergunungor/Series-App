@@ -5,6 +5,7 @@ import '../theme/app_typography.dart';
 import '../widgets/app_input.dart';
 import '../widgets/app_button.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -41,6 +42,9 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('remember_me', _rememberMe);
 
       if (mounted) {
         context.go('/home'); // Başarılıysa Ana Sayfaya
@@ -126,10 +130,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
-                    Text(
-                      'Şifremi unuttum',
-                      style: AppTypography.body12Medium.copyWith(
-                        color: AppColors.brandSecondary,
+                    GestureDetector(
+                      onTap: () => context.push('/forgot-password'),
+                      child: Text(
+                        'Şifremi unuttum',
+                        style: AppTypography.body12Medium.copyWith(
+                          color: AppColors.brandSecondary,
+                        ),
                       ),
                     ),
                   ],

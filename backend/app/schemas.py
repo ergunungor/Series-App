@@ -20,3 +20,8 @@ class UserOnboardingData(BaseModel):
 class SaveProgramRequest(BaseModel):
     user_id: str
     program: dict
+
+class ReviseProgramRequest(BaseModel):
+    user_id: str
+    current_program: dict
+    prompt: str
