@@ -28,7 +28,6 @@ class AppBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // yeni:
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       decoration: BoxDecoration(
@@ -42,14 +41,20 @@ class AppBottomNav extends StatelessWidget {
           ),
         ],
       ),
-      clipBehavior: Clip.antiAlias,
+      // KESİLME ÇÖZÜMÜ 1: "clipBehavior: Clip.antiAlias" satırını tamamen sildik.
+      // Artık animasyon kavisli köşeye değse bile bıçak gibi kesilmeyecek.
+
+      // KESİLME ÇÖZÜMÜ 2: horizontal padding'i 8'den 12'ye çıkardık.
+      // Senin dediğin gibi beyaz kısmı sağdan ve soldan büyütmüş, ikonları güvenli alana almış olduk.
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: LayoutBuilder(
           builder: (context, constraints) {
             final double slotWidth = constraints.maxWidth / _items.length;
 
             return Stack(
+              clipBehavior:
+                  Clip.none, // KRİTİK ÇÖZÜM: Stack'in dışına taşan esneme animasyonunu kesmesini engeller
               children: [
                 // Kayan "damla" arka plan
                 AnimatedPositioned(
@@ -92,7 +97,6 @@ class AppBottomNav extends StatelessWidget {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              // yeni:
                               AnimatedScale(
                                 duration: const Duration(milliseconds: 450),
                                 curve: Curves.easeOutCubic,
@@ -110,7 +114,8 @@ class AppBottomNav extends StatelessWidget {
                                   color: AppColors.brandTertiary,
                                   fontWeight:
                                       isSelected
-                                          ? FontWeight.w700
+                                          ? FontWeight
+                                              .w700 // Hata vermemesi için w700'de bırakıldı
                                           : FontWeight.w500,
                                 ),
                                 child: Text(item.label),
@@ -124,7 +129,6 @@ class AppBottomNav extends StatelessWidget {
                 ),
               ],
             );
-            // yeni:
           },
         ),
       ),
