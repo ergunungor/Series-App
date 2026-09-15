@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shimmer/shimmer.dart'; // YENİ EKLENDİ
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../models/program.dart';
@@ -18,14 +19,16 @@ class ProgramsScreen extends StatefulWidget {
   State<ProgramsScreen> createState() => _ProgramsScreenState();
 }
 
-// yeni:
 class _ProgramsScreenState extends State<ProgramsScreen> {
   List<ActiveProgram> _programs = [];
   bool _isLoading = true;
   String? _activeProgramId;
-  // Seçim modu state'i: hangi kartların işaretli olduğunu tutuyoruz.
+
   bool _isSelectionMode = false;
   final Set<String> _selectedIds = {};
+
+  // YENİ: Arka planda program oluşturulurken listeye shimmer eklemek için
+  bool _isCreatingNewProgram = false;
 
   @override
   void initState() {
@@ -54,12 +57,25 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
           _programs = programs;
           _activeProgramId = activeId;
           _isLoading = false;
+          _isCreatingNewProgram = false; // Veri gelince shimmer'ı kapat
         });
       }
     } catch (error) {
       debugPrint('Program çekme hatası: $error');
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isCreatingNewProgram = false;
+        });
+      }
     }
+  }
+
+  // YENİ: Dışarıdan veya anketten dönerken arka plan işlemini başlatmak için
+  void setCreatingState(bool isCreating) {
+    setState(() {
+      _isCreatingNewProgram = isCreating;
+    });
   }
 
   Future<bool> _confirmDeleteProgram(ActiveProgram program) async {
@@ -87,7 +103,6 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
       } else {
         _selectedIds.add(id);
       }
-      // Son seçili öğe de kaldırılırsa seçim modundan otomatik çık.
       if (_selectedIds.isEmpty) _isSelectionMode = false;
     });
   }
@@ -136,7 +151,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
         children: [
           IconButton(
             onPressed: _exitSelectionMode,
-            icon: Icon(Icons.close, color: AppColors.brandTertiary),
+            icon: const Icon(Icons.close, color: AppColors.brandTertiary),
           ),
           Expanded(
             child: Text(
@@ -148,7 +163,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
           ),
           PopupMenuButton<String>(
             color: Colors.white,
-            icon: Icon(Icons.more_vert, color: AppColors.brandTertiary),
+            icon: const Icon(Icons.more_vert, color: AppColors.brandTertiary),
             onSelected: (value) {
               if (value == 'select_all') _selectAll();
               if (value == 'delete') _deleteSelected();
@@ -189,7 +204,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
         ),
         PopupMenuButton<String>(
           color: Colors.white,
-          icon: Icon(Icons.more_vert, color: AppColors.brandTertiary),
+          icon: const Icon(Icons.more_vert, color: AppColors.brandTertiary),
           onSelected: (value) {
             if (value == 'select' && _programs.isNotEmpty) {
               setState(() => _isSelectionMode = true);
@@ -211,9 +226,62 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     );
   }
 
+  // YENİ: İçi pırıl pırıl parlayan gerçek iskelet (Skeleton) kart tasarımı
+  Widget _buildProgramShimmerCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.brandSecondary),
+      ),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey.shade200,
+        highlightColor: Colors.white,
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 100,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Alt menü ve FAB'ın arkasında kalmaması için dinamik boşluk hesabı
     final bottomInset = MediaQuery.of(context).padding.bottom + 120;
 
     return Scaffold(
@@ -230,7 +298,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                 child:
                     _isLoading
                         ? const Center(child: CircularProgressIndicator())
-                        : _programs.isEmpty
+                        : (_programs.isEmpty && !_isCreatingNewProgram)
                         ? _EmptyState(
                           onCreate: () async {
                             final created = await context.push<bool>(
@@ -240,14 +308,23 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                           },
                         )
                         : ListView.separated(
-                          // YENİ: Listeye alt ve üst boşluk eklenerek arkada kalması önlendi
                           padding: EdgeInsets.fromLTRB(0, 0, 0, bottomInset),
                           physics: const BouncingScrollPhysics(),
-                          itemCount: _programs.length,
+                          itemCount:
+                              _programs.length +
+                              (_isCreatingNewProgram ? 1 : 0),
                           separatorBuilder:
                               (_, __) => const SizedBox(height: 12),
                           itemBuilder: (context, index) {
-                            final program = _programs[index];
+                            // Shimmer'ı en üste bas
+                            if (_isCreatingNewProgram && index == 0) {
+                              return _buildProgramShimmerCard();
+                            }
+
+                            // Gerçek listeyi Shimmer varsa 1 kaydırarak çiz
+                            final actualIndex =
+                                _isCreatingNewProgram ? index - 1 : index;
+                            final program = _programs[actualIndex];
                             final isSelected = _selectedIds.contains(
                               program.id,
                             );
@@ -268,7 +345,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                               confirmDismiss:
                                   (_) => _confirmDeleteProgram(program),
                               onDismissed: (_) {
-                                final removedIndex = index;
+                                final removedIndex = actualIndex;
                                 setState(
                                   () => _programs.removeAt(removedIndex),
                                 );
@@ -298,10 +375,8 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                                     )
                                     .closed
                                     .then((reason) async {
-                                      if (reason ==
-                                          SnackBarClosedReason.action) {
+                                      if (reason == SnackBarClosedReason.action)
                                         return;
-                                      }
                                       try {
                                         await ProgramRepository.deleteProgram(
                                           program.id,
@@ -337,9 +412,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                                     '/program-detail',
                                     extra: program,
                                   );
-                                  if (result == true) {
-                                    _fetch();
-                                  }
+                                  if (result == true) _fetch();
                                 },
                                 onLongPress:
                                     () => _enterSelectionMode(program.id),
@@ -352,7 +425,6 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
           ),
         ),
       ),
-
       floatingActionButton:
           _isSelectionMode
               ? null
@@ -369,18 +441,14 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                             '/onboarding-survey',
                           );
                           if (created == true) {
-                            _fetch();
-                          } // _fetch burada çalışır çünkü bu dosyanın içinde tanımlı
+                            setCreatingState(true);
+                          }
                         },
                         onImportProgram: () async {
-                          // Navigator.pop silindi
                           final created = await context.push<bool>(
                             '/import-program',
                           );
-
-                          if (created == true) {
-                            _fetch();
-                          }
+                          if (created == true) _fetch();
                         },
                       ),
                   backgroundColor: AppColors.brandTertiary,
@@ -442,12 +510,9 @@ class _ProgramCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
               ] else ...[
-                // Marka logosunu küçük bir daire içinde göstererek kartın
-                // "bir program" olduğunu görsel olarak da anlatıyoruz —
                 const AppLogo(explicitSize: 56, type: AppLogoType.dark),
                 const SizedBox(width: 14),
               ],
-              // yeni:
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,13 +530,9 @@ class _ProgramCard extends StatelessWidget {
                             ),
                           ),
                         ),
-
-                        // Sadece bu program aktif olarak işaretlenmişse
-                        // (profiles.active_program_id ile eşleşiyorsa) rozeti
-                        // gösteriyoruz — diğer tüm kartlarda hiç yer kaplamıyor.
                       ],
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         if (!isSelectionMode) ...[
@@ -493,7 +554,7 @@ class _ProgramCard extends StatelessWidget {
                 ),
               ),
               if (!isSelectionMode)
-                Icon(Icons.chevron_right, color: AppColors.textTertiary),
+                const Icon(Icons.chevron_right, color: AppColors.textTertiary),
             ],
           ),
         ),

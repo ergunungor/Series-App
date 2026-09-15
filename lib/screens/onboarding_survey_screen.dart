@@ -9,6 +9,7 @@ import '../widgets/selectable_chip.dart';
 import '../models/onboarding_data.dart';
 import '../services/program_service.dart';
 import '../widgets/app_confirm_dialog.dart';
+import '../services/program_repository.dart'; // YENİ EKLENDİ (programRefreshNotifier için)
 
 class OnboardingSurveyScreen extends StatefulWidget {
   const OnboardingSurveyScreen({super.key});
@@ -24,19 +25,15 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
   final _pageController = PageController();
 
   int _currentStep = 0;
-  bool _isSubmitting = false;
 
-  // YENİ: Toplam adım sayısı 9'dan 10'a çıkarıldı (Cinsiyet eklendiği için)
   static const int totalSteps = 10;
 
-  // YENİ: Cinsiyet Seçenekleri
   static const List<String> _genderOptions = [
     'Erkek',
     'Kadın',
     'Belirtmek İstemiyorum',
   ];
-  String?
-  _selectedGender; // OnboardingData modeline "String? gender;" eklemeyi unutma.
+  String? _selectedGender;
 
   static const List<String> _equipmentOptions = [
     'Sadece Vücut Ağırlığı',
@@ -63,7 +60,6 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     'Esneklik & Hareketlilik',
     'Sağlık / Rehabilitasyon',
   ];
-  // YENİ: Çoklu hedef seçimi için geçici bir Set kullanıyoruz.
   final Set<String> _selectedGoals = {};
 
   static const List<String> _interestOptions = [
@@ -173,6 +169,12 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
   }
 
   Future<bool> _canUseAI(String userId) async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user?.email == 'ergun6e@gmail.com') {
+      return true;
+    }
+
     final today = DateTime.now().toIso8601String().split('T').first;
     final response =
         await Supabase.instance.client
@@ -190,6 +192,12 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
   }
 
   Future<void> _consumeAICredit(String userId) async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user?.email == 'ergun6e@gmail.com') {
+      return;
+    }
+
     final today = DateTime.now().toIso8601String().split('T').first;
     final response =
         await Supabase.instance.client
@@ -209,6 +217,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
         .eq('id', userId);
   }
 
+  // YENİ: ATEŞLE VE UNUT MANTIĞI
   Future<void> _submit() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
@@ -221,10 +230,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
         _blockerController.text.trim().isEmpty
             ? null
             : _blockerController.text.trim();
-
-    // YENİ: Topladığımız yeni verileri AI için hazırlanan modele gönderiyoruz.
-    // (Eğer OnboardingData içinde gender yoksa oraya String? gender; eklemeyi unutma).
-    //_data.gender = _selectedGender;
+    _data.gender = _selectedGender;
     _data.primaryGoal = _selectedGoals.join(', ');
 
     if (_data.age == null) {
@@ -232,57 +238,39 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
       return;
     }
 
-    setState(() => _isSubmitting = true);
-    try {
-      final hasCredit = await _canUseAI(user.id);
-      if (!hasCredit) {
-        _showError(
-          'Bugünlük ücretsiz yapay zeka limitine (5/5) ulaştın. Lütfen yarın tekrar dene.',
-        );
-        if (mounted) setState(() => _isSubmitting = false);
-        return;
-      }
+    // Kota kontrolünü hızlıca bekliyoruz
+    final hasCredit = await _canUseAI(user.id);
+    if (!hasCredit) {
+      _showError(
+        'Bugünlük ücretsiz yapay zeka limitine (5/5) ulaştın. Lütfen yarın tekrar dene.',
+      );
+      return;
+    }
 
-      await ProgramService.generateProgram(_data, user.id);
-      await _consumeAICredit(user.id);
+    // 1. Arka planda AI işlemini başlat (await YOK!)
+    ProgramService.generateProgram(_data, user.id)
+        .then((_) async {
+          await _consumeAICredit(user.id);
+          // İşlem bitince ana sayfadaki listeyi otomatik yenile
+          programRefreshNotifier.value++;
+        })
+        .catchError((error) {
+          debugPrint('AI Oluşturma Hatası: $error');
+        });
 
-      if (mounted) {
-        if (context.canPop()) {
-          context.pop(true);
-        } else {
-          context.go('/home');
-        }
+    // 2. Anket sayfasını ANINDA kapat ki ana sayfadaki Shimmer görünsün!
+    if (mounted) {
+      if (context.canPop()) {
+        context.pop(true);
+      } else {
+        context.go('/home');
       }
-    } catch (error) {
-      if (mounted) _showError('Program oluşturulurken bir hata oluştu: $error');
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isSubmitting) {
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: AppColors.brandPrimary),
-              const SizedBox(height: 24),
-              Text(
-                'Yapay zeka senin için program hazırlıyor...',
-                textAlign: TextAlign.center,
-                style: AppTypography.body16Medium.copyWith(
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    // YENİ: Beyaz yükleme ekranı kodu tamamen silindi
 
     return PopScope(
       canPop: false,
@@ -304,7 +292,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
             physics: const NeverScrollableScrollPhysics(),
             children: [
               _ageStep(),
-              _genderStep(), // YENİ ADIM
+              _genderStep(),
               _experienceStep(),
               _goalStep(),
               _interestsStep(),
@@ -339,7 +327,6 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     },
   );
 
-  // YENİ: Cinsiyet Adımı
   Widget _genderStep() => SurveyStepScaffold(
     currentStep: _currentStep,
     totalSteps: totalSteps,
@@ -398,7 +385,6 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     },
   );
 
-  // GÜNCELLENDİ: Çoklu Hedef Seçimi
   Widget _goalStep() => SurveyStepScaffold(
     currentStep: _currentStep,
     totalSteps: totalSteps,
@@ -435,7 +421,6 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     },
   );
 
-  // GÜNCELLENDİ: "Hepsi" butonu eklendi
   Widget _interestsStep() => SurveyStepScaffold(
     currentStep: _currentStep,
     totalSteps: totalSteps,
@@ -446,7 +431,6 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
       spacing: 12,
       runSpacing: 12,
       children: [
-        // HEPSİ Seçeneği
         SelectableChip(
           label: 'Hepsi (Tüm Vücut)',
           isSelected: _data.specificInterests.length == _interestOptions.length,
@@ -461,7 +445,6 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
             });
           },
         ),
-        // Diğer bölgeler
         ..._interestOptions.map((o) {
           final isSelected = _data.specificInterests.contains(o);
           return SelectableChip(
@@ -663,12 +646,11 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     onExit: _handleCloseSurvey,
     onBack: _goBack,
     nextLabel: 'Bitir',
-    // GÜNCELLENDİ: 700 Karakter limitli, çok satırlı esnek form yapısı
     content: TextField(
       controller: _blockerController,
-      maxLength: 700, // 700 karakter limiti ve sağ altta sayaç
-      maxLines: 4, // Yazdıkça 4 satıra kadar esner
-      minLines: 2, // Başlangıçta 2 satır yüksekliğinde durur
+      maxLength: 700,
+      maxLines: 4,
+      minLines: 2,
       keyboardType: TextInputType.multiline,
       style: AppTypography.body16Regular.copyWith(color: AppColors.textPrimary),
       decoration: InputDecoration(
@@ -693,6 +675,6 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
         contentPadding: const EdgeInsets.all(16),
       ),
     ),
-    onNext: _submit,
+    onNext: _submit, // Artık butona basınca hiç beklemeden kapatacak
   );
 }

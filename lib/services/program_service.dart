@@ -45,7 +45,7 @@ class ProgramService {
         'current_program': currentProgram,
         'prompt': prompt,
         'model_type':
-            'pro', // GÜNCELLENDİ: Zeki revizeler için Pro modeli gönderiliyor
+            'flash', // GÜNCELLENDİ: Zeki revizeler için Pro modeli gönderiliyor
       }),
     );
 

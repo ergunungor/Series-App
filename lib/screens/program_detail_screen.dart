@@ -22,6 +22,13 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
 
   // --- LİMİT KONTROL METOTLARI ---
   Future<bool> _canUseAI(String userId) async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    // YENİ: Patron çıldırdı (Kendi e-postan için VIP Geçiş)
+    if (user?.email == 'ergun6e@gmail.com') {
+      return true; // Sınır yok, hep true döner
+    }
+
     final today = DateTime.now().toIso8601String().split('T').first;
     final response =
         await Supabase.instance.client
@@ -38,6 +45,13 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
   }
 
   Future<void> _consumeAICredit(String userId) async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    // YENİ: Kendi hesabında kota düşürme işlemini tamamen pas geç
+    if (user?.email == 'ergun6e@gmail.com') {
+      return;
+    }
+
     final today = DateTime.now().toIso8601String().split('T').first;
     final response =
         await Supabase.instance.client

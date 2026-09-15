@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import google.generativeai as genai
 from dotenv import load_dotenv
 from .schemas import UserOnboardingData
@@ -7,7 +8,6 @@ from .schemas import UserOnboardingData
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# YENİ: Senin belirlediğin versiyonlara göre Dinamik Model Seçici
 def get_generative_models(model_type: str):
     """
     İsteğe göre ana ve yedek modelleri döndürür.
@@ -37,7 +37,6 @@ def generate_with_fallback(content, generation_config, model_type="flash"):
         
         raise e
 
-
 def get_ai_exercise_catalog():
     file_path = os.path.join(os.path.dirname(__file__), 'exercises.json')
     with open(file_path, 'r', encoding='utf-8') as f:
@@ -55,7 +54,7 @@ def generate_workout_program(data: UserOnboardingData):
     Sen dünya çapında uzman bir fitness ve kalistenik koçusun. 
     Kullanıcı Profili:
     - Yaş: {data.age}
-    - Cinsiyet: {data.gender}  # YENİ EKLENDİ
+    - Cinsiyet: {data.gender}
     - Tecrübe: {data.experience}
     - Ana Hedef: {data.primary_goal}
     - Odaklanmak İstediği Alanlar: {interests_str}
@@ -78,13 +77,35 @@ def generate_workout_program(data: UserOnboardingData):
     KULLANABİLECEĞİN EGZERSİZLER LİSTESİ (KATALOG):
     {ai_catalog_str}
 
-    Yanıtını SADECE JSON formatında ver, başına veya sonuna markdown (```json) EKLEME.
+    Yanıtını SADECE aşağıdaki JSON formatında ver, başına veya sonuna markdown (```json) veya ekstra metin EKLEME:
+    {{
+      "program_name": "Programın havalı ve amaca uygun ismi",
+      "description": "Kullanıcıyı motive edecek 2 cümlelik açıklama",
+      "workouts": [
+        {{
+          "day_number": 1,
+          "name": "Push Day veya Üst Vücut vb.",
+          "estimated_duration_min": {data.logistics.max_duration_min},
+          "exercises": [
+            {{
+              "id": "0025", 
+              "name": "Barbell Bench Press",
+              "sets": 3,
+              "reps": "8-12",
+              "duration_seconds": null,
+              "rest_seconds": 60,
+              "notes": "Formuna dikkat et"
+            }}
+          ]
+        }}
+      ]
+    }}
     """
 
     response = generate_with_fallback(
         prompt,
         generation_config={"response_mime_type": "application/json"},
-        model_type=data.model_type # YENİ EKLENDİ
+        model_type=data.model_type 
     )
     
     return sanitize_program_data(json.loads(response.text.strip()))
@@ -112,7 +133,44 @@ def save_generated_program(supabase_client, user_id: str, generated_program: dic
     return program_id
 
 def parse_program_from_input(text: str = None, file_bytes: bytes = None, mime_type: str = None):
-    prompt = """... (Mevcut prompt içeriğin aynı kalacak) ..."""
+    prompt = """
+    Sen bir fitness programı analiz uzmanısın. Sana verilen antrenman
+    programını (metin, görsel veya PDF olabilir) analiz et ve aşağıdaki
+    JSON formatına dönüştür.
+
+    KURALLAR:
+    - Programda ne yazıyorsa onu kullan, egzersiz uydurma.
+    - Her egzersiz için "instructions" alanına, o hareketin nasıl yapılacağını
+      anlatan kısa (1-2 cümle) bir talimat yaz.
+    - ÇOK ÖNEMLİ (SÜRE BAZLI HAREKETLER): Eğer hareketin yanında "sn", "saniye", "sec", "dk", "dakika" gibi süre belirten bir ifade varsa, "reps" alanını KESİNLİKLE `null` yap ve süreyi saniyeye çevirerek "duration_seconds" alanına yaz (Örn: 30 sn -> duration_seconds: 30, reps: null). Süre yoksa normal hareketlerde "reps" kullan.
+    - Eğer verilen içerik bir antrenman/egzersiz programı DEĞİLSE, SADECE
+      şu JSON'u dön: {"error": "not_a_program"}
+
+    Yanıtını SADECE aşağıdaki JSON formatında ver, markdown veya ekstra
+    metin EKLEME:
+    {
+      "program_name": "Programın ismi (yoksa uygun bir isim öner)",
+      "description": "2 cümlelik açıklama",
+      "workouts": [
+        {
+          "day_number": 1,
+          "name": "Gün adı",
+          "estimated_duration_min": 45,
+          "exercises": [
+            {
+              "name": "Egzersiz adı",
+              "sets": 3,
+              "reps": "8-12",
+              "duration_seconds": null,
+              "rest_seconds": 60,
+              "instructions": "Kısa yapılış talimatı",
+              "notes": null
+            }
+          ]
+        }
+      ]
+    }
+    """
 
     if text:
         prompt += f"\n\nKULLANICININ YAZDIĞI PROGRAM:\n{text}"
@@ -122,7 +180,6 @@ def parse_program_from_input(text: str = None, file_bytes: bytes = None, mime_ty
     else:
         raise ValueError("Ne metin ne dosya verildi.")
 
-    # YENİ: İçe aktarma (Parse) işlemi hızlı olduğu için flash modelini sabit kullanıyoruz
     response = generate_with_fallback(
         content,
         generation_config={"response_mime_type": "application/json"},
@@ -137,9 +194,24 @@ def parse_program_from_input(text: str = None, file_bytes: bytes = None, mime_ty
 
     return sanitize_program_data(result)
 
-import re
 def sanitize_program_data(data: dict):
-    # (Mevcut sanitize_program_data içeriğin tamamen aynı kalacak)
+    for workout in data.get("workouts", []):
+        for exercise in workout.get("exercises", []):
+            reps = exercise.get("reps")
+            dur = exercise.get("duration_seconds")
+            
+            if not dur and reps and isinstance(reps, str):
+                reps_lower = reps.lower()
+                if any(kw in reps_lower for kw in ["sn", "saniye", "sec"]):
+                    match = re.search(r'\d+', reps_lower)
+                    if match:
+                        exercise["duration_seconds"] = int(match.group())
+                        exercise["reps"] = None
+                        
+            name_lower = exercise.get("name", "").lower()
+            if ("plank" in name_lower or "hold" in name_lower) and not exercise.get("duration_seconds") and not exercise.get("reps"):
+                exercise["duration_seconds"] = 30
+                
     return data
 
 def revise_workout_program(data):
@@ -159,13 +231,35 @@ def revise_workout_program(data):
 
     ZORUNLU KURAL: Süreli egzersizlerde (Plank vs.) "reps" alanını null yap ve süreyi saniye olarak "duration_seconds" alanına yaz.
     
-    Yanıtını SADECE aşağıdaki JSON şemasında ver, başına sonuna ekstra metin ekleme.
+    Yanıtını SADECE aşağıdaki JSON şemasında ver, başına sonuna ekstra metin ekleme:
+    {{
+      "program_name": "Güncellenmiş Program İsmi",
+      "description": "Değişiklikleri yansıtan yeni açıklama",
+      "workouts": [
+        {{
+          "day_number": 1,
+          "name": "Gün adı",
+          "estimated_duration_min": 45,
+          "exercises": [
+            {{
+              "id": "0025", 
+              "name": "Egzersiz Adı",
+              "sets": 3,
+              "reps": "8-12",
+              "duration_seconds": null,
+              "rest_seconds": 60,
+              "notes": "Not"
+            }}
+          ]
+        }}
+      ]
+    }}
     """
 
     response = generate_with_fallback(
         prompt,
         generation_config={"response_mime_type": "application/json"},
-        model_type=data.model_type # YENİ: Revize için Pro modeli buradan tetikleniyor
+        model_type=data.model_type 
     )
     
     return sanitize_program_data(json.loads(response.text.strip()))

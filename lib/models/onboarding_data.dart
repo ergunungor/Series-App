@@ -24,6 +24,7 @@ class OnboardingData {
   int? age;
   String? experience;
   String? primaryGoal;
+  String? gender;
   List<String> specificInterests;
   List<String> healthRestrictions;
   LogisticsData logistics;
@@ -33,6 +34,7 @@ class OnboardingData {
     this.age,
     this.experience,
     this.primaryGoal,
+    this.gender,
     List<String>? specificInterests,
     List<String>? healthRestrictions,
     LogisticsData? logistics,
@@ -44,6 +46,7 @@ class OnboardingData {
   Map<String, dynamic> toJson(String userId) => {
     'user_id': userId,
     'age': age,
+    'gender': 'male', // Varsayılan olarak erkek
     'experience': experience,
     'primary_goal': primaryGoal,
     'specific_interests': specificInterests,
