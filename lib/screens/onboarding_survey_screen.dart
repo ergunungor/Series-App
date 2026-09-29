@@ -247,15 +247,18 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
       return;
     }
 
-    // 1. Arka planda AI işlemini başlat (await YOK!)
+    /// 1. Arka planda AI işlemini başlat (await YOK!)
     ProgramService.generateProgram(_data, user.id)
         .then((_) async {
           await _consumeAICredit(user.id);
-          // İşlem bitince ana sayfadaki listeyi otomatik yenile
-          programRefreshNotifier.value++;
         })
         .catchError((error) {
           debugPrint('AI Oluşturma Hatası: $error');
+        })
+        .whenComplete(() {
+          // İŞİN SIRRI BURADA: İşlem başarılı da olsa, timeout (hata) da yese
+          // Shimmer'ı kapatmak ve listeyi kendine getirmek için burası kesin çalışacak!
+          programRefreshNotifier.value++;
         });
 
     // 2. Anket sayfasını ANINDA kapat ki ana sayfadaki Shimmer görünsün!
