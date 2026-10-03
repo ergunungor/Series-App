@@ -27,13 +27,24 @@ def generate_with_fallback(content, generation_config, model_type="flash"):
     """Seçilen model tipine göre önce ana modeli dener, kota hatası alırsa yedeğe geçer."""
     primary_model, fallback_model = get_generative_models(model_type)
     
+    # Sunucu tarafında zombi thread oluşmasını engellemek için 35 saniyelik timeout
+    custom_request_options = {"timeout": 35.0}
+    
     try:
-        return primary_model.generate_content(content, generation_config=generation_config)
+        return primary_model.generate_content(
+            content, 
+            generation_config=generation_config,
+            request_options=custom_request_options
+        )
     except Exception as e:
         error_msg = str(e)
         if "429" in error_msg or "Quota" in error_msg:
             print(f"⚠️ Ana model limiti doldu! Yedek model devreye giriyor... (Model Tipi: {model_type})")
-            return fallback_model.generate_content(content, generation_config=generation_config)
+            return fallback_model.generate_content(
+                content, 
+                generation_config=generation_config,
+                request_options=custom_request_options
+            )
         
         raise e
 

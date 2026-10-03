@@ -51,6 +51,9 @@ async def create_program(user_data: UserOnboardingData):
     except Exception as e:
         print(f"API Hatası: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        print("create_program: İşlem sonlandırıldı/Temizlik yapıldı")
+
 
 @app.post("/api/parse-program")
 async def parse_program(
@@ -76,12 +79,13 @@ async def parse_program(
         }
 
     except ValueError as e:
-        # parse_program_from_input'un bilerek fırlattığı, kullanıcıya
-        # gösterilebilecek hatalar (örn. "bu bir program değil").
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         print(f"Parse API Hatası: {str(e)}")
         raise HTTPException(status_code=429, detail="Sistem limitlerine ulaşıldı, lütfen daha sonra tekrar deneyin.")
+    finally:
+        print("parse_program: İşlem sonlandırıldı/Temizlik yapıldı")
+
 
 @app.post("/api/save-program")
 async def save_program(request: SaveProgramRequest):
@@ -95,6 +99,9 @@ async def save_program(request: SaveProgramRequest):
     except Exception as e:
         print(f"Save API Hatası: {str(e)}")
         raise HTTPException(status_code=500, detail="Program kaydedilirken bir hata oluştu.")
+    finally:
+        print("save_program: İşlem sonlandırıldı/Temizlik yapıldı")
+
 
 @app.post("/api/revise-program")
 async def revise_program(request: ReviseProgramRequest):
@@ -108,8 +115,9 @@ async def revise_program(request: ReviseProgramRequest):
         error_msg = str(e)
         print(f"Revize API Hatası: {error_msg}")
         
-        # Gemini Rate Limit (429) hatasını yakalıyoruz
         if "429" in error_msg or "Quota exceeded" in error_msg:
             raise HTTPException(status_code=429, detail="Yapay zeka şu an çok yoğun. Lütfen 15-20 saniye bekleyip tekrar dene.")
             
         raise HTTPException(status_code=500, detail="Program güncellenirken bir hata oluştu.")
+    finally:
+        print("revise_program: İşlem sonlandırıldı/Temizlik yapıldı")
