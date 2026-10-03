@@ -3,7 +3,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import 'app_logo.dart';
 
-class WorkoutCard extends StatelessWidget {
+class WorkoutCard extends StatefulWidget {
   final String nextWorkoutName;
   final VoidCallback? onStartTap;
 
@@ -14,52 +14,114 @@ class WorkoutCard extends StatelessWidget {
   });
 
   @override
+  State<WorkoutCard> createState() => _WorkoutCardState();
+}
+
+class _WorkoutCardState extends State<WorkoutCard> {
+  static const double _cardRadius = 24;
+  static const double _cardPadding = 24;
+  static const double _buttonHeight = 48;
+  static const double _pressedScale = 0.96;
+  static const Duration _pressDuration = Duration(milliseconds: 120);
+
+  bool _isPressed = false;
+
+  void _setPressed(bool value) {
+    if (_isPressed != value) setState(() => _isPressed = value);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: AppColors.brandPrimary),
-        borderRadius: BorderRadius.circular(8),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.heroGradientStart, AppColors.brandTertiary],
+        ),
+        borderRadius: BorderRadius.circular(_cardRadius),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.brandPrimary.withValues(alpha: 0.28),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
-      child: Row(
+      child: Stack(
         children: [
-          const AppLogo(explicitSize: 64, type: AppLogoType.dark),
-          const SizedBox(width: 12),
-          Expanded(
+          // Dekoratif filigran logo: kartın sağ altından taşar, Container kırpar.
+          Positioned(
+            right: -28,
+            bottom: -28,
+            child: Opacity(
+              opacity: 0.10,
+              child: const AppLogo(explicitSize: 160, type: AppLogoType.light),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(_cardPadding),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  nextWorkoutName,
-                  textAlign: TextAlign.center,
-                  style: AppTypography.body18Medium.copyWith(
-                    color: AppColors.brandTertiary,
+                  'SIRADAKİ ANTRENMAN',
+                  style: AppTypography.body12Medium.copyWith(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
                   ),
                 ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: onStartTap,
-                  icon: Icon(
-                    Icons.play_arrow_rounded,
-                    size: 18,
-                    color: AppColors.brandTertiary,
+                const SizedBox(height: 8),
+                Text(
+                  widget.nextWorkoutName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.heading2.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
                   ),
-                  label: Text(
-                    'Antrenmanı Başlat',
-                    style: AppTypography.body12Medium.copyWith(
-                      color: AppColors.brandTertiary,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: AppColors.brandTertiary),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                ),
+                const SizedBox(height: 24),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapDown: (_) => _setPressed(true),
+                  onTapUp: (_) => _setPressed(false),
+                  onTapCancel: () => _setPressed(false),
+                  onTap: widget.onStartTap,
+                  child: AnimatedScale(
+                    scale: _isPressed ? _pressedScale : 1.0,
+                    duration: _pressDuration,
+                    curve: Curves.easeOut,
+                    child: Container(
+                      height: _buttonHeight,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.play_arrow_rounded,
+                            size: 22,
+                            color: AppColors.brandPrimary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Antrenmanı Başlat',
+                            style: AppTypography.body16Medium.copyWith(
+                              color: AppColors.brandPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

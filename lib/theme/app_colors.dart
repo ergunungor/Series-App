@@ -11,9 +11,16 @@ class AppColors {
   static const Color textSecondary = Color(0xFFCB0000);
   static const Color textTertiary = Color(0xFF818181);
 
-  static const Color background = Color(0xFFFFFDF7);
+  static const Color background = Color(0xFFF5F3F0);
   static const Color white = Color(0xFFFFFFFF);
   static const Color streak = Color(0xFFFF3C00);
   static const Color progressTrack = Color(0xFFD9D9D9);
   static const Color navSelectedBg = Color(0xFFEDEDED);
+
+  // Hero kart gradient başlangıcı (bitişi: brandTertiary)
+  static const Color heroGradientStart = Color(0xFFB3241B);
+
+  // Nötr katman tonları (ikon karoları, buton zeminleri, hairline çizgiler)
+  static const Color fillSubtle = Color(0xFFEFEBE6);
+  static const Color borderSubtle = Color(0xFFE8E4DF);
 }

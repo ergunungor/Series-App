@@ -175,15 +175,31 @@ class AppRouter {
 
       // ── YENİ: bottom nav shell ──
       StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) {
-          return MainShell(
-            currentIndex: navigationShell.currentIndex,
-            onTap:
-                (index) => navigationShell.goBranch(
-                  index,
-                  initialLocation: index == navigationShell.currentIndex,
-                ),
-            child: navigationShell,
+        pageBuilder: (context, state, navigationShell) {
+          return CustomTransitionPage(
+            key: state.pageKey,
+            transitionDuration: const Duration(milliseconds: 500),
+            transitionsBuilder: (
+              context,
+              animation,
+              secondaryAnimation,
+              child,
+            ) {
+              final curvedAnimation = CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeInOut,
+              );
+              return FadeTransition(opacity: curvedAnimation, child: child);
+            },
+            child: MainShell(
+              currentIndex: navigationShell.currentIndex,
+              onTap:
+                  (index) => navigationShell.goBranch(
+                    index,
+                    initialLocation: index == navigationShell.currentIndex,
+                  ),
+              child: navigationShell,
+            ),
           );
         },
         branches: [
