@@ -5,6 +5,16 @@ import 'package:flutter/foundation.dart';
 // Değeri bool veya int yapıp her seferinde tersine çevireceğiz veya artıracağız
 final programRefreshNotifier = ValueNotifier<int>(0);
 
+enum GenerationStatus { idle, generating, error }
+
+// Program oluşturma durumunu her yerden dinleyebilmek için
+final ValueNotifier<GenerationStatus> generationStateNotifier = ValueNotifier(
+  GenerationStatus.idle,
+);
+
+// Hata durumunda son isteği tekrar çalıştırabilmek için
+VoidCallback? retryGenerationCallback;
+
 class ProgramRepository {
   static Future<List<ActiveProgram>> fetchPrograms(String userId) async {
     final client = Supabase.instance.client;

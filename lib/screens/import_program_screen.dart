@@ -187,8 +187,8 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Programın başarıyla oluşturuldu!'),
+          const SnackBar(
+            content: Text('Programın başarıyla oluşturuldu!'),
             backgroundColor: AppColors.brandPrimary,
           ),
         );
@@ -196,14 +196,21 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        // "Exception: " metnini kullanıcı görmemesi için temizliyoruz.
+        final cleanMessage = e.toString().replaceAll('Exception: ', '').trim();
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Hata oluştu: $e'),
+            content: Text('Hata oluştu: $cleanMessage'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 4),
           ),
         );
+      }
+    } finally {
+      // ŞART 3: İşlem başarılı da olsa hata da alsa, loading state'i mutlaka kapatıyoruz.
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -217,7 +218,6 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
         .eq('id', userId);
   }
 
-  // YENİ: ATEŞLE VE UNUT MANTIĞI
   Future<void> _submit() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
@@ -247,21 +247,36 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
       return;
     }
 
-    /// 1. Arka planda AI işlemini başlat (await YOK!)
-    ProgramService.generateProgram(_data, user.id)
-        .then((_) async {
-          await _consumeAICredit(user.id);
-        })
-        .catchError((error) {
-          debugPrint('AI Oluşturma Hatası: $error');
-        })
-        .whenComplete(() {
-          // İŞİN SIRRI BURADA: İşlem başarılı da olsa, timeout (hata) da yese
-          // Shimmer'ı kapatmak ve listeyi kendine getirmek için burası kesin çalışacak!
-          programRefreshNotifier.value++;
-        });
+    // 1. Global state'i güncelliyoruz
+    generationStateNotifier.value = GenerationStatus.generating;
 
-    // 2. Anket sayfasını ANINDA kapat ki ana sayfadaki Shimmer görünsün!
+    // 2. İşlemi ve tekrar deneme fonksiyonunu (retry logic) tanımlıyoruz
+    void doGenerate() {
+      generationStateNotifier.value = GenerationStatus.generating;
+
+      ProgramService.generateProgram(_data, user.id)
+          .timeout(const Duration(seconds: 40))
+          .then((_) async {
+            await _consumeAICredit(user.id);
+            generationStateNotifier.value = GenerationStatus.idle;
+            programRefreshNotifier.value++; // Başarılıysa listeyi yenile
+          })
+          .catchError((error) {
+            debugPrint('AI Oluşturma Hatası veya Timeout: $error');
+            generationStateNotifier.value = GenerationStatus.error;
+          })
+          .whenComplete(() {
+            // İşlem bittiğinde (başarılı veya hatalı) çalışacak ortak kodlar buraya.
+            // Örn: Analiz event'i gönderme, sayaç durdurma, loglama.
+            debugPrint('Program oluşturma asenkron süreci tamamlandı.');
+          });
+    }
+
+    // 3. Tekrar deneme callback'ini globale ata ve süreci başlat
+    retryGenerationCallback = doGenerate;
+    doGenerate();
+
+    // 4. Anket sayfasını ANINDA kapat
     if (mounted) {
       if (context.canPop()) {
         context.pop(true);

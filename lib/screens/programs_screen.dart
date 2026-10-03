@@ -27,20 +27,23 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   bool _isSelectionMode = false;
   final Set<String> _selectedIds = {};
 
-  // YENİ: Arka planda program oluşturulurken listeye shimmer eklemek için
-  bool _isCreatingNewProgram = false;
-
   @override
   void initState() {
     super.initState();
     _fetch();
     programRefreshNotifier.addListener(_fetch);
+    generationStateNotifier.addListener(_onGenerationStateChanged);
   }
 
   @override
   void dispose() {
     programRefreshNotifier.removeListener(_fetch);
+    generationStateNotifier.removeListener(_onGenerationStateChanged);
     super.dispose();
+  }
+
+  void _onGenerationStateChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetch() async {
@@ -57,7 +60,6 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
           _programs = programs;
           _activeProgramId = activeId;
           _isLoading = false;
-          _isCreatingNewProgram = false; // Veri gelince shimmer'ı kapat
         });
       }
     } catch (error) {
@@ -65,17 +67,9 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _isCreatingNewProgram = false;
         });
       }
     }
-  }
-
-  // YENİ: Dışarıdan veya anketten dönerken arka plan işlemini başlatmak için
-  void setCreatingState(bool isCreating) {
-    setState(() {
-      _isCreatingNewProgram = isCreating;
-    });
   }
 
   Future<bool> _confirmDeleteProgram(ActiveProgram program) async {
@@ -280,6 +274,65 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     );
   }
 
+  Widget _buildErrorCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.error_outline, color: Colors.red),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Oluşturulamadı',
+                  style: AppTypography.body16Medium.copyWith(
+                    color: Colors.red.shade700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Bağlantı koptu veya zaman aşımı.',
+                  style: AppTypography.body14Regular.copyWith(
+                    color: Colors.red.shade900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () {
+              if (retryGenerationCallback != null) retryGenerationCallback!();
+            },
+            icon: const Icon(Icons.refresh, color: Colors.red),
+            tooltip: 'Tekrar Dene',
+          ),
+          IconButton(
+            onPressed: () {
+              generationStateNotifier.value = GenerationStatus.idle;
+            },
+            icon: const Icon(Icons.close, color: Colors.red),
+            tooltip: 'İptal',
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom + 120;
@@ -298,13 +351,12 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                 child:
                     _isLoading
                         ? const Center(child: CircularProgressIndicator())
-                        : (_programs.isEmpty && !_isCreatingNewProgram)
+                        : (_programs.isEmpty &&
+                            generationStateNotifier.value ==
+                                GenerationStatus.idle)
                         ? _EmptyState(
                           onCreate: () async {
-                            final created = await context.push<bool>(
-                              '/onboarding-survey',
-                            );
-                            if (created == true) _fetch();
+                            await context.push<bool>('/onboarding-survey');
                           },
                         )
                         : ListView.separated(
@@ -312,18 +364,31 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                           physics: const BouncingScrollPhysics(),
                           itemCount:
                               _programs.length +
-                              (_isCreatingNewProgram ? 1 : 0),
+                              (generationStateNotifier.value !=
+                                      GenerationStatus.idle
+                                  ? 1
+                                  : 0),
                           separatorBuilder:
                               (_, __) => const SizedBox(height: 12),
                           itemBuilder: (context, index) {
-                            // Shimmer'ı en üste bas
-                            if (_isCreatingNewProgram && index == 0) {
-                              return _buildProgramShimmerCard();
+                            // Duruma göre Shimmer veya Hata kartını en üste bas
+                            if (generationStateNotifier.value !=
+                                    GenerationStatus.idle &&
+                                index == 0) {
+                              if (generationStateNotifier.value ==
+                                  GenerationStatus.generating) {
+                                return _buildProgramShimmerCard();
+                              } else {
+                                return _buildErrorCard();
+                              }
                             }
 
-                            // Gerçek listeyi Shimmer varsa 1 kaydırarak çiz
+                            // Gerçek listeyi state kartı varsa 1 kaydırarak çiz
                             final actualIndex =
-                                _isCreatingNewProgram ? index - 1 : index;
+                                (generationStateNotifier.value !=
+                                        GenerationStatus.idle)
+                                    ? index - 1
+                                    : index;
                             final program = _programs[actualIndex];
                             final isSelected = _selectedIds.contains(
                               program.id,
@@ -437,12 +502,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                       () => showAddProgramSheet(
                         context: context,
                         onCreateWithAi: () async {
-                          final created = await context.push<bool>(
-                            '/onboarding-survey',
-                          );
-                          if (created == true) {
-                            setCreatingState(true);
-                          }
+                          await context.push<bool>('/onboarding-survey');
                         },
                         onImportProgram: () async {
                           final created = await context.push<bool>(

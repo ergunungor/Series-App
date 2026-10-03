@@ -160,11 +160,11 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
       debugPrint('Revize Hatası: $e');
       if (mounted) {
         // "Exception: " ön ekini temizleyerek sadece asıl mesajı alıyoruz
-        final errorMessage = e.toString().replaceAll('Exception: ', '');
+        final errorMessage = e.toString().replaceAll('Exception: ', '').trim();
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMessage),
+            content: Text('Hata oluştu: $errorMessage'),
             backgroundColor:
                 AppColors
                     .brandPrimary, // Hata için istersen kırmızı (Colors.red) da yapabilirsin

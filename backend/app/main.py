@@ -81,7 +81,7 @@ async def parse_program(
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         print(f"Parse API Hatası: {str(e)}")
-        raise HTTPException(status_code=500, detail="Program analiz edilirken bir hata oluştu.")
+        raise HTTPException(status_code=429, detail="Sistem limitlerine ulaşıldı, lütfen daha sonra tekrar deneyin.")
 
 @app.post("/api/save-program")
 async def save_program(request: SaveProgramRequest):

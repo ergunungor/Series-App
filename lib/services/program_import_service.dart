@@ -13,7 +13,7 @@ class ProgramImportService {
 
     if (parseResponse.statusCode != 200) {
       throw Exception(
-        'Program analiz edilirken bir hata oluştu: ${parseResponse.body}',
+        'Sistem limitlerine ulaşıldı, lütfen daha sonra tekrar deneyin',
       );
     }
 
@@ -49,9 +49,7 @@ class ProgramImportService {
     final parseResponse = await http.Response.fromStream(streamedResponse);
 
     if (parseResponse.statusCode != 200) {
-      throw Exception(
-        'Dosya analiz edilirken bir hata oluştu: ${parseResponse.body}',
-      );
+      throw Exception('Dosya analiz edilirken bir hata oluştu');
     }
 
     final parsedData = jsonDecode(parseResponse.body)['data'];
@@ -72,9 +70,7 @@ class ProgramImportService {
     );
 
     if (saveResponse.statusCode != 200) {
-      throw Exception(
-        'Program veritabanına kaydedilirken bir hata oluştu: ${saveResponse.body}',
-      );
+      throw Exception('Program veritabanına kaydedilirken bir hata oluştu');
     }
   }
 }
