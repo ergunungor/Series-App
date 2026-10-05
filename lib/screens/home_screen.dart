@@ -13,6 +13,7 @@ import '../widgets/select_active_program_sheet.dart';
 import 'package:lottie/lottie.dart';
 import '../widgets/reveal.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/series_wordmark.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -165,17 +166,8 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Center(
-                  child: Text(
-                    'SERIES',
-                    style: AppTypography.body14Medium.copyWith(
-                      color: AppColors.brandTertiary,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 4,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
+                const SeriesWordmark(),
+                const SizedBox(height: 16),
                 Text(
                   'Hoş geldin',
                   style: AppTypography.body18Medium.copyWith(

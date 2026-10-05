@@ -23,4 +23,15 @@ class AppColors {
   // Nötr katman tonları (ikon karoları, buton zeminleri, hairline çizgiler)
   static const Color fillSubtle = Color(0xFFEFEBE6);
   static const Color borderSubtle = Color(0xFFE8E4DF);
+
+  // Programlar ekranı hero kartı (espresso ve altın)
+  static const Color heroDarkStart = Color(0xFF2B1B14);
+  static const Color heroDarkEnd = Color(0xFF120A07);
+  static const Color accentGold = Color(0xFFE3B55B);
+  static const Color onHeroDark = Color(0xFFFFF4E0);
+
+  // Programlar kartları (hero ile aynı espresso/altın ailesi)
+  static const Color espresso = heroDarkStart;
+  static const Color goldTint = Color(0xFFF3E4C4);
+  static const Color goldDeep = Color(0xFFA87A22);
 }

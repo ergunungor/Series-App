@@ -7,6 +7,13 @@ import '../models/program.dart';
 import '../services/program_service.dart';
 import '../services/program_repository.dart';
 import '../widgets/app_button.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import '../widgets/pressable_scale.dart';
+import 'package:flutter/services.dart';
+import '../widgets/app_logo.dart';
+import 'dart:ui' show ImageFilter;
+import 'package:flutter/cupertino.dart'
+    show CupertinoIcons, CupertinoActivityIndicator;
 
 class ProgramDetailScreen extends StatefulWidget {
   final ActiveProgram program;
@@ -19,6 +26,27 @@ class ProgramDetailScreen extends StatefulWidget {
 
 class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
   bool _isLoading = false;
+  static const double _pagePadding = 16;
+
+  final GlobalKey _heroKey = GlobalKey();
+  bool _isStatusBarLight = true;
+
+  // Hero ekranın üstünden çıkınca saat/pil rengini koyuya çevirir.
+  bool _handleScroll(ScrollNotification notification) {
+    if (notification is! ScrollUpdateNotification || notification.depth != 0) {
+      return false;
+    }
+    final heroHeight = _heroKey.currentContext?.size?.height;
+    if (heroHeight == null) return false;
+
+    final isLight =
+        notification.metrics.pixels <
+        heroHeight - MediaQuery.paddingOf(context).top;
+    if (isLight != _isStatusBarLight) {
+      setState(() => _isStatusBarLight = isLight);
+    }
+    return false;
+  }
 
   // --- LİMİT KONTROL METOTLARI ---
   Future<bool> _canUseAI(String userId) async {
@@ -177,7 +205,6 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
     }
   }
 
-  // --- DÜZENLEME PENCERESİ ---
   void _showReviseSheet() {
     final promptController = TextEditingController();
 
@@ -186,93 +213,313 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
+        final inputBorder = OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide.none,
+        );
+
         return Container(
           decoration: const BoxDecoration(
             color: AppColors.background,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
           padding: EdgeInsets.only(
-            top: 24,
-            left: 16,
-            right: 16,
-            bottom:
-                MediaQuery.of(ctx).viewInsets.bottom +
-                24, // Klavye açıldığında yukarı kayması için
+            top: 12,
+            left: 20,
+            right: 20,
+            // Klavye açıldığında yukarı kayması için
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'AI ile Şekillendir',
-                style: AppTypography.heading2.copyWith(
-                  color: AppColors.brandPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Antrenmanında neleri değiştirmek istersin? (Örn: Süreyi kısalt, bacak hareketlerini çıkar)',
-                textAlign: TextAlign.center,
-                style: AppTypography.body14Regular.copyWith(
-                  color: AppColors.textTertiary,
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.brandSecondary,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
-
-              // YENİ: Tek satırlık AppInput yerine çok satırlı (multi-line) TextField yapısı
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.goldTint,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.auto_awesome,
+                      size: 22,
+                      color: AppColors.goldDeep,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      'AI ile Şekillendir',
+                      style: AppTypography.heading2.copyWith(
+                        color: AppColors.espresso,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Antrenmanında neleri değiştirmek istersin? (Örn: Süreyi kısalt, bacak hareketlerini çıkar)',
+                style: AppTypography.body14Regular.copyWith(
+                  color: AppColors.textTertiary,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
               TextField(
                 controller: promptController,
-                maxLines:
-                    4, // Kullanıcı yazdıkhça 4 satıra kadar dikey olarak büyür
-                minLines: 2, // Başlangıçta 2 satır yükseklikte başlar
+                // Yazdıkça 4 satıra kadar dikey büyür, 2 satırla başlar
+                maxLines: 4,
+                minLines: 2,
                 keyboardType: TextInputType.multiline,
                 style: AppTypography.body16Regular.copyWith(
-                  color: AppColors.textPrimary,
+                  color: AppColors.espresso,
                 ),
                 decoration: InputDecoration(
                   hintText: 'Talebini yaz...',
                   hintStyle: AppTypography.body14Regular.copyWith(
                     color: AppColors.textTertiary,
                   ),
-                  prefixIcon: const Padding(
-                    padding: EdgeInsets.only(
-                      bottom: 24,
-                    ), // İkonu üste hizalamak için
-                    child: Icon(
-                      Icons.auto_awesome,
-                      color: AppColors.brandPrimary,
-                    ),
-                  ),
                   filled: true,
                   fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: AppColors.brandSecondary),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: AppColors.brandSecondary),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(
-                      color: AppColors.brandPrimary,
+                  border: inputBorder,
+                  enabledBorder: inputBorder,
+                  focusedBorder: inputBorder.copyWith(
+                    borderSide: const BorderSide(
+                      color: AppColors.goldDeep,
                       width: 1.5,
                     ),
                   ),
-                  contentPadding: const EdgeInsets.all(16),
+                  contentPadding: const EdgeInsets.all(18),
                 ),
               ),
-
               const SizedBox(height: 16),
-              AppButton(
-                text: 'GÜNCELLE',
-                showIcon: false,
-                onPressed: () => _handleRevise(promptController.text),
+              PressableScale(
+                onTap: () => _handleRevise(promptController.text),
+                child: Container(
+                  height: 52,
+                  width: double.infinity,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.accentGold,
+                    borderRadius: BorderRadius.circular(26),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.goldDeep.withValues(alpha: 0.3),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    'Güncelle',
+                    style: AppTypography.body16Medium.copyWith(
+                      color: AppColors.espresso,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _heroStat(String value, String label, {bool isFirst = false}) {
+    return Expanded(
+      child: Padding(
+        padding: EdgeInsets.only(left: isFirst ? 0 : 14, right: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              value,
+              style: AppTypography.heading2.copyWith(
+                color: AppColors.onHeroDark,
+                fontWeight: FontWeight.w700,
+                height: 1,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: AppTypography.body12Regular.copyWith(
+                color: AppColors.onHeroDark.withValues(alpha: 0.6),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _heroDivider() {
+    return Container(
+      width: 0.5,
+      color: AppColors.onHeroDark.withValues(alpha: 0.18),
+    );
+  }
+
+  Widget _buildHero() {
+    final program = widget.program;
+    final exerciseCount = program.workouts.fold<int>(
+      0,
+      (sum, w) => sum + w.exercises.length,
+    );
+    final totalMinutes = program.workouts.fold<int>(
+      0,
+      (sum, w) => sum + w.estimatedDurationMin,
+    );
+
+    final hero = Container(
+      key: _heroKey,
+      clipBehavior: Clip.antiAlias,
+      padding: EdgeInsets.fromLTRB(
+        _pagePadding,
+        MediaQuery.paddingOf(context).top + 12,
+        _pagePadding,
+        28,
+      ),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppColors.heroDarkStart, AppColors.heroDarkEnd],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            right: -32,
+            bottom: -44,
+            child: Opacity(
+              opacity: 0.06,
+              child: const AppLogo(explicitSize: 190, type: AppLogoType.light),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  PressableScale(
+                    pressedScale: 0.92,
+                    onTap: () => context.pop(),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppColors.onHeroDark.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        CupertinoIcons.back,
+                        size: 20,
+                        color: AppColors.onHeroDark,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  PressableScale(
+                    onTap: _showReviseSheet,
+                    child: Container(
+                      height: 44,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentGold.withValues(alpha: 0.16),
+                        border: Border.all(
+                          color: AppColors.accentGold.withValues(alpha: 0.45),
+                        ),
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.auto_awesome,
+                            size: 16,
+                            color: AppColors.accentGold,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Düzenle',
+                            style: AppTypography.body14Medium.copyWith(
+                              color: AppColors.accentGold,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 28),
+              Text(
+                program.name,
+                style: AppTypography.heading1.copyWith(
+                  color: AppColors.onHeroDark,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              const SizedBox(height: 24),
+              IntrinsicHeight(
+                child: Row(
+                  children: [
+                    _heroStat(
+                      '${program.workouts.length}',
+                      'gün',
+                      isFirst: true,
+                    ),
+                    _heroDivider(),
+                    _heroStat('$exerciseCount', 'hareket'),
+                    _heroDivider(),
+                    _heroStat('$totalMinutes', 'dk toplam'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    // Üst kenar boşluğa çekilince (bounce) hero'nun üstü açık kalmasın diye,
+    // hero'nun üstüne aynı renkte uzun bir blok ekliyoruz. Normalde ekran dışında,
+    // sadece aşağı çekilirken görünür.
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          top: -MediaQuery.sizeOf(context).height,
+          left: 0,
+          right: 0,
+          height: MediaQuery.sizeOf(context).height,
+          child: const ColoredBox(color: AppColors.heroDarkStart),
+        ),
+        hero,
+      ],
     );
   }
 
@@ -282,221 +529,301 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
       children: [
         Scaffold(
           backgroundColor: AppColors.background,
-          body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          body: AnnotatedRegion<SystemUiOverlayStyle>(
+            // Hero durum çubuğunun arkasındayken açık, liste altına geçince koyu
+            value:
+                _isStatusBarLight
+                    ? SystemUiOverlayStyle.light
+                    : SystemUiOverlayStyle.dark,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: _handleScroll,
+              child: ListView(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.paddingOf(context).bottom + 24,
+                ),
                 children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => context.pop(),
-                        icon: const Icon(
-                          Icons.arrow_back,
-                          color: AppColors.brandTertiary,
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          widget.program.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.heading2.copyWith(
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      // GÜNCELLENEN KISIM: Arka planı tamamen beyaz, ince şık bir çerçeveli ve modern "Düzenle" butonu
-                      TextButton.icon(
-                        onPressed: _showReviseSheet,
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.brandPrimary,
-                          backgroundColor:
-                              Colors.white, // Arka planı tamamen beyaz yaptık
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(
-                              color: AppColors.brandSecondary.withValues(
-                                alpha: 0.5,
-                              ),
-                              width: 1,
-                            ), // Hafif zarif bir çerçeve ekledik
-                          ),
-                          elevation: 0,
-                        ),
-                        icon: const Icon(Icons.auto_awesome, size: 16),
-                        label: Text(
-                          'Düzenle',
-                          style: AppTypography.body14Medium.copyWith(
-                            color: AppColors.brandPrimary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (widget.program.description.isNotEmpty) ...[
-                    const SizedBox(height: 12),
+                  _buildHero(),
+                  if (widget.program.description.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: const EdgeInsets.fromLTRB(
+                        _pagePadding,
+                        20,
+                        _pagePadding,
+                        0,
+                      ),
                       child: Text(
                         widget.program.description,
                         style: AppTypography.body14Regular.copyWith(
                           color: AppColors.textTertiary,
+                          height: 1.5,
                         ),
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 24),
-                  Expanded(
-                    child: ListView.separated(
-                      itemCount: widget.program.workouts.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final workout = widget.program.workouts[index];
-                        return Material(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(20),
-                            onTap:
-                                () => context.push(
-                                  '/workout-day-detail',
-                                  extra: workout,
-                                ),
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: AppColors.brandSecondary,
-                                ),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    alignment: Alignment.center,
-                                    decoration: const BoxDecoration(
-                                      color: AppColors.background,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Text(
-                                      '${workout.dayNumber}',
-                                      style: AppTypography.body16Medium
-                                          .copyWith(
-                                            color: AppColors.brandPrimary,
-                                          ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          workout.name,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: AppTypography.body16Medium
-                                              .copyWith(
-                                                color: AppColors.textPrimary,
-                                              ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${workout.exercises.length} hareket · ~${workout.estimatedDurationMin} dk',
-                                          style: AppTypography.body12Regular
-                                              .copyWith(
-                                                color: AppColors.textTertiary,
-                                              ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const Icon(
-                                    Icons.chevron_right,
-                                    color: AppColors.textTertiary,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      _pagePadding,
+                      24,
+                      _pagePadding,
+                      8,
+                    ),
+                    child: Text(
+                      'Antrenman günleri',
+                      style: AppTypography.body18Medium.copyWith(
+                        color: AppColors.espresso,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
+                  for (var i = 0; i < widget.program.workouts.length; i++)
+                    _DayTimelineItem(
+                      workout: widget.program.workouts[i],
+                      isFirst: i == 0,
+                      isLast: i == widget.program.workouts.length - 1,
+                      onTap:
+                          () => context.push(
+                            '/workout-day-detail',
+                            extra: widget.program.workouts[i],
+                          ),
+                    ),
                 ],
               ),
             ),
           ),
         ),
-        // YENİ: Şık Yükleme Ekranı Overlay'i
+        // Yükleme overlay'i: sayfa bulanıklaşır, ortada beyaz bir kart belirir
         if (_isLoading)
-          Container(
-            color: Colors.black.withValues(alpha: 0.5),
-            alignment: Alignment.center,
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 40),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 32,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.brandTertiary.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
+          Positioned.fill(
+            child: TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
+              builder: (context, t, child) {
+                return BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 8 * t, sigmaY: 8 * t),
+                  child: Container(
+                    color: AppColors.heroDarkEnd.withValues(alpha: 0.55 * t),
+                    alignment: Alignment.center,
+                    child: Opacity(opacity: t, child: child),
+                  ),
+                );
+              },
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 40),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 32,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 32,
+                        offset: const Offset(0, 12),
                       ),
-                      child: const CircularProgressIndicator(
-                        color: AppColors.brandPrimary,
-                        strokeWidth: 3,
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(
+                          color: AppColors.goldTint,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const CupertinoActivityIndicator(
+                          radius: 16,
+                          color: AppColors.goldDeep,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'AI İş Başında',
-                      style: AppTypography.heading2.copyWith(
-                        color: AppColors.textPrimary,
+                      const SizedBox(height: 24),
+                      Text(
+                        'AI İş Başında',
+                        style: AppTypography.heading3.copyWith(
+                          color: AppColors.espresso,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Programın yeniden şekillendiriliyor,\nlütfen bekle...',
-                      textAlign: TextAlign.center,
-                      style: AppTypography.body14Regular.copyWith(
-                        color: AppColors.textTertiary,
-                        height: 1.4,
+                      const SizedBox(height: 8),
+                      Text(
+                        'Programın yeniden şekillendiriliyor,\nlütfen bekle...',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.body14Regular.copyWith(
+                          color: AppColors.textTertiary,
+                          height: 1.4,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
       ],
+    );
+  }
+}
+
+class _DayTimelineItem extends StatelessWidget {
+  final WorkoutDay workout;
+  final bool isFirst;
+  final bool isLast;
+  final VoidCallback onTap;
+
+  const _DayTimelineItem({
+    required this.workout,
+    required this.isFirst,
+    required this.isLast,
+    required this.onTap,
+  });
+
+  static const double _nodeSize = 34;
+  static const double _lineWidth = 2;
+  static const double _gap = 12;
+
+  Widget _railLine({required bool visible}) {
+    return Center(
+      child: Container(
+        width: _lineWidth,
+        decoration: BoxDecoration(
+          color:
+              visible
+                  ? AppColors.goldDeep.withValues(alpha: 0.3)
+                  : Colors.transparent,
+          borderRadius: BorderRadius.circular(_lineWidth),
+        ),
+      ),
+    );
+  }
+
+  Widget _meta(IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: AppColors.textTertiary),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: AppTypography.body12Regular.copyWith(
+            color: AppColors.textTertiary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: _nodeSize,
+              child: Column(
+                children: [
+                  Expanded(child: _railLine(visible: !isFirst)),
+                  Container(
+                    width: _nodeSize,
+                    height: _nodeSize,
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: AppColors.espresso,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${workout.dayNumber}',
+                      style: AppTypography.body14Medium.copyWith(
+                        color: AppColors.onHeroDark,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Expanded(child: _railLine(visible: !isLast)),
+                ],
+              ),
+            ),
+            const SizedBox(width: _gap),
+            Expanded(
+              child: Padding(
+                // Boşluk satırın içinde simetrik: daire kartın tam ortasında kalır
+                // ve çizgi satırlar arasında kopmaz.
+                padding: const EdgeInsets.symmetric(vertical: _gap / 2),
+                child: PressableScale(
+                  pressedScale: 0.98,
+                  onTap: onTap,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                workout.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.body16Medium.copyWith(
+                                  color: AppColors.espresso,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.25,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 14,
+                                runSpacing: 4,
+                                children: [
+                                  _meta(
+                                    Icons.fitness_center_rounded,
+                                    '${workout.exercises.length} hareket',
+                                  ),
+                                  _meta(
+                                    Icons.schedule_rounded,
+                                    '~${workout.estimatedDurationMin} dk',
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          CupertinoIcons.chevron_right,
+                          size: 18,
+                          color: AppColors.goldDeep,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
