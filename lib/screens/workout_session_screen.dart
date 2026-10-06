@@ -649,7 +649,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   // Hero altı, GIF, set bloğu, kutular ve "Sıradaki" arasındaki eşit boşluk.
   static const double _sectionGap = 24;
   // Dock'un ekran altından (güvenli alan üstünden) uzaklığı.
-  static const double _dockBottomGap = 28;
+  static const double _dockBottomGap = 4;
 
   Widget _buildExerciseView() {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
