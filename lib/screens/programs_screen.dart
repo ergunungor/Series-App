@@ -965,7 +965,7 @@ class _LiquidGlassFab extends StatefulWidget {
 }
 
 class _LiquidGlassFabState extends State<_LiquidGlassFab> {
-  static const Duration _collapseDelay = Duration(milliseconds: 500);
+  static const Duration _collapseDelay = Duration(milliseconds: 800);
   static const Duration _morphDuration = Duration(milliseconds: 380);
   static const double _compactPadding = 16; // 16 + 20 ikon + 16 = 52 daire
   static const double _expandedPadding = 22;
