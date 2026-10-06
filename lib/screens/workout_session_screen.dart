@@ -1177,15 +1177,6 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Series logosu halkanın üstünde (beyaz silüet).
-                            Opacity(
-                              opacity: 0.9,
-                              child: const AppLogo(
-                                explicitSize: 56,
-                                type: AppLogoType.light,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
                             SizedBox(
                               width: _restRingSize,
                               height: _restRingSize,
@@ -1441,6 +1432,17 @@ class _RestBackground extends StatelessWidget {
                 AppColors.homeHeroGlow,
                 AppColors.homeHeroGlow.withValues(alpha: 0),
               ],
+            ),
+          ),
+        ),
+        // Hero'lardaki gibi silik, ekran dışına taşan büyük logo filigranı.
+        Positioned(
+          right: -90,
+          bottom: -50,
+          child: IgnorePointer(
+            child: Opacity(
+              opacity: 0.07,
+              child: const AppLogo(explicitSize: 440, type: AppLogoType.light),
             ),
           ),
         ),
