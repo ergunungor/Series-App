@@ -20,6 +20,7 @@ import '../widgets/detail_hero.dart' show HeroStatusBarScope;
 import '../widgets/exercise_timer_widget.dart';
 import '../widgets/kiremit_hero_surface.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/reveal.dart';
 import '../widgets/series_wordmark.dart';
 import '../utils/exercise_name.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -204,112 +205,63 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
+        final bottomSafe = MediaQuery.paddingOf(context).bottom;
+        final exercises = widget.workout.exercises;
+
         return Container(
-          height: MediaQuery.of(context).size.height * 0.65,
+          height: MediaQuery.of(context).size.height * 0.7,
           decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            color: AppColors.background,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
           ),
           child: Column(
             children: [
-              const SizedBox(height: 12),
-              // Çekme Çubuğu (Drag Handle)
+              // Çekme çubuğu (drag handle)
               Container(
                 width: 40,
                 height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 20),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: AppColors.textTertiary.withValues(alpha: 0.35),
                   borderRadius: BorderRadius.circular(45),
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Antrenman Akışı',
-                style: AppTypography.heading2.copyWith(
-                  color: AppColors.brandPrimary,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Antrenman Akışı',
+                    style: AppTypography.heading2.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              // Liste
               Expanded(
-                child: ListView.builder(
+                child: ListView.separated(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 8,
-                  ),
-                  itemCount:
-                      widget
-                          .workout
-                          .exercises
-                          .length, // widget.workout içinden çekiyoruz
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, bottomSafe + 24),
+                  itemCount: exercises.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
-                    final exercise = widget.workout.exercises[index];
-                    final isCompleted = index < _exerciseIndex;
-                    final isCurrent = index == _exerciseIndex;
-
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color:
-                              isCompleted
-                                  ? AppColors.brandPrimary
-                                  : (isCurrent
-                                      ? AppColors.brandTertiary
-                                      : Colors.grey.shade200),
-                        ),
-                        child: Icon(
-                          isCompleted ? Icons.check : Icons.fitness_center,
-                          size: 16,
-                          color:
-                              isCompleted || isCurrent
-                                  ? Colors.white
-                                  : Colors.grey.shade500,
-                        ),
-                      ),
-                      title: Text(
-                        formatExerciseName(exercise.name), // Hareketin ismi
-                        style: AppTypography.body16Medium.copyWith(
-                          color:
-                              isCompleted
-                                  ? Colors.grey.shade400
-                                  : AppColors.textPrimary,
-                          decoration:
-                              isCompleted ? TextDecoration.lineThrough : null,
-                        ),
-                      ),
-                      subtitle: Text(
-                        '${exercise.sets} Set x ${exercise.reps}', // Set ve tekrar sayıları
-                        style: AppTypography.body14Regular.copyWith(
-                          color: Colors.grey.shade400,
-                        ),
-                      ),
-                      trailing:
-                          isCurrent
-                              ? Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.brandTertiary.withValues(
-                                    alpha: 0.1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  'Şu an',
-                                  style: AppTypography.body12Medium.copyWith(
-                                    color: AppColors.brandTertiary,
-                                  ),
-                                ),
-                              )
-                              : null,
+                    final row = _FlowRow(
+                      name: formatExerciseName(exercises[index].name),
+                      detail:
+                          '${exercises[index].sets} Set x ${exercises[index].reps}',
+                      number: index + 1,
+                      isCompleted: index < _exerciseIndex,
+                      isCurrent: index == _exerciseIndex,
                       onTap: () => Navigator.pop(context),
+                    );
+                    if (index >= 6) return row;
+                    return Reveal(
+                      delay: const Duration(milliseconds: 50) * index,
+                      duration: const Duration(milliseconds: 400),
+                      offsetY: 10,
+                      child: row,
                     );
                   },
                 ),
@@ -547,16 +499,54 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   Widget build(BuildContext context) {
     if (_isFinishing) {
       return Scaffold(
-        backgroundColor: AppColors.brandPrimary,
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+        backgroundColor: AppColors.homeHeroDeep,
+        body: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: SystemUiOverlayStyle.light,
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              const CircularProgressIndicator(color: Colors.white),
-              const SizedBox(height: 20),
-              Text(
-                'Antrenman kaydediliyor...',
-                style: AppTypography.body16Medium.copyWith(color: Colors.white),
+              const _RestBackground(),
+              Center(
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: 1),
+                  duration: const Duration(milliseconds: 500),
+                  curve: Curves.easeOut,
+                  builder:
+                      (context, t, child) => Opacity(
+                        opacity: t,
+                        child: Transform.translate(
+                          offset: Offset(0, (1 - t) * 12),
+                          child: child,
+                        ),
+                      ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SeriesWordmark(
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
+                      const SizedBox(height: 32),
+                      const SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          strokeCap: StrokeCap.round,
+                          color: AppColors.accentGold,
+                          backgroundColor: Colors.white24,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Antrenman kaydediliyor...',
+                        style: AppTypography.body16Medium.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -1809,6 +1799,149 @@ class _SetCta extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Antrenman Akışı" listesindeki satır: biten hareket kiremit onaylı ve soluk,
+/// mevcut hareket kiremit vurgulu ve "Şu an" etiketli, kalanlar nötr.
+class _FlowRow extends StatelessWidget {
+  final String name;
+  final String detail;
+  final int number;
+  final bool isCompleted;
+  final bool isCurrent;
+  final VoidCallback onTap;
+
+  const _FlowRow({
+    required this.name,
+    required this.detail,
+    required this.number,
+    required this.isCompleted,
+    required this.isCurrent,
+    required this.onTap,
+  });
+
+  static const double _radius = 20;
+  static const double _badge = 40;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      pressedScale: 0.98,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(_radius),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        // Seçim çerçevesi layout'u kaydırmasın diye hep var; yalnızca mevcut
+        // harekette görünür.
+        foregroundDecoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(_radius),
+          border: Border.all(
+            color: isCurrent ? AppColors.homeHero : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: _badge,
+              height: _badge,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient:
+                    isCurrent
+                        ? const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [AppColors.homeHero, AppColors.homeHeroDeep],
+                        )
+                        : null,
+                color:
+                    isCurrent
+                        ? null
+                        : (isCompleted
+                            ? AppColors.workoutsTint
+                            : AppColors.fillSubtle),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child:
+                  isCompleted
+                      ? const Icon(
+                        Icons.check_rounded,
+                        size: 20,
+                        color: AppColors.success,
+                      )
+                      : Text(
+                        '$number',
+                        style: AppTypography.body14Medium.copyWith(
+                          color:
+                              isCurrent ? Colors.white : AppColors.textTertiary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Opacity(
+                opacity: isCompleted ? 0.55 : 1,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.body16Medium.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      detail,
+                      style: AppTypography.body12Regular.copyWith(
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (isCurrent) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.accentGold,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  'Şu an',
+                  style: AppTypography.body12Medium.copyWith(
+                    color: AppColors.espresso,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
