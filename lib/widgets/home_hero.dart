@@ -87,10 +87,10 @@ class HomeHero extends StatelessWidget {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: RadialGradient(
-                      center: const Alignment(0.95, -0.75),
-                      radius: 1.0,
+                      center: const Alignment(0.95, -0.6),
+                      radius: 1.35,
                       colors: [
-                        AppColors.homeHeroGlow.withValues(alpha: 0.9),
+                        AppColors.homeHeroGlow,
                         AppColors.homeHeroGlow.withValues(alpha: 0),
                       ],
                     ),
@@ -278,17 +278,13 @@ class _WorkoutBlock extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.play_arrow_rounded,
-                  size: 24,
-                  color: AppColors.espresso,
-                ),
-                const SizedBox(width: 6),
+                const _PlayOutlineIcon(size: 22, color: AppColors.espresso),
+                const SizedBox(width: 8),
                 Text(
                   'Antrenmanı Başlat',
                   style: AppTypography.body16Medium.copyWith(
                     color: AppColors.espresso,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ],
@@ -352,4 +348,50 @@ class _WorkoutSkeleton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// İnce çizgili, yuvarlak köşeli "oynat" ikonu (Tabler `player-play` ile aynı
+/// çizim): 24'lük bir alanda `M7 4v16l13-8z`, 2 kalınlığında yuvarlak uçlu çizgi.
+class _PlayOutlineIcon extends StatelessWidget {
+  final double size;
+  final Color color;
+
+  const _PlayOutlineIcon({required this.size, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size.square(size),
+      painter: _PlayOutlinePainter(color),
+    );
+  }
+}
+
+class _PlayOutlinePainter extends CustomPainter {
+  final Color color;
+
+  _PlayOutlinePainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 24;
+    final path =
+        Path()
+          ..moveTo(7 * scale, 4 * scale)
+          ..lineTo(7 * scale, 20 * scale)
+          ..lineTo(20 * scale, 12 * scale)
+          ..close();
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2 * scale
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_PlayOutlinePainter old) => old.color != color;
 }
