@@ -436,7 +436,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          backgroundColor: AppColors.brandPrimary,
+          backgroundColor: AppColors.homeHero,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
