@@ -23,6 +23,10 @@ class MainShell extends StatelessWidget {
         systemNavigationBarColor: Colors.transparent,
         systemNavigationBarDividerColor: Colors.transparent,
         systemNavigationBarIconBrightness: Brightness.dark,
+        // Sekme ekranlarında durum çubuğu simgeleri hep koyu (hero'lu detay
+        // ekranından dönünce açık renk takılı kalmasın).
+        statusBarBrightness: Brightness.light,
+        statusBarIconBrightness: Brightness.dark,
       ),
       child: Scaffold(
         backgroundColor: AppColors.background,

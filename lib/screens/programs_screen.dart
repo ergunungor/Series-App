@@ -194,7 +194,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                             Text(
                               'Programlar',
                               style: AppTypography.heading1.copyWith(
-                                color: AppColors.textPrimary,
+                                color: AppColors.espresso,
                                 fontSize: 34,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: -0.6,

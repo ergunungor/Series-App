@@ -4,6 +4,7 @@ import 'router/app_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // Supabase için gerekli
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:app_links/app_links.dart';
+import 'package:flutter/services.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +37,16 @@ class SeriesApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       routerConfig: AppRouter.router, // Trafik polisimizi buraya atadık
+      // Varsayılan durum çubuğu: açık zeminde koyu simgeler. Koyu hero'lu
+      // ekranlar kendi AnnotatedRegion'ı ile bunu geçersiz kılar.
+      builder:
+          (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+            value: const SystemUiOverlayStyle(
+              statusBarBrightness: Brightness.light,
+              statusBarIconBrightness: Brightness.dark,
+            ),
+            child: child ?? const SizedBox.shrink(),
+          ),
     );
   }
 }
