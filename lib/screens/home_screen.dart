@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 import 'package:intl/intl.dart' show DateFormat;
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
@@ -164,6 +165,22 @@ class _HomeScreenState extends State<HomeScreen> {
     };
   }
 
+  /// Bu hafta (Pazartesi başlangıçlı) en az bir kez yapılmış antrenman günleri.
+  Set<String> _doneWorkoutIds(ActiveProgram program) {
+    final now = DateTime.now();
+    final startOfWeek = DateTime(
+      now.year,
+      now.month,
+      now.day - (now.weekday - 1),
+    );
+    final ids = program.workouts.map((w) => w.id).toSet();
+    return {
+      for (final s in _history)
+        if (ids.contains(s.workoutId) && !s.completedAt.isBefore(startOfWeek))
+          s.workoutId,
+    };
+  }
+
   // Program değiştirme akışı: önceki IconButton'daki kodun aynısı.
   Future<void> _changeActiveProgram() async {
     final user = Supabase.instance.client.auth.currentUser;
@@ -285,18 +302,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const SectionTitle(title: 'Aktif program'),
-                                  _RowCard(
-                                    leading: const _LogoTile(),
-                                    title: _activeProgram!.name,
-                                    subtitle: 'Programa git',
-                                    trailing: _SwapButton(
-                                      onTap: _changeActiveProgram,
+                                  _ActiveProgramCard(
+                                    program: _activeProgram!,
+                                    nextIndex: _nextWorkoutIndex,
+                                    doneWorkoutIds: _doneWorkoutIds(
+                                      _activeProgram!,
                                     ),
                                     onTap:
                                         () => context.push(
                                           '/program-detail',
                                           extra: _activeProgram,
                                         ),
+                                    onSwap: _changeActiveProgram,
                                   ),
                                 ],
                               ),
@@ -447,32 +464,272 @@ class _CheckTile extends StatelessWidget {
   }
 }
 
-/// Programı değiştir butonu: 44px yuvarlak, basınca küçülür.
-class _SwapButton extends StatelessWidget {
+/// Aktif program kartı: üstte logo karosu, ad, özet ve "Değiştir" hapı; altta
+/// programın günleri yatay çipler hâlinde (sıradaki gün kiremit, bu hafta
+/// yapılanlar soluk). Karta dokununca program detayı, hapa dokununca program
+/// değiştirme açılır.
+class _ActiveProgramCard extends StatefulWidget {
+  final ActiveProgram program;
+  final int nextIndex;
+  final Set<String> doneWorkoutIds;
   final VoidCallback onTap;
+  final VoidCallback onSwap;
 
-  const _SwapButton({required this.onTap});
+  const _ActiveProgramCard({
+    required this.program,
+    required this.nextIndex,
+    required this.doneWorkoutIds,
+    required this.onTap,
+    required this.onSwap,
+  });
+
+  @override
+  State<_ActiveProgramCard> createState() => _ActiveProgramCardState();
+}
+
+class _ActiveProgramCardState extends State<_ActiveProgramCard> {
+  static const double _radius = 24;
+  static const double _pillHeight = 36;
+  static const double _touchHeight = 44;
+  static const double _chipMaxWidth = 150;
+
+  final GlobalKey _nextChipKey = GlobalKey();
+  final ScrollController _chipScroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollToNextChip();
+  }
+
+  @override
+  void didUpdateWidget(_ActiveProgramCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Geçmiş sonradan yüklenince sıradaki gün değişebilir.
+    if (oldWidget.nextIndex != widget.nextIndex) _scrollToNextChip();
+  }
+
+  // Sıradaki gün çipi görünür alanın dışındaysa yatay listeyi kaydırıp getirir.
+  // Scrollable.ensureVisible sayfanın dikey kaydırmasını da oynatırdı; bu
+  // yüzden yalnızca bu listenin kontrolcüsünü kullanıyoruz.
+  void _scrollToNextChip() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final box = _nextChipKey.currentContext?.findRenderObject();
+      if (box == null || !mounted || !_chipScroll.hasClients) return;
+      final viewport = RenderAbstractViewport.maybeOf(box);
+      if (viewport == null) return;
+      final target =
+          viewport.getOffsetToReveal(box, 0.1, axis: Axis.horizontal).offset;
+      _chipScroll.animateTo(
+        target.clamp(0.0, _chipScroll.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _chipScroll.dispose();
+    super.dispose();
+  }
+
+  String get _summary {
+    final days = widget.program.workouts.length;
+    final exercises = widget.program.workouts.fold<int>(
+      0,
+      (sum, w) => sum + w.exercises.length,
+    );
+    return '$days gün · $exercises hareket';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: 'Programı değiştir',
-      button: true,
-      child: PressableScale(
-        pressedScale: 0.92,
-        onTap: onTap,
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: const BoxDecoration(
-            color: AppColors.fillSubtle,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.swap_horiz_rounded,
-            size: 20,
-            color: AppColors.homeHero,
-          ),
+    final workouts = widget.program.workouts;
+    return PressableScale(
+      pressedScale: 0.98,
+      onTap: widget.onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(_radius),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const _LogoTile(),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        widget.program.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.body16Medium.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _summary,
+                        style: AppTypography.body12Regular.copyWith(
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Semantics(
+                  label: 'Programı değiştir',
+                  button: true,
+                  child: PressableScale(
+                    pressedScale: 0.94,
+                    onTap: widget.onSwap,
+                    // Görsel hap 36px, dokunma alanı 44px.
+                    child: SizedBox(
+                      height: _touchHeight,
+                      child: Center(
+                        child: Container(
+                          height: _pillHeight,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: AppColors.fillSubtle,
+                            borderRadius: BorderRadius.circular(
+                              _pillHeight / 2,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.swap_horiz_rounded,
+                                size: 16,
+                                color: AppColors.homeHero,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                'Değiştir',
+                                style: AppTypography.body12Medium.copyWith(
+                                  color: AppColors.homeHero,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (workouts.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              SingleChildScrollView(
+                controller: _chipScroll,
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    for (var i = 0; i < workouts.length; i++)
+                      Padding(
+                        padding: EdgeInsets.only(left: i == 0 ? 0 : 6),
+                        child: _DayChip(
+                          key: i == widget.nextIndex ? _nextChipKey : null,
+                          name: workouts[i].name,
+                          state:
+                              i == widget.nextIndex
+                                  ? _DayState.next
+                                  : widget.doneWorkoutIds.contains(
+                                    workouts[i].id,
+                                  )
+                                  ? _DayState.done
+                                  : _DayState.upcoming,
+                          maxWidth: _chipMaxWidth,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+enum _DayState { next, done, upcoming }
+
+class _DayChip extends StatelessWidget {
+  final String name;
+  final _DayState state;
+  final double maxWidth;
+
+  const _DayChip({
+    super.key,
+    required this.name,
+    required this.state,
+    required this.maxWidth,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isNext = state == _DayState.next;
+    final isDone = state == _DayState.done;
+    final label = isNext ? 'Sıradaki' : (isDone ? 'Yapıldı' : 'Bekliyor');
+    return Opacity(
+      opacity: isDone ? 0.55 : 1,
+      child: Container(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isNext ? AppColors.homeHero : AppColors.background,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: AppTypography.body12Regular.copyWith(
+                fontSize: 10,
+                height: 1.2,
+                color:
+                    isNext
+                        ? AppColors.onHeroDark.withValues(alpha: 0.7)
+                        : AppColors.textTertiary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.body12Medium.copyWith(
+                height: 1.25,
+                color: isNext ? AppColors.onHeroDark : AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );
