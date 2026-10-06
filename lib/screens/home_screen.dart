@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
-import '../widgets/workout_card.dart';
+import '../widgets/detail_hero.dart';
+import '../widgets/home_hero.dart';
 import '../widgets/app_logo.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,7 +14,6 @@ import '../widgets/select_active_program_sheet.dart';
 import 'package:lottie/lottie.dart';
 import '../widgets/reveal.dart';
 import '../widgets/pressable_scale.dart';
-import '../widgets/series_wordmark.dart';
 import '../widgets/app_bottom_nav.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -24,7 +24,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const Duration _heroSwitchDuration = Duration(milliseconds: 350);
   static const Duration _revealDuration = Duration(milliseconds: 500);
   static const Duration _revealStagger = Duration(milliseconds: 100);
   String _firstName = '';
@@ -151,158 +150,154 @@ class _HomeScreenState extends State<HomeScreen> {
     final bottomInset =
         MediaQuery.of(context).padding.bottom + AppBottomNav.clearance + 34;
 
+    final program = _activeProgram;
+    final hasProgram = program != null && program.workouts.isNotEmpty;
+    final nextWorkout = hasProgram ? program.workouts[_nextWorkoutIndex] : null;
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom:
-            false, // Alt padding'i biz dinamik yönettiğimiz için SafeArea'nın altını serbest bırakıyoruz
-        child: RefreshIndicator(
-          color: AppColors.brandPrimary,
-          backgroundColor: Colors.white,
-          onRefresh: _handleRefresh,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics(),
-            ),
-            padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SeriesWordmark(),
-                const SizedBox(height: 16),
-                Text(
-                  'Hoş geldin',
-                  style: AppTypography.body18Medium.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
+      body: HeroStatusBarScope(
+        builder:
+            (context, heroKey) => RefreshIndicator(
+              color: AppColors.homeHero,
+              backgroundColor: Colors.white,
+              // Hero durum çubuğunun arkasına uzandığı için gösterge altından başlar.
+              edgeOffset: MediaQuery.paddingOf(context).top,
+              onRefresh: _handleRefresh,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
                 ),
-                const SizedBox(height: 2),
-                AnimatedOpacity(
-                  duration: const Duration(milliseconds: 350),
-                  curve: Curves.easeOut,
-                  opacity: _firstName.isEmpty ? 0 : 1,
-                  child: Text(
-                    // Boşken de bir satır yüksekliği korunsun diye ' ' kullanıyoruz
-                    _firstName.isEmpty ? ' ' : _firstName,
-                    style: AppTypography.heading1.copyWith(
-                      color: AppColors.textPrimary,
-                      fontSize: 34,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.6,
+                padding: EdgeInsets.only(bottom: bottomInset),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    HomeHero(
+                      heroKey: heroKey,
+                      firstName: _firstName,
+                      isLoading: _isLoadingProgram,
+                      workoutName: nextWorkout?.name,
+                      exerciseCount: nextWorkout?.exercises.length ?? 0,
+                      durationMin: nextWorkout?.estimatedDurationMin ?? 0,
+                      onStart:
+                          nextWorkout == null
+                              ? null
+                              : () async {
+                                final confirmed = await showAppConfirmDialog(
+                                  context: context,
+                                  title: 'Antrenmanı Başlat',
+                                  message:
+                                      '"${nextWorkout.name}" antrenmanına başlamak istiyor musunuz?',
+                                  confirmLabel: 'Başla',
+                                );
+                                if (confirmed && context.mounted) {
+                                  context.push(
+                                    '/workout-player',
+                                    extra: nextWorkout,
+                                  );
+                                }
+                              },
                     ),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                AnimatedSwitcher(
-                  duration: _heroSwitchDuration,
-                  child:
-                      _isLoadingProgram
-                          ? const _HeroSkeleton()
-                          : (_activeProgram == null ||
-                              _activeProgram!.workouts.isEmpty)
-                          ? _NoProgramCard(
-                            onCreate: () => context.push('/onboarding-survey'),
-                          )
-                          : WorkoutCard(
-                            nextWorkoutName:
-                                _activeProgram!
-                                    .workouts[_nextWorkoutIndex]
-                                    .name,
-                            onStartTap: () async {
-                              final workout =
-                                  _activeProgram!.workouts[_nextWorkoutIndex];
-                              final confirmed = await showAppConfirmDialog(
-                                context: context,
-                                title: 'Antrenmanı Başlat',
-                                message:
-                                    '"${workout.name}" antrenmanına başlamak istiyor musunuz?',
-                                confirmLabel: 'Başla',
-                              );
-                              if (confirmed && context.mounted) {
-                                context.push('/workout-player', extra: workout);
-                              }
-                            },
-                          ),
-                ),
-                if (_activeProgram != null) ...[
-                  const SizedBox(height: 32),
-                  Reveal(
-                    delay: _revealStagger,
-                    duration: _revealDuration,
-                    child: _WeeklyProgress(
-                      completed: _weeklyCompleted,
-                      total: _weeklyTotal,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Reveal(
-                    delay: _revealStagger * 2,
-                    duration: _revealDuration,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Aktif Program',
-                          style: AppTypography.body16Medium.copyWith(
-                            color: AppColors.brandTertiary,
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () async {
-                            final user =
-                                Supabase.instance.client.auth.currentUser;
-                            if (user == null) return;
-                            final allPrograms =
-                                await ProgramRepository.fetchPrograms(user.id);
-                            if (!context.mounted) return;
-                            final selected = await showSelectActiveProgramSheet(
-                              context: context,
-                              programs: allPrograms,
-                              currentActiveId: _activeProgram?.id,
-                            );
-                            if (selected != null) {
-                              await ProgramRepository.setActiveProgram(
-                                user.id,
-                                selected.id,
-                              );
-                              _fetchActiveProgram();
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (!_isLoadingProgram && !hasProgram)
+                            _NoProgramCard(
+                              onCreate:
+                                  () => context.push('/onboarding-survey'),
+                            ),
+                          if (_activeProgram != null) ...[
+                            const SizedBox(height: 32),
+                            Reveal(
+                              delay: _revealStagger,
+                              duration: _revealDuration,
+                              child: _WeeklyProgress(
+                                completed: _weeklyCompleted,
+                                total: _weeklyTotal,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Reveal(
+                              delay: _revealStagger * 2,
+                              duration: _revealDuration,
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Aktif Program',
+                                    style: AppTypography.body16Medium.copyWith(
+                                      color: AppColors.brandTertiary,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () async {
+                                      final user =
+                                          Supabase
+                                              .instance
+                                              .client
+                                              .auth
+                                              .currentUser;
+                                      if (user == null) return;
+                                      final allPrograms =
+                                          await ProgramRepository.fetchPrograms(
+                                            user.id,
+                                          );
+                                      if (!context.mounted) return;
+                                      final selected =
+                                          await showSelectActiveProgramSheet(
+                                            context: context,
+                                            programs: allPrograms,
+                                            currentActiveId: _activeProgram?.id,
+                                          );
+                                      if (selected != null) {
+                                        await ProgramRepository.setActiveProgram(
+                                          user.id,
+                                          selected.id,
+                                        );
+                                        _fetchActiveProgram();
 
-                              // HER SEFERİNDE DEĞERİ DEĞİŞTİRİYORUZ (SAYAÇ ARTIYOR)
-                              programRefreshNotifier.value++;
-                            }
-                          },
-                          style: IconButton.styleFrom(
-                            backgroundColor: AppColors.fillSubtle,
-                            minimumSize: const Size(44, 44),
-                          ),
-                          icon: Icon(
-                            Icons.swap_horiz_rounded,
-                            size: 20,
-                            color: AppColors.brandTertiary,
-                          ),
-                          tooltip: 'Programı değiştir',
-                        ),
-                      ],
+                                        // HER SEFERİNDE DEĞERİ DEĞİŞTİRİYORUZ (SAYAÇ ARTIYOR)
+                                        programRefreshNotifier.value++;
+                                      }
+                                    },
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: AppColors.fillSubtle,
+                                      minimumSize: const Size(44, 44),
+                                    ),
+                                    icon: Icon(
+                                      Icons.swap_horiz_rounded,
+                                      size: 20,
+                                      color: AppColors.brandTertiary,
+                                    ),
+                                    tooltip: 'Programı değiştir',
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Reveal(
+                              delay: _revealStagger * 3,
+                              duration: _revealDuration,
+                              child: _ActiveProgramTile(
+                                name: _activeProgram!.name,
+                                onTap:
+                                    () => context.push(
+                                      '/program-detail',
+                                      extra: _activeProgram,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Reveal(
-                    delay: _revealStagger * 3,
-                    duration: _revealDuration,
-                    child: _ActiveProgramTile(
-                      name: _activeProgram!.name,
-                      onTap:
-                          () => context.push(
-                            '/program-detail',
-                            extra: _activeProgram,
-                          ),
-                    ),
-                  ),
-                ],
-              ],
+                  ],
+                ),
+              ),
             ),
-          ),
-        ),
       ),
     );
   }
@@ -530,55 +525,6 @@ class _WeeklyProgress extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _HeroSkeleton extends StatefulWidget {
-  const _HeroSkeleton();
-
-  @override
-  State<_HeroSkeleton> createState() => _HeroSkeletonState();
-}
-
-class _HeroSkeletonState extends State<_HeroSkeleton>
-    with SingleTickerProviderStateMixin {
-  // WorkoutCard'ın yaklaşık yüksekliği; layout zıplamasın diye eşleştirildi.
-  static const double _height = 200;
-  static const Duration _pulseDuration = Duration(milliseconds: 1100);
-
-  late final AnimationController _controller;
-  late final Animation<double> _opacity;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: _pulseDuration)
-      ..repeat(reverse: true);
-    _opacity = Tween<double>(
-      begin: 0.5,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _opacity,
-      child: Container(
-        width: double.infinity,
-        height: _height,
-        decoration: BoxDecoration(
-          color: AppColors.fillSubtle,
-          borderRadius: BorderRadius.circular(24),
-        ),
       ),
     );
   }

@@ -31,6 +31,11 @@ class AppColors {
   static const Color profileHero = Color(0xFF25262B);
   static const Color profileHeroDeep = Color(0xFF17181C);
 
+  // Ana Sayfa hero (kiremit): ışık, gövde, derin ton
+  static const Color homeHeroGlow = Color(0xFFA5392B);
+  static const Color homeHero = Color(0xFF7A2418);
+  static const Color homeHeroDeep = Color(0xFF47130C);
+
   // --- Eski palet (migrasyon bitince silinecek) ---
   static const Color brandPrimary = Color(0xFF960000); // ana bordo
   static const Color brandSecondary = Color(0xFFD8D8D8);

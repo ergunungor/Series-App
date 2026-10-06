@@ -5,7 +5,10 @@ import '../theme/app_typography.dart';
 /// Ekranların üstündeki ortalı "SERIES" yazısı. Tüm sekmelerde aynı yükseklik
 /// ve konumda durması için tek yerde tanımlı.
 class SeriesWordmark extends StatelessWidget {
-  const SeriesWordmark({super.key});
+  /// Koyu hero üzerinde krem kullanmak için değiştirilebilir.
+  final Color color;
+
+  const SeriesWordmark({super.key, this.color = AppColors.brandTertiary});
 
   static const double _letterSpacing = 4;
 
@@ -19,7 +22,7 @@ class SeriesWordmark extends StatelessWidget {
         child: Text(
           'SERIES',
           style: AppTypography.body14Medium.copyWith(
-            color: AppColors.brandTertiary,
+            color: color,
             fontWeight: FontWeight.w800,
             letterSpacing: _letterSpacing,
           ),
