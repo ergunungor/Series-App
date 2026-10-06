@@ -108,6 +108,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               AppInput(
                 controller: _emailController,
                 hintText: 'E-mail Adresiniz',
+                keyboardType: TextInputType.emailAddress,
                 prefixIcon: Icons.mail_outline,
               ),
               const SizedBox(height: 12),
@@ -164,10 +165,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ],
               ),
             ),
-            Text(
-              'Şifremi unuttum',
-              style: AppTypography.body12Medium.copyWith(
-                color: AppColors.textTertiary,
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => context.push('/forgot-password'),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'Şifremi unuttum',
+                  style: AppTypography.body12Medium.copyWith(
+                    color: AppColors.homeHero,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
           ],

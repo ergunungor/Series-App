@@ -1,5 +1,3 @@
-// ignore_for_file: unused_field
-
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
@@ -94,6 +92,7 @@ class _AppInputState extends State<AppInput> {
               child: TextField(
                 controller: widget.controller,
                 focusNode: _focusNode,
+                keyboardType: widget.keyboardType,
                 obscureText: widget.isPassword ? _obscure : false,
                 cursorColor: AppColors.homeHero,
                 textAlignVertical: TextAlignVertical.center,

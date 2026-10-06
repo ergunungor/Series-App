@@ -82,21 +82,24 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
       return exercise.durationSeconds!;
     }
 
-    // 2. Reps metninde süre geçiyorsa
+    // 2. Reps metninde süre geçiyorsa. Birim yalnızca bir sayının ardından ya da
+    // tek başına bir kelime olarak aranır; "reps" gibi kelimelerin içindeki
+    // harfler (eskiden herhangi bir 's') süreli hareket sanılmasın.
     final repsText = exercise.reps?.toString().toLowerCase() ?? '';
-    if (repsText.contains('sn') ||
-        repsText.contains('sec') ||
-        repsText.contains('saniye') ||
-        repsText.contains('s')) {
+    final minutesUnit = RegExp(
+      r'(\d\s*(dk|mins?|dakika)\b)|(\b(dk|mins?|dakika)\b)',
+    );
+    final secondsUnit = RegExp(
+      r'(\d\s*(sn|secs?|saniye|s)\b)|(\b(sn|secs?|saniye)\b)',
+    );
+    if (minutesUnit.hasMatch(repsText)) {
+      final match = RegExp(r'\d+').firstMatch(repsText);
+      return match != null ? int.parse(match.group(0)!) * 60 : 60;
+    } else if (secondsUnit.hasMatch(repsText)) {
       final match = RegExp(r'\d+').firstMatch(repsText);
       return match != null
           ? int.parse(match.group(0)!)
           : 30; // Sayı bulunamazsa varsayılan 30 sn
-    } else if (repsText.contains('dk') ||
-        repsText.contains('min') ||
-        repsText.contains('dakika')) {
-      final match = RegExp(r'\d+').firstMatch(repsText);
-      return match != null ? int.parse(match.group(0)!) * 60 : 60;
     }
 
     // 3. Eğer hareketin adında (name) "plank" veya "hold" geçiyor ama süre belirtilmemişse varsayılan 30 sn verelim ki timer çıksın
@@ -359,6 +362,8 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
       if (_isPaused) return;
       if (_remainingSeconds <= 1) {
         timer.cancel();
+        // Mola bitişi: zil sesine ek olarak güçlü bir titreşim.
+        HapticFeedback.heavyImpact();
         setState(() {
           _isResting = false;
           _remainingSeconds = 0;

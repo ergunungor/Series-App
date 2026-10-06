@@ -89,6 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
               AppInput(
                 controller: _emailController, // EKLENDİ
                 hintText: 'E-mail Adresiniz',
+                keyboardType: TextInputType.emailAddress,
                 prefixIcon: Icons.mail_outline,
               ),
               const SizedBox(height: 12),
