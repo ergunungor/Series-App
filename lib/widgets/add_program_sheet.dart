@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
+import 'pressable_scale.dart';
+import 'reveal.dart';
 
 Future<void> showAddProgramSheet({
   required BuildContext context,
@@ -14,14 +16,13 @@ Future<void> showAddProgramSheet({
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
     builder: (context) {
-      // Süzülen alt barın ve cihazın alt çentiğinin yüksekliği kadar akıllı boşluk
-      final bottomInset = MediaQuery.of(context).padding.bottom + 110;
+      final bottomSafe = MediaQuery.of(context).padding.bottom;
 
       return Container(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset),
+        padding: EdgeInsets.fromLTRB(16, 0, 16, bottomSafe + 24),
         decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -29,40 +30,55 @@ Future<void> showAddProgramSheet({
             Container(
               width: 40,
               height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
+              margin: const EdgeInsets.only(top: 12, bottom: 20),
               decoration: BoxDecoration(
-                color: AppColors.brandSecondary,
+                color: AppColors.textTertiary.withValues(alpha: 0.35),
                 borderRadius: BorderRadius.circular(45),
               ),
             ),
             Align(
               alignment: Alignment.centerLeft,
-              child: Text(
-                'Yeni Program',
-                style: AppTypography.heading3.copyWith(
-                  color: AppColors.textPrimary,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  'Yeni Program',
+                  style: AppTypography.heading2.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.4,
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            _SheetOption(
-              icon: Icons.auto_awesome,
-              title: 'AI ile Program Oluştur',
-              subtitle: 'Birkaç soruyla sana özel bir program üretelim',
-              onTap: () {
-                Navigator.of(context).pop();
-                onCreateWithAi();
-              },
+            Reveal(
+              duration: const Duration(milliseconds: 400),
+              offsetY: 10,
+              child: _SheetOption(
+                icon: Icons.auto_awesome,
+                isPrimary: true,
+                title: 'AI ile Program Oluştur',
+                subtitle: 'Birkaç soruyla sana özel bir program üretelim',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  onCreateWithAi();
+                },
+              ),
             ),
             const SizedBox(height: 12),
-            _SheetOption(
-              icon: Icons.file_upload_outlined,
-              title: 'Program Yükle',
-              subtitle: 'Kendi programını yükle ve takibini kolaylaştır',
-              onTap: () {
-                Navigator.of(context).pop();
-                onImportProgram();
-              },
+            Reveal(
+              delay: const Duration(milliseconds: 70),
+              duration: const Duration(milliseconds: 400),
+              offsetY: 10,
+              child: _SheetOption(
+                icon: Icons.file_upload_outlined,
+                title: 'Program Yükle',
+                subtitle: 'Kendi programını yükle ve takibini kolaylaştır',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  onImportProgram();
+                },
+              ),
             ),
           ],
         ),
@@ -77,63 +93,90 @@ class _SheetOption extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
 
+  /// Ana seçenek: kiremit gradyan ikon karosu; diğeri nötr karo.
+  final bool isPrimary;
+
   const _SheetOption({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.isPrimary = false,
   });
+
+  static const double _radius = 22;
+  static const double _tile = 48;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.background,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.brandSecondary),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                ),
-                child: Icon(icon, color: AppColors.brandPrimary, size: 22),
+    return PressableScale(
+      pressedScale: 0.98,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(_radius),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: _tile,
+              height: _tile,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                gradient:
+                    isPrimary
+                        ? const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [AppColors.homeHero, AppColors.homeHeroDeep],
+                        )
+                        : null,
+                color: isPrimary ? null : AppColors.fillSubtle,
+                borderRadius: BorderRadius.circular(16),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: AppTypography.body16Medium.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: AppTypography.body12Regular.copyWith(
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
-                  ],
-                ),
+              child: Icon(
+                icon,
+                color: isPrimary ? AppColors.accentGold : AppColors.homeHero,
+                size: 22,
               ),
-              const Icon(Icons.chevron_right, color: AppColors.textTertiary),
-            ],
-          ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: AppTypography.body16Medium.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: AppTypography.body12Regular.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              size: 24,
+              color: AppColors.textTertiary,
+            ),
+          ],
         ),
       ),
     );
