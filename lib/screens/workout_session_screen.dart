@@ -16,11 +16,11 @@ import '../models/workout_history.dart';
 import '../models/exercise.dart';
 import '../services/exercise_service.dart';
 import 'workouts_screen.dart'; // workoutRefreshNotifier'ı kullanabilmek için
-import '../widgets/app_logo.dart';
 import '../widgets/detail_hero.dart' show HeroStatusBarScope;
 import '../widgets/exercise_timer_widget.dart';
 import '../widgets/kiremit_hero_surface.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/series_wordmark.dart';
 import '../utils/exercise_name.dart';
 import 'package:audioplayers/audioplayers.dart';
 
@@ -1177,6 +1177,11 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            // Ekranların üstündeki "SERIES" wordmark'ı, halkanın üstünde.
+                            SeriesWordmark(
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                            const SizedBox(height: 28),
                             SizedBox(
                               width: _restRingSize,
                               height: _restRingSize,
@@ -1432,17 +1437,6 @@ class _RestBackground extends StatelessWidget {
                 AppColors.homeHeroGlow,
                 AppColors.homeHeroGlow.withValues(alpha: 0),
               ],
-            ),
-          ),
-        ),
-        // Hero'lardaki gibi silik, ekran dışına taşan büyük logo filigranı.
-        Positioned(
-          right: -90,
-          bottom: -50,
-          child: IgnorePointer(
-            child: Opacity(
-              opacity: 0.07,
-              child: const AppLogo(explicitSize: 440, type: AppLogoType.light),
             ),
           ),
         ),
