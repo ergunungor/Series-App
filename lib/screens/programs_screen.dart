@@ -12,6 +12,7 @@ import '../widgets/add_program_sheet.dart';
 import '../widgets/app_confirm_dialog.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/reveal.dart';
 
 class ProgramsScreen extends StatefulWidget {
   const ProgramsScreen({super.key});
@@ -27,10 +28,20 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   // dokunmadığımız için burada tutuluyor; nav ölçüleri değişirse güncellenmeli.
   static const double _navBarClearance = 102;
   static const double _fabGap = 16;
+  // Giriş animasyonu (Home ile aynı ritim). Grid'de sadece ilk ekrandaki
+  // kartlar animasyonlanır; geri kalanı lazy olduğu için kaydırınca tekrar oynardı.
+  static const Duration _revealDuration = Duration(milliseconds: 500);
+  static const Duration _revealStagger = Duration(milliseconds: 100);
+  static const int _revealedGridItems = 4;
+  static const int _introSteps = 2 + _revealedGridItems; // başlık, hero, kartlar
 
   List<ActiveProgram> _programs = [];
   bool _isLoading = true;
   String? _activeProgramId;
+
+  // İlk içerik gösterildikten sonra kapanır; kaydırınca Reveal tekrar oynamasın.
+  bool _isIntroActive = true;
+  bool _isIntroTimerArmed = false;
 
   bool _isSelectionMode = false;
   final Set<String> _selectedIds = {};
@@ -69,11 +80,20 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
           _activeProgramId = activeId;
           _isLoading = false;
         });
+        _armIntroTimer();
       }
     } catch (error) {
       debugPrint('Program çekme hatası: $error');
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _armIntroTimer() {
+    if (_isIntroTimerArmed) return;
+    _isIntroTimerArmed = true;
+    Future.delayed(_revealStagger * _introSteps + _revealDuration, () {
+      if (mounted) _isIntroActive = false;
+    });
   }
 
   Future<bool> _confirmDeleteProgram(ActiveProgram program) async {
@@ -144,10 +164,12 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(_pagePadding, 16, _pagePadding, 16),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child:
-              _isSelectionMode
+        child: Reveal(
+          duration: _revealDuration,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child:
+                _isSelectionMode
                   ? Row(
                     key: const ValueKey('selection_header'),
                     children: [
@@ -210,6 +232,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                         ),
                     ],
                   ),
+          ),
         ),
       ),
     );
@@ -411,7 +434,10 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                         horizontal: _pagePadding,
                         vertical: 16,
                       ),
-                      child: _DismissibleWrapper(
+                      child: Reveal(
+                        delay: _revealStagger,
+                        duration: _revealDuration,
+                        child: _DismissibleWrapper(
                         program: activeProgram,
                         isSelectionMode: _isSelectionMode,
                         onDeleteConfirmed: () async {
@@ -447,6 +473,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                           },
                           onLongPress: _enterSelectionMode,
                         ),
+                        ),
                       ),
                     ),
                   ),
@@ -467,7 +494,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                           ),
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final program = otherPrograms[index];
-                        return _DismissibleWrapper(
+                        final card = _DismissibleWrapper(
                           program: program,
                           isSelectionMode: _isSelectionMode,
                           onDeleteConfirmed: () async {
@@ -499,6 +526,14 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                             },
                             onLongPress: _enterSelectionMode,
                           ),
+                        );
+                        if (!_isIntroActive || index >= _revealedGridItems) {
+                          return card;
+                        }
+                        return Reveal(
+                          delay: _revealStagger * (2 + index),
+                          duration: _revealDuration,
+                          child: card,
                         );
                       }, childCount: otherPrograms.length),
                     ),
