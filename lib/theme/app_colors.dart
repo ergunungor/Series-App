@@ -33,6 +33,7 @@ class AppColors {
 
   // --- Antrenmanlar: ardıç yeşili ---
   static const Color workoutsHero = Color(0xFF24382E);
+  static const Color workoutsGlow = Color(0xFF3F6B55);
   static const Color workoutsHeroDeep = Color(0xFF141F19);
   static const Color workoutsAccent = Color(0xFF2F5D46);
   static const Color workoutsTint = Color(0xFFE4EEE8);

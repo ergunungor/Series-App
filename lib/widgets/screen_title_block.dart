@@ -9,6 +9,7 @@ class ScreenTitleBlock extends StatelessWidget {
   final String eyebrow;
   final String title;
   final Color titleColor;
+  final Color eyebrowColor;
   final Widget? trailing;
 
   const ScreenTitleBlock({
@@ -16,6 +17,7 @@ class ScreenTitleBlock extends StatelessWidget {
     required this.eyebrow,
     required this.title,
     this.titleColor = AppColors.textPrimary,
+    this.eyebrowColor = AppColors.textTertiary,
     this.trailing,
   });
 
@@ -44,7 +46,7 @@ class ScreenTitleBlock extends StatelessWidget {
                 Text(
                   eyebrow,
                   style: AppTypography.body18Medium.copyWith(
-                    color: AppColors.textTertiary,
+                    color: eyebrowColor,
                   ),
                 ),
                 const SizedBox(height: _gap),

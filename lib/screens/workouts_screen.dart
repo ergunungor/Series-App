@@ -11,6 +11,8 @@ import '../services/workout_history_repository.dart';
 import '../widgets/app_confirm_dialog.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/reveal.dart';
+import '../widgets/detail_hero.dart' show HeroStatusBarScope;
+import '../widgets/kiremit_hero_surface.dart';
 import '../widgets/screen_title_block.dart';
 import '../widgets/section_title.dart';
 import '../widgets/workout_insights_section.dart';
@@ -165,15 +167,11 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     }
   }
 
-  Widget _buildHeader() {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(_pagePadding, 16, _pagePadding, 16),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child: _isSelectionMode ? _buildSelectionHeader() : _buildTitle(),
-        ),
-      ),
+  // Hero içindeki başlık satırı: normal başlık ya da seçim modu başlığı.
+  Widget _buildHeaderRow() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      child: _isSelectionMode ? _buildSelectionHeader() : _buildTitle(),
     );
   }
 
@@ -186,17 +184,17 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           _CircleIconButton(
             icon: CupertinoIcons.xmark,
             onTap: _exitSelectionMode,
+            onHero: true,
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Text(
               '${_selectedKeys.length} seçili',
-              style: AppTypography.heading2.copyWith(
-                color: AppColors.textPrimary,
-              ),
+              style: AppTypography.heading2.copyWith(color: Colors.white),
             ),
           ),
           _MenuButton(
+            onHero: true,
             onSelected: (value) {
               if (value == 'select_all') _selectAll();
               if (value == 'delete') _deleteSelected();
@@ -237,7 +235,10 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
       key: const ValueKey('normal_header'),
       eyebrow: 'Geçmiş',
       title: 'Antrenmanlarım',
+      titleColor: Colors.white,
+      eyebrowColor: Colors.white.withValues(alpha: 0.65),
       trailing: _MenuButton(
+        onHero: true,
         onSelected: (value) {
           if (value == 'select' && _sessions.isNotEmpty) {
             setState(() => _isSelectionMode = true);
@@ -268,7 +269,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     final totalSets = _sessions.fold<int>(0, (sum, s) => sum + s.setCount);
     final thisWeek =
         _sessions.where((s) => !s.completedAt.isBefore(weekStart)).length;
-    return _SummaryHero(
+    return _HeroStats(
       workouts: _sessions.length,
       sets: totalSets,
       thisWeek: thisWeek,
@@ -362,72 +363,96 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: RefreshIndicator(
-        color: AppColors.workoutsHero,
-        backgroundColor: Colors.white,
-        onRefresh: _fetch,
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          slivers: [
-            const SliverSafeArea(
-              sliver: SliverToBoxAdapter(child: SizedBox(height: 12)),
-              bottom: false,
+      body: HeroStatusBarScope(
+        builder:
+            (context, heroKey) => RefreshIndicator(
+              color: AppColors.workoutsHero,
+              backgroundColor: Colors.white,
+              // Hero durum çubuğunun arkasına uzandığı için gösterge altından başlar.
+              edgeOffset: MediaQuery.paddingOf(context).top,
+              onRefresh: _fetch,
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
+                slivers: [
+                  SliverToBoxAdapter(child: _buildScreenHero(heroKey)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                  if (_isLoading)
+                    const SliverPadding(
+                      padding: EdgeInsets.symmetric(horizontal: _pagePadding),
+                      sliver: SliverToBoxAdapter(child: _ListSkeleton()),
+                    )
+                  else if (_sessions.isEmpty)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _EmptyHistory(),
+                    )
+                  else ...[
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: _pagePadding,
+                      ),
+                      sliver: SliverToBoxAdapter(
+                        child: WorkoutInsightsSection(
+                          sessions: _sessions,
+                          animateIntro: _isIntroActive,
+                          revealStagger: _revealStagger,
+                          revealDuration: _revealDuration,
+                        ),
+                      ),
+                    ),
+                    const SliverPadding(
+                      padding: EdgeInsets.symmetric(horizontal: _pagePadding),
+                      sliver: SliverToBoxAdapter(
+                        child: SectionTitle(title: 'Geçmiş kayıtlar'),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: _pagePadding,
+                      ),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => _buildSessionItem(index),
+                          childCount: _sessions.length,
+                        ),
+                      ),
+                    ),
+                    SliverToBoxAdapter(child: SizedBox(height: bottomInset)),
+                  ],
+                ],
+              ),
             ),
-            const SliverToBoxAdapter(child: SeriesWordmark()),
-            _buildHeader(),
-            if (_isLoading || _sessions.isNotEmpty)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: _pagePadding,
-                    vertical: 16,
-                  ),
-                  child: AnimatedSwitcher(
-                    duration: _heroSwitchDuration,
-                    child: _isLoading ? const _HeroSkeleton() : _buildHero(),
-                  ),
-                ),
+      ),
+    );
+  }
+
+  Widget _buildScreenHero(GlobalKey heroKey) {
+    return KiremitHeroSurface(
+      heroKey: heroKey,
+      topColor: AppColors.workoutsHero,
+      bottomColor: AppColors.workoutsHeroDeep,
+      glowColor: AppColors.workoutsGlow,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          _pagePadding,
+          MediaQuery.paddingOf(context).top + 12,
+          _pagePadding,
+          28,
+        ),
+        child: Column(
+          children: [
+            SeriesWordmark(color: Colors.white.withValues(alpha: 0.9)),
+            // Diğer sekmelerle aynı başlık konumu (wordmark + 16 boşluk).
+            const SizedBox(height: 16),
+            _buildHeaderRow(),
+            if (_isLoading || _sessions.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              AnimatedSwitcher(
+                duration: _heroSwitchDuration,
+                child: _isLoading ? const _HeroStatsSkeleton() : _buildHero(),
               ),
-            if (_isLoading)
-              const SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: _pagePadding),
-                sliver: SliverToBoxAdapter(child: _ListSkeleton()),
-              )
-            else if (_sessions.isEmpty)
-              const SliverFillRemaining(
-                hasScrollBody: false,
-                child: _EmptyHistory(),
-              )
-            else ...[
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: _pagePadding),
-                sliver: SliverToBoxAdapter(
-                  child: WorkoutInsightsSection(
-                    sessions: _sessions,
-                    animateIntro: _isIntroActive,
-                    revealStagger: _revealStagger,
-                    revealDuration: _revealDuration,
-                  ),
-                ),
-              ),
-              const SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: _pagePadding),
-                sliver: SliverToBoxAdapter(
-                  child: SectionTitle(title: 'Geçmiş kayıtlar'),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: _pagePadding),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => _buildSessionItem(index),
-                    childCount: _sessions.length,
-                  ),
-                ),
-              ),
-              SliverToBoxAdapter(child: SizedBox(height: bottomInset)),
             ],
           ],
         ),
@@ -453,7 +478,14 @@ class _CircleIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
 
-  const _CircleIconButton({required this.icon, this.onTap});
+  /// Koyu hero üzerinde yarı saydam beyaz daire ve beyaz ikon.
+  final bool onHero;
+
+  const _CircleIconButton({
+    required this.icon,
+    this.onTap,
+    this.onHero = false,
+  });
 
   static const double size = 44;
   static const double _pressedScale = 0.92;
@@ -464,11 +496,18 @@ class _CircleIconButton extends StatelessWidget {
       width: size,
       height: size,
       alignment: Alignment.center,
-      decoration: const BoxDecoration(
-        color: AppColors.fillSubtle,
+      decoration: BoxDecoration(
+        color:
+            onHero
+                ? Colors.white.withValues(alpha: 0.14)
+                : AppColors.fillSubtle,
         shape: BoxShape.circle,
       ),
-      child: Icon(icon, size: 20, color: AppColors.workoutsHero),
+      child: Icon(
+        icon,
+        size: 20,
+        color: onHero ? Colors.white : AppColors.workoutsHero,
+      ),
     );
     if (onTap == null) return circle;
     return PressableScale(
@@ -483,8 +522,13 @@ class _CircleIconButton extends StatelessWidget {
 class _MenuButton extends StatelessWidget {
   final PopupMenuItemSelected<String> onSelected;
   final PopupMenuItemBuilder<String> itemBuilder;
+  final bool onHero;
 
-  const _MenuButton({required this.onSelected, required this.itemBuilder});
+  const _MenuButton({
+    required this.onSelected,
+    required this.itemBuilder,
+    this.onHero = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -499,48 +543,31 @@ class _MenuButton extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         onSelected: onSelected,
         itemBuilder: itemBuilder,
-        child: const _CircleIconButton(icon: CupertinoIcons.ellipsis),
+        child: _CircleIconButton(icon: CupertinoIcons.ellipsis, onHero: onHero),
       ),
     );
   }
 }
 
-class _SummaryHero extends StatelessWidget {
+/// Hero içindeki üç rakam: antrenman, set ve bu hafta (altın).
+class _HeroStats extends StatelessWidget {
   final int workouts;
   final int sets;
   final int thisWeek;
 
-  const _SummaryHero({
+  const _HeroStats({
     required this.workouts,
     required this.sets,
     required this.thisWeek,
   });
 
-  static const double radius = 24;
-  static const double height = 112;
+  static const double height = 64;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      key: const ValueKey('summary_hero'),
+    return SizedBox(
+      key: const ValueKey('hero_stats'),
       height: height,
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppColors.workoutsHero, AppColors.workoutsHeroDeep],
-        ),
-        borderRadius: BorderRadius.circular(radius),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.workoutsHero.withValues(alpha: 0.28),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
       child: Row(
         children: [
           Expanded(child: _Stat(value: workouts, label: 'Antrenman')),
@@ -610,21 +637,49 @@ class _StatDivider extends StatelessWidget {
   }
 }
 
-class _HeroSkeleton extends StatelessWidget {
-  const _HeroSkeleton();
+/// Hero içindeki rakamlar yüklenirken: koyu zeminde silik shimmer çubukları.
+class _HeroStatsSkeleton extends StatelessWidget {
+  const _HeroStatsSkeleton();
+
+  Widget _column() => Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      Container(
+        width: 44,
+        height: 30,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+      const SizedBox(height: 8),
+      Container(
+        width: 62,
+        height: 10,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(5),
+        ),
+      ),
+    ],
+  );
 
   @override
   Widget build(BuildContext context) {
     return Shimmer.fromColors(
-      baseColor: AppColors.borderSubtle,
-      highlightColor: Colors.white,
-      child: Container(
-        key: const ValueKey('hero_skeleton'),
-        height: _SummaryHero.height,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(_SummaryHero.radius),
+      key: const ValueKey('hero_stats_skeleton'),
+      baseColor: Colors.white.withValues(alpha: 0.1),
+      highlightColor: Colors.white.withValues(alpha: 0.24),
+      child: SizedBox(
+        height: _HeroStats.height,
+        child: Row(
+          children: [
+            Expanded(child: _column()),
+            const SizedBox(width: 1),
+            Expanded(child: _column()),
+            const SizedBox(width: 1),
+            Expanded(child: _column()),
+          ],
         ),
       ),
     );
