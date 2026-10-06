@@ -13,6 +13,9 @@ import '../widgets/add_program_sheet.dart';
 import '../widgets/app_confirm_dialog.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/detail_hero.dart' show HeroStatusBarScope;
+import '../widgets/hero_stats_row.dart';
+import '../widgets/kiremit_hero_surface.dart';
 import '../widgets/reveal.dart';
 import '../widgets/screen_title_block.dart';
 import '../widgets/app_bottom_nav.dart';
@@ -152,58 +155,107 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     }
   }
 
-  Widget _buildHeader() {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(_pagePadding, 16, _pagePadding, 16),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child:
-              _isSelectionMode
-                  ? SizedBox(
-                    key: const ValueKey('selection_header'),
-                    height: ScreenTitleBlock.height,
-                    child: Row(
-                      children: [
-                        _GlassIconButton(
-                          icon: CupertinoIcons.xmark,
-                          onTap: _exitSelectionMode,
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Text(
-                            '${_selectedIds.length} Seçili',
-                            style: AppTypography.heading2.copyWith(
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        _GlassIconButton(
-                          icon: CupertinoIcons.check_mark_circled,
-                          onTap: _selectAll,
-                        ),
-                        const SizedBox(width: 12),
-                        _GlassIconButton(
-                          icon: CupertinoIcons.trash,
-                          color: AppColors.error,
-                          onTap: _selectedIds.isEmpty ? () {} : _deleteSelected,
-                        ),
-                      ],
+  // Hero içindeki başlık satırı: normal başlık ya da seçim modu başlığı.
+  Widget _buildHeaderRow() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      child:
+          _isSelectionMode
+              ? SizedBox(
+                key: const ValueKey('selection_header'),
+                height: ScreenTitleBlock.height,
+                child: Row(
+                  children: [
+                    _GlassIconButton(
+                      icon: CupertinoIcons.xmark,
+                      onTap: _exitSelectionMode,
                     ),
-                  )
-                  : ScreenTitleBlock(
-                    key: const ValueKey('normal_header'),
-                    eyebrow: 'Kütüphane',
-                    title: 'Programlar',
-                    titleColor: AppColors.espresso,
-                    trailing:
-                        _programs.isNotEmpty
-                            ? _GlassIconButton(
-                              icon: CupertinoIcons.check_mark_circled,
-                              onTap: _enterSelectionMode,
-                            )
-                            : null,
-                  ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        '${_selectedIds.length} Seçili',
+                        style: AppTypography.heading2.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    _GlassIconButton(
+                      icon: CupertinoIcons.check_mark_circled,
+                      onTap: _selectAll,
+                    ),
+                    const SizedBox(width: 12),
+                    _GlassIconButton(
+                      icon: CupertinoIcons.trash,
+                      destructive: true,
+                      onTap: _selectedIds.isEmpty ? () {} : _deleteSelected,
+                    ),
+                  ],
+                ),
+              )
+              : ScreenTitleBlock(
+                key: const ValueKey('normal_header'),
+                eyebrow: 'Kütüphane',
+                title: 'Programlar',
+                titleColor: Colors.white,
+                eyebrowColor: Colors.white.withValues(alpha: 0.65),
+                trailing:
+                    _programs.isNotEmpty
+                        ? _GlassIconButton(
+                          icon: CupertinoIcons.check_mark_circled,
+                          onTap: _enterSelectionMode,
+                        )
+                        : null,
+              ),
+    );
+  }
+
+  // Tam ekran espresso hero: wordmark, başlık satırı ve üç rakam (program sayısı,
+  // aktif programın gün ve hareket sayısı).
+  Widget _buildScreenHero(GlobalKey heroKey) {
+    final active = _programs.where((p) => p.id == _activeProgramId).firstOrNull;
+    final exercises =
+        active?.workouts.fold<int>(0, (sum, w) => sum + w.exercises.length) ??
+        0;
+
+    return KiremitHeroSurface(
+      heroKey: heroKey,
+      topColor: AppColors.espresso,
+      bottomColor: AppColors.heroDarkEnd,
+      glowColor: AppColors.espressoGlow,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          _pagePadding,
+          MediaQuery.paddingOf(context).top + 12,
+          _pagePadding,
+          28,
+        ),
+        child: Column(
+          children: [
+            SeriesWordmark(color: Colors.white.withValues(alpha: 0.9)),
+            // Diğer sekmelerle aynı başlık konumu (wordmark + 16 boşluk).
+            const SizedBox(height: 16),
+            _buildHeaderRow(),
+            if (_isLoading || _programs.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              AnimatedSwitcher(
+                duration: _heroSwitchDuration,
+                child:
+                    _isLoading
+                        ? const HeroStatsSkeleton()
+                        : HeroStatsRow(
+                          stats: [
+                            HeroStat(_programs.length, 'Program'),
+                            HeroStat(active?.workouts.length ?? 0, 'Gün'),
+                            HeroStat(
+                              exercises,
+                              'Hareket',
+                              valueColor: AppColors.accentGold,
+                            ),
+                          ],
+                        ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -405,150 +457,162 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
-            slivers: [
-              const SliverSafeArea(
-                sliver: SliverToBoxAdapter(child: SizedBox(height: 12)),
-                bottom: false,
-              ),
-              const SliverToBoxAdapter(child: SeriesWordmark()),
-              _buildHeader(),
-              _buildGenerationStatus(),
-
-              // Hero alanı: Home'daki gibi iskelet ↔ içerik crossfade (aynı ölçü,
-              // layout zıplamaz).
-              if (_isLoading || hero != null)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: _pagePadding,
-                      vertical: 16,
-                    ),
-                    child: AnimatedSwitcher(
-                      duration: _heroSwitchDuration,
-                      child: _isLoading ? const _FeaturedSkeleton() : hero,
-                    ),
+      body: HeroStatusBarScope(
+        builder:
+            (context, heroKey) => Stack(
+              children: [
+                CustomScrollView(
+                  physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
                   ),
-                ),
+                  slivers: [
+                    SliverToBoxAdapter(child: _buildScreenHero(heroKey)),
+                    const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                    _buildGenerationStatus(),
 
-              if (!_isLoading)
-                if (_programs.isEmpty &&
-                    generationStateNotifier.value == GenerationStatus.idle)
-                  SliverFillRemaining(
-                    child: _PremiumEmptyState(
-                      onCreate: () => context.push<bool>('/onboarding-survey'),
-                    ),
-                  )
-                else ...[
-                  // Grid Other Programs
-                  if (otherPrograms.isNotEmpty)
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: _pagePadding,
+                    // Hero alanı: Home'daki gibi iskelet ↔ içerik crossfade (aynı ölçü,
+                    // layout zıplamaz).
+                    if (_isLoading || hero != null)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: _pagePadding,
+                            vertical: 16,
+                          ),
+                          child: AnimatedSwitcher(
+                            duration: _heroSwitchDuration,
+                            child:
+                                _isLoading ? const _FeaturedSkeleton() : hero,
+                          ),
+                        ),
                       ),
-                      sliver: SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 16,
-                              crossAxisSpacing: 16,
-                              childAspectRatio: 0.85,
+
+                    if (!_isLoading)
+                      if (_programs.isEmpty &&
+                          generationStateNotifier.value ==
+                              GenerationStatus.idle)
+                        SliverFillRemaining(
+                          child: _PremiumEmptyState(
+                            onCreate:
+                                () => context.push<bool>('/onboarding-survey'),
+                          ),
+                        )
+                      else ...[
+                        // Grid Other Programs
+                        if (otherPrograms.isNotEmpty)
+                          SliverPadding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: _pagePadding,
                             ),
-                        delegate: SliverChildBuilderDelegate((context, index) {
-                          final program = otherPrograms[index];
-                          final card = _DismissibleWrapper(
-                            program: program,
-                            isSelectionMode: _isSelectionMode,
-                            onDeleteConfirmed: () async {
-                              final originalIndex = _programs.indexOf(program);
-                              setState(() => _programs.removeAt(originalIndex));
-                              try {
-                                await ProgramRepository.deleteProgram(
-                                  program.id,
+                            sliver: SliverGrid(
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    mainAxisSpacing: 16,
+                                    crossAxisSpacing: 16,
+                                    childAspectRatio: 0.85,
+                                  ),
+                              delegate: SliverChildBuilderDelegate((
+                                context,
+                                index,
+                              ) {
+                                final program = otherPrograms[index];
+                                final card = _DismissibleWrapper(
+                                  program: program,
+                                  isSelectionMode: _isSelectionMode,
+                                  onDeleteConfirmed: () async {
+                                    final originalIndex = _programs.indexOf(
+                                      program,
+                                    );
+                                    setState(
+                                      () => _programs.removeAt(originalIndex),
+                                    );
+                                    try {
+                                      await ProgramRepository.deleteProgram(
+                                        program.id,
+                                      );
+                                    } catch (e) {
+                                      debugPrint(e.toString());
+                                    }
+                                  },
+                                  child: _GridProgramCard(
+                                    program: program,
+                                    isSelected: _selectedIds.contains(
+                                      program.id,
+                                    ),
+                                    isSelectionMode: _isSelectionMode,
+                                    onTap: () {
+                                      if (_isSelectionMode) {
+                                        _toggleSelection(program.id);
+                                      } else {
+                                        context
+                                            .push<bool>(
+                                              '/program-detail',
+                                              extra: program,
+                                            )
+                                            .then((v) {
+                                              if (v == true) _fetch();
+                                            });
+                                      }
+                                    },
+                                    onLongPress: _enterSelectionMode,
+                                  ),
                                 );
-                              } catch (e) {
-                                debugPrint(e.toString());
-                              }
-                            },
-                            child: _GridProgramCard(
-                              program: program,
-                              isSelected: _selectedIds.contains(program.id),
-                              isSelectionMode: _isSelectionMode,
-                              onTap: () {
-                                if (_isSelectionMode) {
-                                  _toggleSelection(program.id);
-                                } else {
-                                  context
-                                      .push<bool>(
-                                        '/program-detail',
-                                        extra: program,
-                                      )
-                                      .then((v) {
-                                        if (v == true) _fetch();
-                                      });
+                                if (!_isIntroActive ||
+                                    index >= _revealedGridItems) {
+                                  return card;
                                 }
-                              },
-                              onLongPress: _enterSelectionMode,
+                                return Reveal(
+                                  delay: _revealStagger * (1 + index),
+                                  duration: _revealDuration,
+                                  child: card,
+                                );
+                              }, childCount: otherPrograms.length),
                             ),
-                          );
-                          if (!_isIntroActive || index >= _revealedGridItems) {
-                            return card;
-                          }
-                          return Reveal(
-                            delay: _revealStagger * (1 + index),
-                            duration: _revealDuration,
-                            child: card,
-                          );
-                        }, childCount: otherPrograms.length),
-                      ),
-                    ),
+                          ),
 
-                  // Bottom padding to avoid FAB overlap
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height:
-                          MediaQuery.paddingOf(context).bottom +
-                          _navBarClearance +
-                          _LiquidGlassFab.height +
-                          _fabGap * 2,
+                        // Bottom padding to avoid FAB overlap
+                        SliverToBoxAdapter(
+                          child: SizedBox(
+                            height:
+                                MediaQuery.paddingOf(context).bottom +
+                                _navBarClearance +
+                                _LiquidGlassFab.height +
+                                _fabGap * 2,
+                          ),
+                        ),
+                      ],
+                  ],
+                ),
+
+                if (!_isSelectionMode)
+                  Positioned(
+                    bottom:
+                        MediaQuery.paddingOf(context).bottom +
+                        _navBarClearance +
+                        _fabGap,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: _LiquidGlassFab(
+                        onTap:
+                            () => showAddProgramSheet(
+                              context: context,
+                              onCreateWithAi: () async {
+                                await context.push<bool>('/onboarding-survey');
+                              },
+                              onImportProgram: () async {
+                                final created = await context.push<bool>(
+                                  '/import-program',
+                                );
+                                if (created == true) _fetch();
+                              },
+                            ),
+                      ),
                     ),
                   ),
-                ],
-            ],
-          ),
-
-          if (!_isSelectionMode)
-            Positioned(
-              bottom:
-                  MediaQuery.paddingOf(context).bottom +
-                  _navBarClearance +
-                  _fabGap,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: _LiquidGlassFab(
-                  onTap:
-                      () => showAddProgramSheet(
-                        context: context,
-                        onCreateWithAi: () async {
-                          await context.push<bool>('/onboarding-survey');
-                        },
-                        onImportProgram: () async {
-                          final created = await context.push<bool>(
-                            '/import-program',
-                          );
-                          if (created == true) _fetch();
-                        },
-                      ),
-                ),
-              ),
+              ],
             ),
-        ],
       ),
     );
   }
@@ -1107,12 +1171,18 @@ class _DismissibleWrapper extends StatelessWidget {
   }
 }
 
+/// Koyu hero üzerinde 44px yarı saydam beyaz daire buton; [destructive] ise
+/// kırmızı dolgu (silme).
 class _GlassIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
-  final Color? color;
+  final bool destructive;
 
-  const _GlassIconButton({required this.icon, required this.onTap, this.color});
+  const _GlassIconButton({
+    required this.icon,
+    required this.onTap,
+    this.destructive = false,
+  });
 
   static const double _size = 44;
   static const double _pressedScale = 0.92;
@@ -1126,11 +1196,14 @@ class _GlassIconButton extends StatelessWidget {
         width: _size,
         height: _size,
         alignment: Alignment.center,
-        decoration: const BoxDecoration(
-          color: AppColors.fillSubtle,
+        decoration: BoxDecoration(
+          color:
+              destructive
+                  ? AppColors.error
+                  : Colors.white.withValues(alpha: 0.14),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, size: 20, color: color ?? AppColors.espresso),
+        child: Icon(icon, size: 20, color: Colors.white),
       ),
     );
   }

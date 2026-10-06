@@ -12,6 +12,7 @@ import '../widgets/app_confirm_dialog.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/reveal.dart';
 import '../widgets/detail_hero.dart' show HeroStatusBarScope;
+import '../widgets/hero_stats_row.dart';
 import '../widgets/kiremit_hero_surface.dart';
 import '../widgets/screen_title_block.dart';
 import '../widgets/section_title.dart';
@@ -269,10 +270,12 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     final totalSets = _sessions.fold<int>(0, (sum, s) => sum + s.setCount);
     final thisWeek =
         _sessions.where((s) => !s.completedAt.isBefore(weekStart)).length;
-    return _HeroStats(
-      workouts: _sessions.length,
-      sets: totalSets,
-      thisWeek: thisWeek,
+    return HeroStatsRow(
+      stats: [
+        HeroStat(_sessions.length, 'Antrenman'),
+        HeroStat(totalSets, 'Set'),
+        HeroStat(thisWeek, 'Bu hafta', valueColor: AppColors.accentGold),
+      ],
     );
   }
 
@@ -451,7 +454,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
               const SizedBox(height: 24),
               AnimatedSwitcher(
                 duration: _heroSwitchDuration,
-                child: _isLoading ? const _HeroStatsSkeleton() : _buildHero(),
+                child: _isLoading ? const HeroStatsSkeleton() : _buildHero(),
               ),
             ],
           ],
@@ -544,143 +547,6 @@ class _MenuButton extends StatelessWidget {
         onSelected: onSelected,
         itemBuilder: itemBuilder,
         child: _CircleIconButton(icon: CupertinoIcons.ellipsis, onHero: onHero),
-      ),
-    );
-  }
-}
-
-/// Hero içindeki üç rakam: antrenman, set ve bu hafta (altın).
-class _HeroStats extends StatelessWidget {
-  final int workouts;
-  final int sets;
-  final int thisWeek;
-
-  const _HeroStats({
-    required this.workouts,
-    required this.sets,
-    required this.thisWeek,
-  });
-
-  static const double height = 64;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      key: const ValueKey('hero_stats'),
-      height: height,
-      child: Row(
-        children: [
-          Expanded(child: _Stat(value: workouts, label: 'Antrenman')),
-          const _StatDivider(),
-          Expanded(child: _Stat(value: sets, label: 'Set')),
-          const _StatDivider(),
-          Expanded(
-            child: _Stat(
-              value: thisWeek,
-              label: 'Bu hafta',
-              valueColor: AppColors.accentGold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  final int value;
-  final String label;
-  final Color valueColor;
-
-  const _Stat({
-    required this.value,
-    required this.label,
-    this.valueColor = AppColors.onHeroDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          '$value',
-          style: AppTypography.heading1.copyWith(
-            color: valueColor,
-            fontSize: 32,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.6,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: AppTypography.body12Medium.copyWith(
-            color: AppColors.onHeroDark.withValues(alpha: 0.7),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatDivider extends StatelessWidget {
-  const _StatDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 40,
-      color: AppColors.onHeroDark.withValues(alpha: 0.14),
-    );
-  }
-}
-
-/// Hero içindeki rakamlar yüklenirken: koyu zeminde silik shimmer çubukları.
-class _HeroStatsSkeleton extends StatelessWidget {
-  const _HeroStatsSkeleton();
-
-  Widget _column() => Column(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      Container(
-        width: 44,
-        height: 30,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-        ),
-      ),
-      const SizedBox(height: 8),
-      Container(
-        width: 62,
-        height: 10,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(5),
-        ),
-      ),
-    ],
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    return Shimmer.fromColors(
-      key: const ValueKey('hero_stats_skeleton'),
-      baseColor: Colors.white.withValues(alpha: 0.1),
-      highlightColor: Colors.white.withValues(alpha: 0.24),
-      child: SizedBox(
-        height: _HeroStats.height,
-        child: Row(
-          children: [
-            Expanded(child: _column()),
-            const SizedBox(width: 1),
-            Expanded(child: _column()),
-            const SizedBox(width: 1),
-            Expanded(child: _column()),
-          ],
-        ),
       ),
     );
   }
