@@ -1,5 +1,9 @@
 import '../models/workout_history.dart';
 
+/// 100 → "100", 116.67 → "116.7" (gösterim için).
+String formatKg(double value) =>
+    value % 1 == 0 ? value.toInt().toString() : value.toStringAsFixed(1);
+
 /// Bir egzersizin tek bir seanstaki en iyi performansı.
 class StrengthPoint {
   final DateTime date;

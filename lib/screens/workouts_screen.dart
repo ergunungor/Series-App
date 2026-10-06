@@ -12,6 +12,7 @@ import '../widgets/app_confirm_dialog.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/reveal.dart';
 import '../widgets/screen_title_block.dart';
+import '../widgets/workout_insights_section.dart';
 import '../widgets/series_wordmark.dart';
 import 'package:lottie/lottie.dart';
 
@@ -88,7 +89,8 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
   void _armIntroTimer() {
     if (_isIntroTimerArmed) return;
     _isIntroTimerArmed = true;
-    Future.delayed(_revealStagger * (_revealedItems + 1) + _revealDuration, () {
+    final steps = _revealedItems + 1 + WorkoutInsightsSection.cardCount;
+    Future.delayed(_revealStagger * steps + _revealDuration, () {
       if (mounted) _isIntroActive = false;
     });
   }
@@ -345,7 +347,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     if (!_isIntroActive || index >= _revealedItems) return item;
     return Reveal(
       key: ValueKey('reveal_$key'),
-      delay: _revealStagger * (1 + index),
+      delay: _revealStagger * (1 + WorkoutInsightsSection.cardCount + index),
       duration: _revealDuration,
       child: item,
     );
@@ -396,6 +398,17 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                 child: _EmptyHistory(),
               )
             else ...[
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: _pagePadding),
+                sliver: SliverToBoxAdapter(
+                  child: WorkoutInsightsSection(
+                    sessions: _sessions,
+                    animateIntro: _isIntroActive,
+                    revealStagger: _revealStagger,
+                    revealDuration: _revealDuration,
+                  ),
+                ),
+              ),
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: _pagePadding),
                 sliver: SliverList(

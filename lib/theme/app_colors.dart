@@ -25,6 +25,7 @@ class AppColors {
   static const Color workoutsHero = Color(0xFF24382E);
   static const Color workoutsHeroDeep = Color(0xFF141F19);
   static const Color workoutsAccent = Color(0xFF2F5D46);
+  static const Color workoutsTint = Color(0xFFE4EEE8);
 
   // --- Eski palet (migrasyon bitince silinecek) ---
   static const Color brandPrimary = Color(0xFF960000); // ana bordo

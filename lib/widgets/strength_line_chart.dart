@@ -102,8 +102,8 @@ class _StrengthLineChartState extends State<StrengthLineChart>
     final first = widget.points.first;
     final last = widget.points.last;
     return 'Güç puanı grafiği, ${widget.points.length} antrenman. '
-        'İlk puan ${_formatKg(first.score)} kilo, '
-        'son puan ${_formatKg(last.score)} kilo.';
+        'İlk puan ${formatKg(first.score)} kilo, '
+        'son puan ${formatKg(last.score)} kilo.';
   }
 
   @override
@@ -149,9 +149,6 @@ class _StrengthLineChartState extends State<StrengthLineChart>
     );
   }
 }
-
-String _formatKg(double value) =>
-    value % 1 == 0 ? value.toInt().toString() : value.toStringAsFixed(1);
 
 /// Çizim alanı ölçüleri; painter ve dokunma hesabı aynı yerden okusun.
 class _ChartGeometry {
@@ -364,7 +361,7 @@ class _StrengthPainter extends CustomPainter {
       text: TextSpan(
         children: [
           TextSpan(
-            text: '${_formatKg(p.score)} kg\n',
+            text: '${formatKg(p.score)} kg\n',
             style: labelStyle.copyWith(
               color: AppColors.onHeroDark,
               fontWeight: FontWeight.w700,
@@ -374,7 +371,7 @@ class _StrengthPainter extends CustomPainter {
           ),
           TextSpan(
             text:
-                '${_formatKg(p.weight)} kg × ${p.reps} · ${dateFormat.format(p.date)}',
+                '${formatKg(p.weight)} kg × ${p.reps} · ${dateFormat.format(p.date)}',
             style: labelStyle.copyWith(
               color: AppColors.onHeroDark.withValues(alpha: 0.75),
               fontSize: 10,
