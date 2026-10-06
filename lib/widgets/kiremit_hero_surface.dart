@@ -4,16 +4,16 @@ import '../theme/app_colors.dart';
 /// Kiremit hero yüzeyi: dikey gradyan, sağ üstten gelen yumuşak ışık (üst
 /// kenarda şeffafa solar), alt köşeleri yuvarlak, renkli alt gölge ve üstte
 /// bounce (aşağı çekme) için aynı renkte uzun blok. İçeriği ve iç boşluğu
-/// çağıran verir; [heroKey] kaydırmada durum çubuğu rengini ölçmek için
-/// `HeroStatusBarScope` ile kullanılır.
+/// çağıran verir; [heroKey] (opsiyonel) kaydırmada durum çubuğu rengini ölçmek
+/// için `HeroStatusBarScope` ile kullanılır.
 class KiremitHeroSurface extends StatelessWidget {
-  final GlobalKey heroKey;
+  final GlobalKey? heroKey;
   final Widget child;
   final double bottomRadius;
 
   const KiremitHeroSurface({
     super.key,
-    required this.heroKey,
+    this.heroKey,
     required this.child,
     this.bottomRadius = 32,
   });

@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import 'app_button.dart';
-import 'gradient_progress_bar.dart';
+import 'kiremit_hero_surface.dart';
 import 'pressable_scale.dart';
 import 'reveal.dart';
 import 'series_wordmark.dart';
 
-/// Anket adımlarının ortak iskeleti: üstte wordmark ve kapat butonu, ilerleme
-/// çubuğu ve "Adım n / m", büyük soru, kaydırılan içerik, altta Geri ve İleri.
+/// Anket adımlarının ortak iskeleti: üstte ışıklı kiremit hero (wordmark, kapat
+/// butonu, segmentli ilerleme, adım etiketi ve beyaz büyük soru), altında krem
+/// zeminde kaydırılan içerik ve en altta Geri / İleri.
 class SurveyStepScaffold extends StatelessWidget {
   final int currentStep;
   final int totalSteps;
@@ -37,79 +39,122 @@ class SurveyStepScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        // Üst boşluk diğer ekranlarla (Ana Sayfa) aynı 12.
-        padding: const EdgeInsets.fromLTRB(_pagePadding, 12, _pagePadding, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              height: _topBarHeight,
-              child: Stack(
-                alignment: Alignment.center,
+    final bottomSafe = MediaQuery.paddingOf(context).bottom;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      // Hero koyu: durum çubuğu simgeleri açık.
+      value: SystemUiOverlayStyle.light,
+      child: Column(
+        children: [
+          KiremitHeroSurface(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                _pagePadding,
+                MediaQuery.paddingOf(context).top + 8,
+                _pagePadding,
+                26,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SeriesWordmark(),
-                  if (onExit != null)
-                    Positioned(
-                      right: 0,
-                      child: PressableScale(
-                        pressedScale: 0.92,
-                        onTap: onExit,
-                        child: Container(
-                          width: _topBarHeight,
-                          height: _topBarHeight,
-                          decoration: const BoxDecoration(
-                            color: AppColors.fillSubtle,
-                            shape: BoxShape.circle,
+                  SizedBox(
+                    height: _topBarHeight,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SeriesWordmark(
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                        if (onExit != null)
+                          Positioned(
+                            right: 0,
+                            child: PressableScale(
+                              pressedScale: 0.92,
+                              onTap: onExit,
+                              child: Container(
+                                width: _topBarHeight,
+                                height: _topBarHeight,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.14),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.close_rounded,
+                                  size: 22,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.close_rounded,
-                            size: 22,
-                            color: AppColors.homeHero,
-                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _SegmentedProgress(current: currentStep, total: totalSteps),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: AppColors.accentGold,
+                          shape: BoxShape.circle,
                         ),
                       ),
+                      const SizedBox(width: 7),
+                      Text(
+                        'ADIM ${currentStep + 1} / $totalSteps',
+                        style: AppTypography.body12Medium.copyWith(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 10,
+                          letterSpacing: 1.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Reveal(
+                    duration: _revealDuration,
+                    child: Text(
+                      question,
+                      style: AppTypography.heading1.copyWith(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.8,
+                        height: 1.15,
+                      ),
                     ),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            GradientProgressBar(value: (currentStep + 1) / totalSteps),
-            const SizedBox(height: 10),
-            Text(
-              'Adım ${currentStep + 1} / $totalSteps',
-              style: AppTypography.body12Regular.copyWith(
-                color: AppColors.textTertiary,
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                _pagePadding,
+                24,
+                _pagePadding,
+                16,
+              ),
+              child: Reveal(
+                delay: const Duration(milliseconds: 100),
+                duration: _revealDuration,
+                child: content,
               ),
             ),
-            const SizedBox(height: 22),
-            Reveal(
-              duration: _revealDuration,
-              child: Text(
-                question,
-                style: AppTypography.heading1.copyWith(
-                  color: AppColors.textPrimary,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.6,
-                  height: 1.2,
-                ),
-              ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              _pagePadding,
+              4,
+              _pagePadding,
+              bottomSafe > 0 ? bottomSafe : 20,
             ),
-            const SizedBox(height: 24),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Reveal(
-                  delay: const Duration(milliseconds: 100),
-                  duration: _revealDuration,
-                  child: content,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
+            child: Row(
               children: [
                 if (onBack != null) ...[
                   _BackButton(onTap: onBack!),
@@ -125,9 +170,50 @@ class SurveyStepScaffold extends StatelessWidget {
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+/// Adım başına bir segment: tamamlanan ve mevcut adım altın dolu (akıcı uzar).
+class _SegmentedProgress extends StatelessWidget {
+  final int current;
+  final int total;
+
+  const _SegmentedProgress({required this.current, required this.total});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var i = 0; i < total; i++)
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(left: i == 0 ? 0 : 4),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween<double>(end: i <= current ? 1 : 0),
+                duration: const Duration(milliseconds: 450),
+                curve: Curves.easeOutCubic,
+                builder:
+                    (context, value, _) => ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: Container(
+                        height: 4,
+                        color: Colors.white.withValues(alpha: 0.2),
+                        alignment: Alignment.centerLeft,
+                        child: FractionallySizedBox(
+                          widthFactor: value,
+                          heightFactor: 1,
+                          child: const ColoredBox(color: AppColors.accentGold),
+                        ),
+                      ),
+                    ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

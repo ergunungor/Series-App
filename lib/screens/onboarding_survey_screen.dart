@@ -7,6 +7,7 @@ import '../theme/app_typography.dart';
 import '../widgets/app_input.dart';
 import '../widgets/survey_step_scaffold.dart';
 import '../widgets/selectable_chip.dart';
+import '../widgets/selectable_option_card.dart';
 import '../models/onboarding_data.dart';
 import '../services/program_service.dart';
 import '../widgets/app_confirm_dialog.dart';
@@ -364,6 +365,17 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     child: slider,
   );
 
+  // Tek seçimli adımlar: tam genişlik kartlar, aralarında 12px.
+  Widget _optionCards(List<Widget> cards) => Column(
+    children: [
+      for (var i = 0; i < cards.length; i++)
+        Padding(
+          padding: EdgeInsets.only(top: i == 0 ? 0 : 12),
+          child: cards[i],
+        ),
+    ],
+  );
+
   Widget _ageStep() => SurveyStepScaffold(
     currentStep: _currentStep,
     totalSteps: totalSteps,
@@ -389,19 +401,16 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     question: 'Cinsiyetin nedir?',
     onExit: _handleCloseSurvey,
     onBack: _goBack,
-    content: Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children:
-          _genderOptions
-              .map(
-                (o) => SelectableChip(
-                  label: o,
-                  isSelected: _selectedGender == o,
-                  onTap: () => setState(() => _selectedGender = o),
-                ),
-              )
-              .toList(),
+    content: _optionCards(
+      _genderOptions
+          .map(
+            (o) => SelectableOptionCard(
+              label: o,
+              isSelected: _selectedGender == o,
+              onTap: () => setState(() => _selectedGender = o),
+            ),
+          )
+          .toList(),
     ),
     onNext: () {
       if (_selectedGender == null) {
@@ -418,19 +427,16 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     question: 'Antrenman tecrüben ne seviyede?',
     onExit: _handleCloseSurvey,
     onBack: _goBack,
-    content: Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children:
-          _experienceOptions
-              .map(
-                (o) => SelectableChip(
-                  label: o,
-                  isSelected: _data.experience == o,
-                  onTap: () => setState(() => _data.experience = o),
-                ),
-              )
-              .toList(),
+    content: _optionCards(
+      _experienceOptions
+          .map(
+            (o) => SelectableOptionCard(
+              label: o,
+              isSelected: _data.experience == o,
+              onTap: () => setState(() => _data.experience = o),
+            ),
+          )
+          .toList(),
     ),
     onNext: () {
       if (_data.experience == null) {
