@@ -3,10 +3,12 @@ import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/detail_hero.dart';
 import '../widgets/home_hero.dart';
+import '../widgets/home_week_strip.dart';
 import '../widgets/app_logo.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/program.dart';
+import '../models/workout_history.dart';
 import '../services/program_repository.dart';
 import '../services/workout_history_repository.dart';
 import '../widgets/app_confirm_dialog.dart';
@@ -32,6 +34,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _weeklyCompleted = 0;
   int _weeklyTotal = 0;
   int _nextWorkoutIndex = 0;
+  // Geçmiş kayıtları (yeni → eski); hafta şeridi bundan hesaplanır.
+  List<WorkoutHistorySession> _history = [];
 
   @override
   void initState() {
@@ -100,6 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (mounted) {
         setState(() {
+          _history = history;
           _weeklyCompleted = doneThisWeek.length;
           _weeklyTotal = program.workouts.length;
           // Eğer 3 günlük programı tamamladıysa (completed=3), modulo % 3 = 0 olur (başa döner).
@@ -138,6 +143,23 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (error) {
       debugPrint('Veri çekme hatası: $error');
     }
+  }
+
+  /// Bu hafta (Pazartesi başlangıçlı) bu programa ait antrenman yapılan günler:
+  /// 0 = Pazartesi ... 6 = Pazar.
+  Set<int> _doneWeekdays(ActiveProgram program) {
+    final now = DateTime.now();
+    final startOfWeek = DateTime(
+      now.year,
+      now.month,
+      now.day - (now.weekday - 1),
+    );
+    final ids = program.workouts.map((w) => w.id).toSet();
+    return {
+      for (final s in _history)
+        if (ids.contains(s.workoutId) && !s.completedAt.isBefore(startOfWeek))
+          s.completedAt.weekday - 1,
+    };
   }
 
   Future<void> _handleRefresh() async {
@@ -179,6 +201,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       workoutName: nextWorkout?.name,
                       exerciseCount: nextWorkout?.exercises.length ?? 0,
                       durationMin: nextWorkout?.estimatedDurationMin ?? 0,
+                      footer:
+                          hasProgram
+                              ? HomeWeekStrip(
+                                doneDays: _doneWeekdays(program),
+                                todayIndex: DateTime.now().weekday - 1,
+                                completed: _weeklyCompleted,
+                                total: _weeklyTotal,
+                              )
+                              : null,
                       onStart:
                           nextWorkout == null
                               ? null
