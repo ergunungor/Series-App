@@ -67,7 +67,7 @@ class _OtpInputState extends State<OtpInput> {
                 keyboardType: TextInputType.number,
                 maxLength: 1,
                 style: AppTypography.heading3.copyWith(
-                  color: AppColors.textPrimary,
+                  color: Colors.black,
                   fontSize: 20, // Ekrana sığması için fontu çok az küçülttük
                 ),
                 decoration: InputDecoration(
@@ -83,7 +83,9 @@ class _OtpInputState extends State<OtpInput> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppColors.primary),
+                    borderSide: const BorderSide(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
                 onChanged: (v) => _onChanged(index, v),

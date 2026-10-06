@@ -14,7 +14,7 @@ Future<bool> showAppConfirmDialog({
     context: context,
     builder:
         (context) => AlertDialog(
-          backgroundColor: AppColors.surface,
+          backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -45,7 +45,7 @@ Future<bool> showAppConfirmDialog({
               child: Text(
                 confirmLabel,
                 style: AppTypography.body14Medium.copyWith(
-                  color: isDestructive ? AppColors.error : AppColors.primary,
+                  color: isDestructive ? Colors.red : AppColors.brandPrimary,
                 ),
               ),
             ),

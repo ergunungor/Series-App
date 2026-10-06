@@ -39,12 +39,12 @@ class _WorkoutCardState extends State<WorkoutCard> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primaryDeep],
+          colors: [AppColors.heroGradientStart, AppColors.brandTertiary],
         ),
         borderRadius: BorderRadius.circular(_cardRadius),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.28),
+            color: AppColors.brandPrimary.withValues(alpha: 0.28),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
@@ -70,7 +70,7 @@ class _WorkoutCardState extends State<WorkoutCard> {
                 Text(
                   'SIRADAKİ ANTRENMAN',
                   style: AppTypography.body12Medium.copyWith(
-                    color: AppColors.onPrimary.withValues(alpha: 0.72),
+                    color: Colors.white.withValues(alpha: 0.72),
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.2,
                   ),
@@ -81,7 +81,7 @@ class _WorkoutCardState extends State<WorkoutCard> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: AppTypography.heading2.copyWith(
-                    color: AppColors.onPrimary,
+                    color: Colors.white,
                     fontWeight: FontWeight.w700,
                     height: 1.25,
                   ),
@@ -101,7 +101,7 @@ class _WorkoutCardState extends State<WorkoutCard> {
                       height: _buttonHeight,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       decoration: BoxDecoration(
-                        color: AppColors.accent,
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Row(
@@ -110,13 +110,13 @@ class _WorkoutCardState extends State<WorkoutCard> {
                           Icon(
                             Icons.play_arrow_rounded,
                             size: 22,
-                            color: AppColors.onAccent,
+                            color: AppColors.brandPrimary,
                           ),
                           const SizedBox(width: 8),
                           Text(
                             'Antrenmanı Başlat',
                             style: AppTypography.body16Medium.copyWith(
-                              color: AppColors.onAccent,
+                              color: AppColors.brandPrimary,
                               fontWeight: FontWeight.w700,
                             ),
                           ),

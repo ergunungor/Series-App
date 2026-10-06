@@ -22,16 +22,17 @@ class SelectableChip extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : AppColors.surface,
+          color: isSelected ? AppColors.brandTertiary : Colors.white,
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.textTertiary,
+            color:
+                isSelected ? AppColors.brandTertiary : AppColors.textTertiary,
           ),
           borderRadius: BorderRadius.circular(45),
         ),
         child: Text(
           label,
           style: AppTypography.body16Medium.copyWith(
-            color: isSelected ? AppColors.onPrimary : AppColors.textPrimary,
+            color: isSelected ? Colors.white : AppColors.textPrimary,
           ),
         ),
       ),
