@@ -1170,6 +1170,9 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                     ),
                     child: _buildTopBar(),
                   ),
+                  // Süre hapının hemen altında ortalı "SERIES" wordmark'ı.
+                  const SizedBox(height: 10),
+                  SeriesWordmark(color: Colors.white.withValues(alpha: 0.9)),
                   Expanded(
                     child: Center(
                       child: SingleChildScrollView(
@@ -1177,11 +1180,6 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Ekranların üstündeki "SERIES" wordmark'ı, halkanın üstünde.
-                            SeriesWordmark(
-                              color: Colors.white.withValues(alpha: 0.9),
-                            ),
-                            const SizedBox(height: 28),
                             SizedBox(
                               width: _restRingSize,
                               height: _restRingSize,
