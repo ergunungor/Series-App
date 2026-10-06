@@ -108,9 +108,8 @@ class _BarsPainter extends CustomPainter {
   static const double _bottomLabelSpace = 16;
   static const double _emptyBarHeight = 6;
   static const double _pillGap = 6;
-  static const double _pillRadius = 25;
-  static const double _pillPadX = 9;
-  static const double _pillPadY = 3;
+  static const double _pillSize = 26;
+  static const double _pillPadX = 7;
   // Çubuklar soldan sağa sırayla büyür; her biri toplam sürenin bir diliminde.
   static const double _staggerSpan = 0.5;
 
@@ -164,9 +163,12 @@ class _BarsPainter extends CustomPainter {
     );
   }
 
-  /// Seçili çubuğun sayısı: çubuktan [_pillGap] kadar ayrık, arkasında yuvarlak
-  /// köşeli koyu hap. [bottomCenter] haptın alt orta noktası.
+  /// Seçili çubuğun sayısı: çubuktan [_pillGap] kadar ayrık, koyu yeşil daire
+  /// içinde ortalı. Çok haneli sayıda daire yatayda hap şekline uzar.
+  /// [bottomCenter] şeklin alt orta noktası.
   void _paintValuePill(Canvas canvas, String text, Offset bottomCenter) {
+    // Satır yüksekliği 1 ve eşit boşluk dağılımı: metin kutusu rakamın kendisine
+    // yakın olur, böylece daire içinde dikey olarak da ortalanır.
     final painter = TextPainter(
       text: TextSpan(
         text: text,
@@ -174,23 +176,27 @@ class _BarsPainter extends CustomPainter {
           color: AppColors.onHeroDark,
           fontWeight: FontWeight.w700,
           fontSize: 12,
+          height: 1,
+          leadingDistribution: TextLeadingDistribution.even,
         ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    final w = painter.width + _pillPadX * 2;
-    final h = painter.height + _pillPadY * 2;
+    final w = math.max(_pillSize, painter.width + _pillPadX * 2);
     final rect = Rect.fromLTWH(
       bottomCenter.dx - w / 2,
-      bottomCenter.dy - h,
+      bottomCenter.dy - _pillSize,
       w,
-      h,
+      _pillSize,
     );
     canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(_pillRadius)),
+      RRect.fromRectAndRadius(rect, const Radius.circular(_pillSize / 2)),
       Paint()..color = AppColors.workoutsHero,
     );
-    painter.paint(canvas, Offset(rect.left + _pillPadX, rect.top + _pillPadY));
+    painter.paint(
+      canvas,
+      rect.center - Offset(painter.width / 2, painter.height / 2),
+    );
   }
 
   void _paintText(Canvas canvas, String text, TextStyle style, Offset center) {
