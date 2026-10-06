@@ -650,6 +650,9 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   static const double _sectionGap = 24;
   // Dock'un ekran altından (güvenli alan üstünden) uzaklığı.
   static const double _dockBottomGap = 12;
+  // "Sıradaki" satırı (yaklaşık 20px) ile dock butonları arası.
+  static const double _nextRowHeight = 20;
+  static const double _nextToDockGap = 14;
 
   Widget _buildExerciseView() {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
@@ -667,7 +670,12 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                   physics: const BouncingScrollPhysics(),
                   padding: EdgeInsets.only(
                     bottom:
-                        _ctaHeight + bottomSafe + _dockBottomGap + _sectionGap,
+                        _ctaHeight +
+                        bottomSafe +
+                        _dockBottomGap +
+                        _nextRowHeight +
+                        _nextToDockGap +
+                        _sectionGap,
                   ),
                   child: Column(
                     children: [
@@ -1066,29 +1074,32 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
             ],
           ),
         ],
-        const SizedBox(height: _sectionGap),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Sıradaki:',
-              style: AppTypography.body14Regular.copyWith(
-                color: AppColors.textTertiary,
-              ),
+      ],
+    );
+  }
+
+  // "Sıradaki" bilgisi dock'un hemen üstünde: alt aksiyon grubunun parçası.
+  Widget _buildNextRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'Sıradaki:',
+          style: AppTypography.body14Regular.copyWith(
+            color: AppColors.textTertiary,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            _nextPreviewLabel(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: AppTypography.body14Medium.copyWith(
+              color: AppColors.textPrimary,
             ),
-            const SizedBox(width: 12),
-            Flexible(
-              child: Text(
-                _nextPreviewLabel(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.right,
-                style: AppTypography.body14Medium.copyWith(
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ],
     );
@@ -1120,31 +1131,44 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
           _pagePadding,
           bottomSafe + _dockBottomGap,
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _DockChevron(
-              icon: Icons.chevron_left_rounded,
-              size: _chevronSize,
-              onTap: canGoPrev ? () => _goToExercise(_exerciseIndex - 1) : null,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _SetCta(
-                height: _ctaHeight,
-                onTap:
-                    _isPaused
-                        ? null
-                        : () {
-                          HapticFeedback.mediumImpact();
-                          _confirmSet();
-                        },
-              ),
-            ),
-            const SizedBox(width: 10),
-            _DockChevron(
-              icon: Icons.chevron_right_rounded,
-              size: _chevronSize,
-              onTap: canGoNext ? () => _goToExercise(_exerciseIndex + 1) : null,
+            _buildNextRow(),
+            const SizedBox(height: _nextToDockGap),
+            Row(
+              children: [
+                _DockChevron(
+                  icon: Icons.chevron_left_rounded,
+                  size: _chevronSize,
+                  onTap:
+                      canGoPrev
+                          ? () => _goToExercise(_exerciseIndex - 1)
+                          : null,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _SetCta(
+                    height: _ctaHeight,
+                    onTap:
+                        _isPaused
+                            ? null
+                            : () {
+                              HapticFeedback.mediumImpact();
+                              _confirmSet();
+                            },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _DockChevron(
+                  icon: Icons.chevron_right_rounded,
+                  size: _chevronSize,
+                  onTap:
+                      canGoNext
+                          ? () => _goToExercise(_exerciseIndex + 1)
+                          : null,
+                ),
+              ],
             ),
           ],
         ),
