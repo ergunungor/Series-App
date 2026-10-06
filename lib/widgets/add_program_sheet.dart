@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
+import 'app_bottom_nav.dart';
 import 'pressable_scale.dart';
 import 'reveal.dart';
 
@@ -16,10 +17,13 @@ Future<void> showAddProgramSheet({
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
     builder: (context) {
-      final bottomSafe = MediaQuery.of(context).padding.bottom;
+      // Sheet, sekme kabuğundaki süzülen alt barın ALTINDA kalmasın diye barın
+      // kapladığı alan kadar boşluk bırakılır.
+      final bottomInset =
+          MediaQuery.of(context).padding.bottom + AppBottomNav.clearance;
 
       return Container(
-        padding: EdgeInsets.fromLTRB(16, 0, 16, bottomSafe + 24),
+        padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 16),
         decoration: const BoxDecoration(
           color: AppColors.background,
           borderRadius: BorderRadius.vertical(top: Radius.circular(32)),

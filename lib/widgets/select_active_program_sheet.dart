@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../models/program.dart';
+import 'app_bottom_nav.dart';
 import 'app_logo.dart';
 import 'pressable_scale.dart';
 import 'reveal.dart';
@@ -17,7 +18,9 @@ Future<ActiveProgram?> showSelectActiveProgramSheet({
         true, // KRİTİK: İçerik yüksekliğine göre esnek ve kaydırılabilir olmasını sağlar
     backgroundColor: Colors.transparent,
     builder: (context) {
-      final bottomPadding = MediaQuery.of(context).padding.bottom;
+      // Sekme kabuğundaki süzülen alt barın altında kalmasın.
+      final bottomPadding =
+          MediaQuery.of(context).padding.bottom + AppBottomNav.clearance;
 
       return DraggableScrollableSheet(
         initialChildSize: 0.55,
