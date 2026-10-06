@@ -4,6 +4,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/app_input.dart';
 import '../widgets/app_button.dart';
+import '../widgets/auth_scaffold.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,6 +20,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _rememberMe = false;
+  // Hata olunca alanları sallamak için artan sayaç (yalnızca görsel).
+  int _shakeCount = 0;
 
   @override
   void dispose() {
@@ -29,6 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _signIn() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      setState(() => _shakeCount++);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Lütfen e-posta ve şifrenizi girin.')),
       );
@@ -51,6 +55,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } on AuthException catch (_) {
       if (mounted) {
+        setState(() => _shakeCount++);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -74,97 +79,100 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Kullanıcı Girişi',
-                  textAlign: TextAlign.center,
-                  style: AppTypography.heading1.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                AppInput(
-                  controller: _emailController, // EKLENDİ
-                  hintText: 'E-mail Adresiniz',
-                  prefixIcon: Icons.mail_outline,
-                ),
-                const SizedBox(height: 16),
-                AppInput(
-                  controller: _passwordController, // EKLENDİ
-                  hintText: 'Şifre',
-                  prefixIcon: Icons.lock_outline,
-                  isPassword: true,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: Checkbox(
-                            value: _rememberMe,
-                            onChanged:
-                                (v) => setState(() => _rememberMe = v ?? false),
-                            side: BorderSide(color: AppColors.brandSecondary),
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        Text(
-                          'Beni hatırla',
-                          style: AppTypography.body12Medium.copyWith(
-                            color: AppColors.brandSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    GestureDetector(
-                      onTap: () => context.push('/forgot-password'),
-                      child: Text(
-                        'Şifremi unuttum',
-                        style: AppTypography.body12Medium.copyWith(
-                          color: AppColors.brandSecondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                AppButton(
-                  text: _isLoading ? 'GİRİŞ YAPILIYOR...' : 'GİRİŞ YAP',
-                  showIcon: false,
-                  onPressed: _isLoading ? null : _signIn, // EKLENDİ
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'veya', // ... (tasarım kodları aynı kalıyor)
-                ),
-                const SizedBox(height: 16),
-                AppButton(
-                  text: 'KAYIT OL',
-                  variant: AppButtonVariant.outlined,
-                  showIcon: false,
-                  onPressed: () {
-                    context.push('/register'); // YENİ: Kayıt ekranına geçiş
-                  },
-                ),
-              ],
-            ),
+    return AuthScaffold(
+      title: 'Kullanıcı Girişi',
+      children: [
+        AuthShake(
+          trigger: _shakeCount,
+          child: Column(
+            children: [
+              AppInput(
+                controller: _emailController, // EKLENDİ
+                hintText: 'E-mail Adresiniz',
+                prefixIcon: Icons.mail_outline,
+              ),
+              const SizedBox(height: 12),
+              AppInput(
+                controller: _passwordController, // EKLENDİ
+                hintText: 'Şifre',
+                prefixIcon: Icons.lock_outline,
+                isPassword: true,
+              ),
+            ],
           ),
         ),
-      ),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _rememberMe = !_rememberMe),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: Checkbox(
+                      value: _rememberMe,
+                      onChanged:
+                          (v) => setState(() => _rememberMe = v ?? false),
+                      activeColor: AppColors.homeHero,
+                      side: const BorderSide(
+                        color: AppColors.textTertiary,
+                        width: 1.5,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Beni hatırla',
+                    style: AppTypography.body12Medium.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => context.push('/forgot-password'),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'Şifremi unuttum',
+                  style: AppTypography.body12Medium.copyWith(
+                    color: AppColors.homeHero,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        AppButton(
+          text: _isLoading ? 'GİRİŞ YAPILIYOR...' : 'GİRİŞ YAP',
+          showIcon: false,
+          isLoading: _isLoading,
+          onPressed: _isLoading ? null : _signIn, // EKLENDİ
+        ),
+        const SizedBox(height: 16),
+        const AuthDivider(),
+        const SizedBox(height: 16),
+        AppButton(
+          text: 'KAYIT OL',
+          variant: AppButtonVariant.outlined,
+          showIcon: false,
+          onPressed: () {
+            context.push('/register'); // YENİ: Kayıt ekranına geçiş
+          },
+        ),
+      ],
     );
   }
 }
