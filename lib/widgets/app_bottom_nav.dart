@@ -1,7 +1,8 @@
-import 'dart:ui' show ImageFilter;
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 
@@ -12,12 +13,13 @@ class AppBottomNavItem {
   const AppBottomNavItem({required this.icon, required this.label});
 }
 
-/// iOS 26 "Liquid Glass" esinli alt bar: bulanık cam kapsül + yay fiziğiyle
-/// hareket eden, hızla hafifçe esneyen cam seçim göstergesi (lens).
+/// iOS 26 "Liquid Glass" alt bar: `liquid_glass_renderer` ile gerçek kırılmalı
+/// cam kapsül + yay fiziğiyle hareket eden, hızla hafifçe esneyen seçim lensi.
 ///
-/// Gerçek ışık kırılması yok (shader gerektirir); cam hissi blur, yarı saydam
-/// dolgu ve ince ışık kenarıyla verilir. Dışarıya sadece [currentIndex] ve
-/// [onTap] açıktır.
+/// Paket deneysel ve sadece Impeller'da çalışır (iOS'ta varsayılan). Cam
+/// kapsül statik olduğu için ucuz; hareket eden lens bilerek düz bir pill
+/// (shader yok), böylece geçişte her karede cam yeniden hesaplanmaz.
+/// Dışarıya sadece [currentIndex] ve [onTap] açıktır.
 class AppBottomNav extends StatefulWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -43,9 +45,18 @@ class _AppBottomNavState extends State<AppBottomNav>
     with SingleTickerProviderStateMixin {
   // Kapsül
   static const double _barRadius = 45;
-  static const double _blurSigma = 24;
-  static const double _glassAlpha = 0.58;
-  static const double _borderAlpha = 0.75;
+  // Performans sorunu olursa true yap: shader yerine hafif sahte cam kullanılır.
+  static const bool _useFakeGlass = false;
+  static const LiquidGlassSettings _glassSettings = LiquidGlassSettings(
+    thickness: 24,
+    blur: 8,
+    refractiveIndex: 1.21,
+    saturation: 1.5,
+    lightIntensity: 1,
+    ambientStrength: 0.5,
+    lightAngle: 0.25 * math.pi,
+    glassColor: Color(0x73FFFFFF),
+  );
   static const EdgeInsets _barMargin = EdgeInsets.fromLTRB(16, 0, 16, 16);
   static const EdgeInsets _barPadding = EdgeInsets.symmetric(
     horizontal: 12,
@@ -55,7 +66,7 @@ class _AppBottomNavState extends State<AppBottomNav>
   // Seçim lensi
   static const double _lensHeight = 56;
   static const double _lensInset = 3;
-  static const double _lensAlpha = 0.7;
+  static const double _lensAlpha = 0.5;
   static const double _stretchPerVelocity = 0.035;
   static const double _maxStretch = 1.22;
   static const double _squashFactor = 0.5;
@@ -188,35 +199,15 @@ class _AppBottomNavState extends State<AppBottomNav>
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(_barRadius);
-
-    // Gölge kırpmanın dışında kalmalı; bu yüzden ClipRRect'in bir üstünde.
-    return Container(
-      margin: _barMargin,
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.10),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: radius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma),
-          child: Container(
+    return Padding(
+      padding: _barMargin,
+      child: LiquidGlassLayer(
+        settings: _glassSettings,
+        fake: _useFakeGlass,
+        child: LiquidGlass(
+          shape: const LiquidRoundedSuperellipse(borderRadius: _barRadius),
+          child: Padding(
             padding: _barPadding,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: _glassAlpha),
-              borderRadius: radius,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: _borderAlpha),
-                width: 1,
-              ),
-            ),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final slotWidth =
