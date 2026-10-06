@@ -24,6 +24,7 @@ import '../widgets/reveal.dart';
 import '../widgets/series_wordmark.dart';
 import '../utils/exercise_name.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class WorkoutSessionScreen extends StatefulWidget {
   final WorkoutDay workout;
@@ -122,6 +123,8 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     _fetchLastPerformance();
     _fetchCurrentExerciseGif();
     _playBell();
+    // Antrenman boyunca ekran kararmasın.
+    WakelockPlus.enable();
   }
 
   Future<void> _fetchCurrentExerciseGif() async {
@@ -189,6 +192,9 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
 
   @override
   void dispose() {
+    // Antrenman ekranından çıkınca (bitiş, çıkış) ekranın normal kararma
+    // davranışı geri gelir.
+    WakelockPlus.disable();
     _restTimer?.cancel();
     _elapsedTimer?.cancel();
     _repsController.dispose();
