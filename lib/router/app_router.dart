@@ -9,7 +9,6 @@ import '../screens/programs_screen.dart';
 import '../screens/workouts_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/workout_session_screen.dart';
-import '../widgets/fade_branch_container.dart';
 import '../widgets/main_shell.dart';
 import '../screens/onboarding_survey_screen.dart';
 import '../screens/program_detail_screen.dart';
@@ -175,13 +174,7 @@ class AppRouter {
       ),
 
       // ── YENİ: bottom nav shell ──
-      StatefulShellRoute(
-        // Sekmeler arası geçiş: anında kesme yerine crossfade.
-        navigatorContainerBuilder:
-            (context, navigationShell, children) => FadeBranchContainer(
-              currentIndex: navigationShell.currentIndex,
-              children: children,
-            ),
+      StatefulShellRoute.indexedStack(
         pageBuilder: (context, state, navigationShell) {
           return CustomTransitionPage(
             key: state.pageKey,
