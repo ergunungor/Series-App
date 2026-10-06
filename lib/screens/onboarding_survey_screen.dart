@@ -342,7 +342,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
       ],
     ),
     style: AppTypography.heading1.copyWith(
-      color: AppColors.homeHero,
+      color: AppColors.espresso,
       fontSize: 56,
       fontWeight: FontWeight.w700,
       letterSpacing: -2,
@@ -353,10 +353,10 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
   Widget _sliderTheme(Slider slider) => SliderTheme(
     data: SliderTheme.of(context).copyWith(
       trackHeight: 8,
-      activeTrackColor: AppColors.homeHero,
+      activeTrackColor: AppColors.espresso,
       inactiveTrackColor: AppColors.borderSubtle,
-      thumbColor: AppColors.homeHero,
-      overlayColor: AppColors.homeHero.withValues(alpha: 0.12),
+      thumbColor: AppColors.accentGold,
+      overlayColor: AppColors.espresso.withValues(alpha: 0.12),
       thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 13),
       trackShape: const RoundedRectSliderTrackShape(),
       activeTickMarkColor: Colors.transparent,
@@ -385,6 +385,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
       hintText: 'Yaşın',
       controller: _ageController,
       keyboardType: TextInputType.number,
+      focusColor: AppColors.espresso,
     ),
     onNext: () {
       if (int.tryParse(_ageController.text) == null) {
@@ -713,7 +714,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
       maxLines: 4,
       minLines: 2,
       keyboardType: TextInputType.multiline,
-      cursorColor: AppColors.homeHero,
+      cursorColor: AppColors.espresso,
       style: AppTypography.body16Regular.copyWith(color: AppColors.textPrimary),
       decoration: InputDecoration(
         hintText: 'Örn: motivasyon eksikliği, zaman yönetimi...',
@@ -738,7 +739,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: AppColors.homeHero, width: 1.5),
+          borderSide: const BorderSide(color: AppColors.espresso, width: 1.5),
         ),
         contentPadding: const EdgeInsets.all(16),
       ),

@@ -20,6 +20,7 @@ class AppColors {
   static const Color espresso = Color(0xFF2B1B14);
   static const Color heroDarkStart = espresso;
   static const Color heroDarkEnd = Color(0xFF120A07);
+  static const Color espressoGlow = Color(0xFF4A2A1D);
   static const Color accentGold = Color(0xFFE3B55B);
   static const Color goldTint = Color(0xFFF3E4C4);
   static const Color goldDeep = Color(0xFFA87A22);

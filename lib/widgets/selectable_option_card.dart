@@ -35,14 +35,14 @@ class SelectableOptionCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(_radius),
           border: Border.all(
-            color: isSelected ? AppColors.homeHero : AppColors.borderSubtle,
+            color: isSelected ? AppColors.espresso : AppColors.borderSubtle,
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
               color:
                   isSelected
-                      ? AppColors.homeHero.withValues(alpha: 0.16)
+                      ? AppColors.espresso.withValues(alpha: 0.16)
                       : Colors.black.withValues(alpha: 0.03),
               blurRadius: isSelected ? 18 : 8,
               offset: Offset(0, isSelected ? 8 : 2),
@@ -70,11 +70,11 @@ class SelectableOptionCard extends StatelessWidget {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isSelected ? AppColors.homeHero : Colors.transparent,
+                color: isSelected ? AppColors.espresso : Colors.transparent,
                 border: Border.all(
                   color:
                       isSelected
-                          ? AppColors.homeHero
+                          ? AppColors.espresso
                           : AppColors.textTertiary.withValues(alpha: 0.4),
                   width: 1.5,
                 ),

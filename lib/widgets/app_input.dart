@@ -12,6 +12,9 @@ class AppInput extends StatefulWidget {
   final TextEditingController? controller;
   final TextInputType? keyboardType;
 
+  /// Odak çerçevesi, ikon ve imleç rengi; varsayılan kiremit.
+  final Color focusColor;
+
   const AppInput({
     super.key,
     required this.hintText,
@@ -19,6 +22,7 @@ class AppInput extends StatefulWidget {
     this.isPassword = false,
     this.controller,
     this.keyboardType,
+    this.focusColor = AppColors.homeHero,
   });
 
   @override
@@ -48,7 +52,7 @@ class _AppInputState extends State<AppInput> {
   @override
   Widget build(BuildContext context) {
     final focused = _focusNode.hasFocus;
-    final iconColor = focused ? AppColors.homeHero : AppColors.textTertiary;
+    final iconColor = focused ? widget.focusColor : AppColors.textTertiary;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -62,14 +66,14 @@ class _AppInputState extends State<AppInput> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(_radius),
           border: Border.all(
-            color: focused ? AppColors.homeHero : AppColors.borderSubtle,
+            color: focused ? widget.focusColor : AppColors.borderSubtle,
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
               color:
                   focused
-                      ? AppColors.homeHero.withValues(alpha: 0.12)
+                      ? widget.focusColor.withValues(alpha: 0.12)
                       : Colors.black.withValues(alpha: 0.03),
               blurRadius: focused ? 18 : 8,
               offset: Offset(0, focused ? 6 : 2),
@@ -94,7 +98,7 @@ class _AppInputState extends State<AppInput> {
                 focusNode: _focusNode,
                 keyboardType: widget.keyboardType,
                 obscureText: widget.isPassword ? _obscure : false,
-                cursorColor: AppColors.homeHero,
+                cursorColor: widget.focusColor,
                 textAlignVertical: TextAlignVertical.center,
                 style: AppTypography.body16Regular.copyWith(
                   color: AppColors.textPrimary,

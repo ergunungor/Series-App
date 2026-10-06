@@ -8,7 +8,7 @@ import 'pressable_scale.dart';
 import 'reveal.dart';
 import 'series_wordmark.dart';
 
-/// Anket adımlarının ortak iskeleti: üstte ışıklı kiremit hero (wordmark, kapat
+/// Anket adımlarının ortak iskeleti: üstte ışıklı espresso hero (wordmark, kapat
 /// butonu, segmentli ilerleme, adım etiketi ve beyaz büyük soru), altında krem
 /// zeminde kaydırılan içerik ve en altta Geri / İleri.
 class SurveyStepScaffold extends StatelessWidget {
@@ -47,6 +47,9 @@ class SurveyStepScaffold extends StatelessWidget {
       child: Column(
         children: [
           KiremitHeroSurface(
+            topColor: AppColors.espresso,
+            bottomColor: AppColors.heroDarkEnd,
+            glowColor: AppColors.espressoGlow,
             child: Padding(
               padding: EdgeInsets.fromLTRB(
                 _pagePadding,
@@ -166,6 +169,8 @@ class SurveyStepScaffold extends StatelessWidget {
                     onPressed: onNext,
                     showIcon: nextLabel == 'İleri',
                     icon: Icons.chevron_right_rounded,
+                    color: AppColors.espresso,
+                    deepColor: AppColors.heroDarkEnd,
                   ),
                 ),
               ],
@@ -243,14 +248,14 @@ class _BackButton extends StatelessWidget {
           children: [
             const Icon(
               Icons.chevron_left_rounded,
-              color: AppColors.homeHero,
+              color: AppColors.espresso,
               size: 22,
             ),
             const SizedBox(width: 2),
             Text(
               'Geri',
               style: AppTypography.body16Medium.copyWith(
-                color: AppColors.homeHero,
+                color: AppColors.espresso,
                 fontWeight: FontWeight.w700,
               ),
             ),

@@ -11,11 +11,19 @@ class KiremitHeroSurface extends StatelessWidget {
   final Widget child;
   final double bottomRadius;
 
+  /// Varsayılan kiremit; başka bir ekran (ör. anket) kendi hero rengini verebilir.
+  final Color topColor;
+  final Color bottomColor;
+  final Color glowColor;
+
   const KiremitHeroSurface({
     super.key,
     this.heroKey,
     required this.child,
     this.bottomRadius = 32,
+    this.topColor = AppColors.homeHero,
+    this.bottomColor = AppColors.homeHeroDeep,
+    this.glowColor = AppColors.homeHeroGlow,
   });
 
   // Işığın üstten ne kadarlık kısmında (hero yüksekliğinin oranı) soluk başladığı.
@@ -28,17 +36,17 @@ class KiremitHeroSurface extends StatelessWidget {
       width: double.infinity,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [AppColors.homeHero, AppColors.homeHeroDeep],
+          colors: [topColor, bottomColor],
         ),
         borderRadius: BorderRadius.vertical(
           bottom: Radius.circular(bottomRadius),
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.homeHeroDeep.withValues(alpha: 0.5),
+            color: bottomColor.withValues(alpha: 0.5),
             blurRadius: 40,
             spreadRadius: -18,
             offset: const Offset(0, 24),
@@ -65,10 +73,7 @@ class KiremitHeroSurface extends StatelessWidget {
                     gradient: RadialGradient(
                       center: const Alignment(0.95, -0.6),
                       radius: 1.35,
-                      colors: [
-                        AppColors.homeHeroGlow,
-                        AppColors.homeHeroGlow.withValues(alpha: 0),
-                      ],
+                      colors: [glowColor, glowColor.withValues(alpha: 0)],
                     ),
                   ),
                 ),
@@ -88,7 +93,7 @@ class KiremitHeroSurface extends StatelessWidget {
           left: 0,
           right: 0,
           height: MediaQuery.sizeOf(context).height,
-          child: const ColoredBox(color: AppColors.homeHero),
+          child: ColoredBox(color: topColor),
         ),
         hero,
       ],

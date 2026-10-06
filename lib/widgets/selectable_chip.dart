@@ -3,7 +3,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import 'pressable_scale.dart';
 
-/// Seçilebilir hap: seçilince kiremit dolar, yazı beyaza döner (180ms). Basınca
+/// Seçilebilir hap: seçilince espresso dolar, yazı beyaza döner (180ms). Basınca
 /// hafifçe küçülür.
 class SelectableChip extends StatelessWidget {
   final String label;
@@ -27,9 +27,9 @@ class SelectableChip extends StatelessWidget {
         curve: Curves.easeOut,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.homeHero : Colors.white,
+          color: isSelected ? AppColors.espresso : Colors.white,
           border: Border.all(
-            color: isSelected ? AppColors.homeHero : AppColors.borderSubtle,
+            color: isSelected ? AppColors.espresso : AppColors.borderSubtle,
             width: 1.5,
           ),
           borderRadius: BorderRadius.circular(45),
@@ -37,7 +37,7 @@ class SelectableChip extends StatelessWidget {
             BoxShadow(
               color:
                   isSelected
-                      ? AppColors.homeHero.withValues(alpha: 0.28)
+                      ? AppColors.espresso.withValues(alpha: 0.28)
                       : Colors.black.withValues(alpha: 0.03),
               blurRadius: isSelected ? 14 : 8,
               offset: Offset(0, isSelected ? 6 : 2),

@@ -17,6 +17,11 @@ class AppButton extends StatefulWidget {
   final IconData icon;
   final bool isLoading;
 
+  /// Dolu hâlde gradyanın üst/alt rengi, çerçeveli hâlde çerçeve ve yazı
+  /// rengi. Varsayılan kiremit; anket gibi ekranlar kendi rengini verebilir.
+  final Color color;
+  final Color deepColor;
+
   const AppButton({
     super.key,
     required this.text,
@@ -25,6 +30,8 @@ class AppButton extends StatefulWidget {
     this.showIcon = true,
     this.icon = Icons.play_arrow_rounded,
     this.isLoading = false,
+    this.color = AppColors.homeHero,
+    this.deepColor = AppColors.homeHeroDeep,
   });
 
   @override
@@ -54,7 +61,7 @@ class _AppButtonState extends State<AppButton> {
   @override
   Widget build(BuildContext context) {
     final isFilled = widget.variant == AppButtonVariant.filled;
-    final Color fg = isFilled ? Colors.white : AppColors.homeHero;
+    final Color fg = isFilled ? Colors.white : widget.color;
 
     return Semantics(
       button: true,
@@ -79,10 +86,10 @@ class _AppButtonState extends State<AppButton> {
               decoration: BoxDecoration(
                 gradient:
                     isFilled
-                        ? const LinearGradient(
+                        ? LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [AppColors.homeHero, AppColors.homeHeroDeep],
+                          colors: [widget.color, widget.deepColor],
                         )
                         : null,
                 color: isFilled ? null : Colors.white,
@@ -90,12 +97,12 @@ class _AppButtonState extends State<AppButton> {
                 border:
                     isFilled
                         ? null
-                        : Border.all(color: AppColors.homeHero, width: 1.5),
+                        : Border.all(color: widget.color, width: 1.5),
                 boxShadow:
                     isFilled && _isEnabled
                         ? [
                           BoxShadow(
-                            color: AppColors.homeHero.withValues(alpha: 0.5),
+                            color: widget.color.withValues(alpha: 0.5),
                             blurRadius: 24,
                             spreadRadius: -8,
                             offset: const Offset(0, 12),
