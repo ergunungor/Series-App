@@ -646,6 +646,10 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   static const double _gifOverlap = 56;
   static const double _ctaHeight = 64;
   static const double _chevronSize = 52;
+  // Hero altı, GIF, set bloğu, kutular ve "Sıradaki" arasındaki eşit boşluk.
+  static const double _sectionGap = 24;
+  // Dock'un ekran altından (güvenli alan üstünden) uzaklığı.
+  static const double _dockBottomGap = 28;
 
   Widget _buildExerciseView() {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
@@ -659,7 +663,8 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                 SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
                   padding: EdgeInsets.only(
-                    bottom: _ctaHeight + bottomSafe + 56,
+                    bottom:
+                        _ctaHeight + bottomSafe + _dockBottomGap + _sectionGap,
                   ),
                   child: Column(
                     children: [
@@ -668,7 +673,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(
                           _pagePadding,
-                          20,
+                          _sectionGap,
                           _pagePadding,
                           0,
                         ),
@@ -1027,7 +1032,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: _sectionGap),
           Row(
             children: [
               Expanded(
@@ -1058,7 +1063,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
             ],
           ),
         ],
-        const SizedBox(height: 20),
+        const SizedBox(height: _sectionGap),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -1110,7 +1115,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
           _pagePadding,
           32,
           _pagePadding,
-          bottomSafe + 16,
+          bottomSafe + _dockBottomGap,
         ),
         child: Row(
           children: [
