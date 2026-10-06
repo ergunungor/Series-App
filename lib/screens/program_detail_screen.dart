@@ -8,6 +8,7 @@ import '../services/program_service.dart';
 import '../services/program_repository.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import '../widgets/pressable_scale.dart';
+import '../widgets/reveal.dart';
 import 'package:flutter/services.dart';
 import '../widgets/app_logo.dart';
 import 'dart:ui' show ImageFilter;
@@ -27,6 +28,17 @@ class ProgramDetailScreen extends StatefulWidget {
 class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
   bool _isLoading = false;
   static const double _pagePadding = 16;
+  // Giriş animasyonu (Home ile aynı ritim). Hero sabit kalır; altındaki bloklar
+  // sırayla gelir. ListView lazy olduğu için sadece ilk açılışta ve ilk birkaç
+  // gün kartında oynar, kaydırınca tekrar oynamaz.
+  static const Duration _revealDuration = Duration(milliseconds: 500);
+  static const Duration _revealStagger = Duration(milliseconds: 100);
+  static const int _descriptionStep = 1;
+  static const int _headingStep = 2;
+  static const int _firstDayStep = 3;
+  static const int _revealedDayCards = 4;
+  static const int _introSteps = _firstDayStep + _revealedDayCards;
+  bool _isIntroActive = true;
   // Öneri çipleri: dokununca yazı alanına eklenir (gönderim akışına dokunmaz).
   static const List<String> _reviseSuggestions = [
     'Süreyi kısalt',
@@ -37,6 +49,23 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
 
   final GlobalKey _heroKey = GlobalKey();
   bool _isStatusBarLight = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(_revealStagger * _introSteps + _revealDuration, () {
+      if (mounted) _isIntroActive = false;
+    });
+  }
+
+  Widget _reveal(int step, Widget child) {
+    if (!_isIntroActive) return child;
+    return Reveal(
+      delay: _revealStagger * step,
+      duration: _revealDuration,
+      child: child,
+    );
+  }
 
   // Hero ekranın üstünden çıkınca saat/pil rengini koyuya çevirir.
   bool _handleScroll(ScrollNotification notification) {
@@ -583,6 +612,16 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
     );
   }
 
+  Widget _buildDayItem(int i) {
+    final workouts = widget.program.workouts;
+    return _DayTimelineItem(
+      workout: workouts[i],
+      isFirst: i == 0,
+      isLast: i == workouts.length - 1,
+      onTap: () => context.push('/workout-day-detail', extra: workouts[i]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -604,47 +643,46 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                 children: [
                   _buildHero(),
                   if (widget.program.description.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        _pagePadding,
-                        20,
-                        _pagePadding,
-                        0,
-                      ),
-                      child: Text(
-                        widget.program.description,
-                        style: AppTypography.body14Regular.copyWith(
-                          color: AppColors.textTertiary,
-                          height: 1.5,
+                    _reveal(
+                      _descriptionStep,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          _pagePadding,
+                          20,
+                          _pagePadding,
+                          0,
+                        ),
+                        child: Text(
+                          widget.program.description,
+                          style: AppTypography.body14Regular.copyWith(
+                            color: AppColors.textTertiary,
+                            height: 1.5,
+                          ),
                         ),
                       ),
                     ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      _pagePadding,
-                      24,
-                      _pagePadding,
-                      8,
-                    ),
-                    child: Text(
-                      'Antrenman günleri',
-                      style: AppTypography.body18Medium.copyWith(
-                        color: AppColors.espresso,
-                        fontWeight: FontWeight.w700,
+                  _reveal(
+                    _headingStep,
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        _pagePadding,
+                        24,
+                        _pagePadding,
+                        8,
+                      ),
+                      child: Text(
+                        'Antrenman günleri',
+                        style: AppTypography.body18Medium.copyWith(
+                          color: AppColors.espresso,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
                   for (var i = 0; i < widget.program.workouts.length; i++)
-                    _DayTimelineItem(
-                      workout: widget.program.workouts[i],
-                      isFirst: i == 0,
-                      isLast: i == widget.program.workouts.length - 1,
-                      onTap:
-                          () => context.push(
-                            '/workout-day-detail',
-                            extra: widget.program.workouts[i],
-                          ),
-                    ),
+                    i < _revealedDayCards
+                        ? _reveal(_firstDayStep + i, _buildDayItem(i))
+                        : _buildDayItem(i),
                 ],
               ),
             ),
