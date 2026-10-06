@@ -8,6 +8,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../utils/exercise_name.dart';
 import '../utils/workout_stats.dart';
+import 'app_logo.dart';
 import 'pressable_scale.dart';
 import 'reveal.dart';
 import 'strength_line_chart.dart';
@@ -219,13 +220,26 @@ class _WorkoutInsightsSectionState extends State<WorkoutInsightsSection> {
                         color: AppColors.onHeroDark.withValues(alpha: 0.6),
                       ),
                     ),
-                    Text(
-                      '${formatKg(latest.score)} kg',
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(text: formatKg(latest.score)),
+                          TextSpan(
+                            text: ' kg',
+                            style: AppTypography.body16Medium.copyWith(
+                              color: AppColors.onHeroDark.withValues(
+                                alpha: 0.6,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                       style: AppTypography.heading1.copyWith(
                         color: AppColors.onHeroDark,
-                        fontSize: 26,
+                        fontSize: 34,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: -0.5,
+                        letterSpacing: -0.8,
+                        height: 1.15,
                       ),
                     ),
                   ],
@@ -268,6 +282,16 @@ class _InsightCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
+      clipBehavior: dark ? Clip.antiAlias : Clip.none,
+      foregroundDecoration:
+          dark
+              ? BoxDecoration(
+                borderRadius: BorderRadius.circular(radius),
+                border: Border.all(
+                  color: AppColors.onHeroDark.withValues(alpha: 0.08),
+                ),
+              )
+              : null,
       decoration: BoxDecoration(
         color: dark ? null : Colors.white,
         gradient:
@@ -290,7 +314,29 @@ class _InsightCard extends StatelessWidget {
           ),
         ],
       ),
-      child: child,
+      child:
+          dark
+              ? Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // Hero'daki gibi silik logo filigranı; kart köşelerinde kırpılır.
+                  Positioned(
+                    right: -26,
+                    top: -34,
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.05,
+                        child: const AppLogo(
+                          explicitSize: 130,
+                          type: AppLogoType.light,
+                        ),
+                      ),
+                    ),
+                  ),
+                  child,
+                ],
+              )
+              : child,
     );
   }
 }

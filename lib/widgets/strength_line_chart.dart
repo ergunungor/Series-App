@@ -11,56 +11,69 @@ import '../utils/workout_stats.dart';
 /// Grafiğin renkleri; açık (beyaz kart) ve koyu (yeşil gradyan kart) zemin için
 /// hazır iki ön ayar var.
 class StrengthChartStyle {
-  final Color line;
+  final Color lineStart;
+  final Color lineEnd;
   final Color fillTop;
   final Color grid;
   final Color dotFill;
   final Color dotStroke;
   final Color dateLabel;
   final Color recordLabel;
+  final Color recordFill;
   final Color recordRing;
+  final bool gridDashed;
   final Color tooltipBackground;
   final Color tooltipTitle;
   final Color tooltipSubtitle;
 
   const StrengthChartStyle({
-    required this.line,
+    required this.lineStart,
+    required this.lineEnd,
     required this.fillTop,
     required this.grid,
     required this.dotFill,
     required this.dotStroke,
     required this.dateLabel,
     required this.recordLabel,
+    required this.recordFill,
     required this.recordRing,
+    required this.gridDashed,
     required this.tooltipBackground,
     required this.tooltipTitle,
     required this.tooltipSubtitle,
   });
 
   static final StrengthChartStyle light = StrengthChartStyle(
-    line: AppColors.workoutsHero,
+    lineStart: AppColors.workoutsHero,
+    lineEnd: AppColors.workoutsHero,
     fillTop: AppColors.workoutsHero.withValues(alpha: 0.10),
     grid: AppColors.fillSubtle,
     dotFill: Colors.white,
     dotStroke: AppColors.workoutsHero,
     dateLabel: AppColors.textTertiary,
     recordLabel: AppColors.accentDeep,
+    recordFill: AppColors.accentGold,
     recordRing: Colors.white,
+    gridDashed: false,
     tooltipBackground: AppColors.workoutsHero,
     tooltipTitle: AppColors.onHeroDark,
     tooltipSubtitle: AppColors.onHeroDark.withValues(alpha: 0.75),
   );
 
-  /// Koyu yeşil gradyan kart üzerinde: krem çizgi, altın rekor, krem tooltip.
+  /// Koyu yeşil gradyan kart üzerinde: altın gradyan çizgi, altın nokta,
+  /// krem rekor işareti ve krem tooltip.
   static final StrengthChartStyle dark = StrengthChartStyle(
-    line: AppColors.onHeroDark,
-    fillTop: AppColors.onHeroDark.withValues(alpha: 0.2),
-    grid: AppColors.onHeroDark.withValues(alpha: 0.1),
-    dotFill: AppColors.workoutsHero,
-    dotStroke: AppColors.onHeroDark,
+    lineStart: AppColors.accentGold.withValues(alpha: 0.45),
+    lineEnd: AppColors.accentGold,
+    fillTop: AppColors.accentGold.withValues(alpha: 0.22),
+    grid: AppColors.onHeroDark.withValues(alpha: 0.12),
+    dotFill: AppColors.accentGold,
+    dotStroke: AppColors.workoutsHero,
     dateLabel: AppColors.onHeroDark.withValues(alpha: 0.55),
     recordLabel: AppColors.accentGold,
+    recordFill: AppColors.onHeroDark,
     recordRing: AppColors.workoutsHero,
+    gridDashed: true,
     tooltipBackground: AppColors.onHeroDark,
     tooltipTitle: AppColors.workoutsHeroDeep,
     tooltipSubtitle: AppColors.workoutsHeroDeep.withValues(alpha: 0.65),
@@ -269,6 +282,8 @@ class _StrengthPainter extends CustomPainter {
   });
 
   static const double _lineWidth = 2.5;
+  static const double _dashLength = 3;
+  static const double _dashGap = 5;
   static const double _dotRadius = 3.5;
   static const double _selectedRadius = 6;
 
@@ -284,7 +299,17 @@ class _StrengthPainter extends CustomPainter {
           ..strokeWidth = 1;
     for (var i = 0; i < 3; i++) {
       final y = g.plotTop + (g.plotBottom - g.plotTop) * i / 2;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+      if (style.gridDashed) {
+        for (var x = 0.0; x < size.width; x += _dashLength + _dashGap) {
+          canvas.drawLine(
+            Offset(x, y),
+            Offset(math.min(x + _dashLength, size.width), y),
+            gridPaint,
+          );
+        }
+      } else {
+        canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+      }
     }
 
     // Eğri: yatay teğetli kübik Bézier, değerleri aşmaz.
@@ -314,7 +339,16 @@ class _StrengthPainter extends CustomPainter {
     canvas.drawPath(
       line,
       Paint()
-        ..color = style.line
+        ..shader = LinearGradient(
+          colors: [style.lineStart, style.lineEnd],
+        ).createShader(
+          Rect.fromLTWH(
+            g.x(0),
+            0,
+            math.max(1, g.x(points.length - 1) - g.x(0)),
+            size.height,
+          ),
+        )
         ..style = PaintingStyle.stroke
         ..strokeWidth = _lineWidth
         ..strokeCap = StrokeCap.round
@@ -341,7 +375,7 @@ class _StrengthPainter extends CustomPainter {
           9,
           Paint()..color = AppColors.accentGold.withValues(alpha: 0.35),
         );
-        canvas.drawCircle(center, 5, Paint()..color = AppColors.accentGold);
+        canvas.drawCircle(center, 5, Paint()..color = style.recordFill);
         canvas.drawCircle(
           center,
           5,
