@@ -38,6 +38,8 @@ class HomeHero extends StatelessWidget {
   static const double _pagePadding = 20;
   static const double _radius = 32;
   static const double _ctaHeight = 54;
+  // Işığın üstten ne kadarlık kısmında (hero yüksekliğinin oranı) soluk başladığı.
+  static const double _glowFadeStop = 0.4;
   static const Duration _switchDuration = Duration(milliseconds: 350);
 
   @override
@@ -68,18 +70,30 @@ class HomeHero extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          // Sağ üstten gelen yumuşak ışık
+          // Sağ üstten gelen yumuşak ışık. Üst kenarda şeffafa solar: aşağı
+          // çekince (refresh/bounce) hero'nun üstündeki düz renkli bloğa
+          // bıçak gibi bir kesik olmadan bağlanır.
           Positioned.fill(
             child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: const Alignment(0.95, -1.1),
-                    radius: 1.1,
-                    colors: [
-                      AppColors.homeHeroGlow.withValues(alpha: 0.9),
-                      AppColors.homeHeroGlow.withValues(alpha: 0),
-                    ],
+              child: ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback:
+                    (rect) => const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, Colors.black],
+                      stops: [0, _glowFadeStop],
+                    ).createShader(rect),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: const Alignment(0.95, -0.75),
+                      radius: 1.0,
+                      colors: [
+                        AppColors.homeHeroGlow.withValues(alpha: 0.9),
+                        AppColors.homeHeroGlow.withValues(alpha: 0),
+                      ],
+                    ),
                   ),
                 ),
               ),
