@@ -649,7 +649,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   // Hero altı, GIF, set bloğu, kutular ve "Sıradaki" arasındaki eşit boşluk.
   static const double _sectionGap = 24;
   // Dock'un ekran altından (güvenli alan üstünden) uzaklığı.
-  static const double _dockBottomGap = 4;
+  static const double _dockBottomGap = 12;
 
   Widget _buildExerciseView() {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
@@ -658,7 +658,10 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
       backgroundColor: AppColors.background,
       body: HeroStatusBarScope(
         builder:
+            // fit: expand: SingleChildScrollView içerik kısaysa küçüldüğü için
+            // dock'un ekranın gerçek altına yapışması bununla sağlanıyor.
             (context, heroKey) => Stack(
+              fit: StackFit.expand,
               children: [
                 SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
