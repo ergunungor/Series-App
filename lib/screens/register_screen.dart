@@ -6,6 +6,7 @@ import '../widgets/app_button.dart';
 import '../widgets/auth_scaffold.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -55,6 +56,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+
+      // "Beni hatırla" seçimini Giriş ekranındaki gibi kaydet; yönlendirici
+      // açılışta bu tercihe bakıp oturumu koruyor ya da kapatıyor.
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('remember_me', _rememberMe);
 
       // 3. İşlem başarılıysa, profili OLUŞTURMADAN doğrudan doğrulama ekranına git.
       if (mounted) {
