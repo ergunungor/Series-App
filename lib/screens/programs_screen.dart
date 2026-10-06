@@ -99,17 +99,6 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     });
   }
 
-  Future<bool> _confirmDeleteProgram(ActiveProgram program) async {
-    return showAppConfirmDialog(
-      context: context,
-      title: 'Programı Sil',
-      message:
-          '"${program.name}" programını silmek istediğine emin misin? Bu işlem geri alınamaz.',
-      confirmLabel: 'Sil',
-      isDestructive: true,
-    );
-  }
-
   void _enterSelectionMode() {
     setState(() => _isSelectionMode = true);
   }

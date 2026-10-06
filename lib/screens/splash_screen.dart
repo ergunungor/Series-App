@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
+import '../widgets/reveal.dart';
 import '../theme/app_typography.dart';
 import '../widgets/app_logo.dart';
 
@@ -35,7 +36,7 @@ class _SplashScreenState extends State<SplashScreen> {
             // Logonun tam ekranın ortasında kalmasını sağlayan esnek alan
             Expanded(
               child: Center(
-                child: _Reveal(
+                child: Reveal(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -51,7 +52,7 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             // En altta imza alanı, logodan biraz sonra belirir
-            _Reveal(
+            Reveal(
               delay: const Duration(milliseconds: 500),
               offsetY: 8,
               child: Padding(
@@ -85,48 +86,6 @@ class _SplashScreenState extends State<SplashScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _Reveal extends StatelessWidget {
-  final Widget child;
-  final Duration delay;
-  final Duration duration;
-  final double offsetY;
-
-  const _Reveal({
-    required this.child,
-    this.delay = Duration.zero,
-    this.duration = const Duration(milliseconds: 700),
-    this.offsetY = 12,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // TweenAnimationBuilder'da gecikme yok; bu yüzden toplam süreyi uzatıp
-    // eğrinin ilk kısmını (gecikme payını) Interval ile boş bırakıyoruz.
-    final total = delay + duration;
-    final curve = Interval(
-      delay.inMilliseconds / total.inMilliseconds,
-      1.0,
-      curve: Curves.easeOutCubic,
-    );
-
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: 1),
-      duration: total,
-      curve: curve,
-      child: child,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(0, (1 - value) * offsetY),
-            child: child,
-          ),
-        );
-      },
     );
   }
 }

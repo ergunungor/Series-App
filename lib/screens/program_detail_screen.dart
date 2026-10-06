@@ -10,7 +10,6 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import '../widgets/pressable_scale.dart';
 import '../widgets/detail_hero.dart';
 import 'dart:ui' show ImageFilter;
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'dart:async';
 import 'dart:math';
 
