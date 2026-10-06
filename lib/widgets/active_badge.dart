@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 
 class ActiveBadge extends StatelessWidget {
@@ -9,8 +10,7 @@ class ActiveBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
       decoration: BoxDecoration(
-        // SVG'deki renk ve opaklık birebir: #78EB7B, %70 opaklık
-        color: const Color(0xFF78EB7B).withValues(alpha: 0.7),
+        color: AppColors.success,
         borderRadius: BorderRadius.circular(15),
       ),
       child: Text(

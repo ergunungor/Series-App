@@ -19,7 +19,7 @@ class SeriesWordmark extends StatelessWidget {
         child: Text(
           'SERIES',
           style: AppTypography.body14Medium.copyWith(
-            color: AppColors.brandTertiary,
+            color: AppColors.primary,
             fontWeight: FontWeight.w800,
             letterSpacing: _letterSpacing,
           ),

@@ -44,6 +44,6 @@ class AppTypography {
     fontSize: 36,
     fontWeight: FontWeight.bold,
     height: 38,
-    color: AppColors.brandTertiary,
+    color: AppColors.primary,
   );
 }

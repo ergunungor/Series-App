@@ -23,15 +23,15 @@ class AppButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isFilled = variant == AppButtonVariant.filled;
-    final Color fg = isFilled ? Colors.white : AppColors.brandTertiary;
+    final Color fg = isFilled ? AppColors.onPrimary : AppColors.primary;
 
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          backgroundColor: isFilled ? AppColors.brandTertiary : Colors.white,
-          side: BorderSide(color: AppColors.brandTertiary),
+          backgroundColor: isFilled ? AppColors.primary : AppColors.surface,
+          side: BorderSide(color: AppColors.primary),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 15),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),

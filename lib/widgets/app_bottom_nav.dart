@@ -163,17 +163,13 @@ class _AppBottomNavState extends State<AppBottomNav>
                   duration: const Duration(milliseconds: 450),
                   curve: Curves.easeOutCubic,
                   scale: isSelected ? 1.08 : 1.0,
-                  child: Icon(
-                    item.icon,
-                    color: AppColors.brandTertiary,
-                    size: 26,
-                  ),
+                  child: Icon(item.icon, color: AppColors.primary, size: 26),
                 ),
                 const SizedBox(height: 4),
                 AnimatedDefaultTextStyle(
                   duration: const Duration(milliseconds: 250),
                   style: AppTypography.body12Medium.copyWith(
-                    color: AppColors.brandTertiary,
+                    color: AppColors.primary,
                     fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   ),
                   child: Text(item.label),

@@ -25,18 +25,7 @@ class GradientProgressBar extends StatelessWidget {
               width: constraints.maxWidth * value.clamp(0.0, 1.0),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
-                gradient: const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [AppColors.brandPrimary, Color(0xFF300000)],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.brandPrimary.withValues(alpha: 0.25),
-                    blurRadius: 10,
-                    offset: const Offset(2, 2),
-                  ),
-                ],
+                color: AppColors.primary,
               ),
             ),
           ],
