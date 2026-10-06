@@ -97,7 +97,9 @@ class _AppBottomNavState extends State<AppBottomNav>
 
   // Dokunurken bar hover gibi hafifçe büyür.
   static const double _pressedScale = 1.05;
-  static const Duration _pressDuration = Duration(milliseconds: 380);
+  // Basarken hızlı (kısa dokunuşta da görünsün), bırakırken yavaş ve yumuşak.
+  static const Duration _pressInDuration = Duration(milliseconds: 140);
+  static const Duration _pressOutDuration = Duration(milliseconds: 380);
 
   // Boşta kalma ve animasyon süreleri
   static const Duration _idleDelay = Duration(milliseconds: 3500);
@@ -408,8 +410,8 @@ class _AppBottomNavState extends State<AppBottomNav>
       padding: const EdgeInsets.only(bottom: AppBottomNav.bottomMargin),
       child: AnimatedScale(
         scale: _isPressed ? _pressedScale : 1,
-        duration: _pressDuration,
-        curve: Curves.easeInOutCubic,
+        duration: _isPressed ? _pressInDuration : _pressOutDuration,
+        curve: _isPressed ? Curves.easeOut : Curves.easeInOutCubic,
         child: bar,
       ),
     );
