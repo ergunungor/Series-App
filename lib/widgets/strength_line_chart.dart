@@ -8,6 +8,65 @@ import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../utils/workout_stats.dart';
 
+/// Grafiğin renkleri; açık (beyaz kart) ve koyu (yeşil gradyan kart) zemin için
+/// hazır iki ön ayar var.
+class StrengthChartStyle {
+  final Color line;
+  final Color fillTop;
+  final Color grid;
+  final Color dotFill;
+  final Color dotStroke;
+  final Color dateLabel;
+  final Color recordLabel;
+  final Color recordRing;
+  final Color tooltipBackground;
+  final Color tooltipTitle;
+  final Color tooltipSubtitle;
+
+  const StrengthChartStyle({
+    required this.line,
+    required this.fillTop,
+    required this.grid,
+    required this.dotFill,
+    required this.dotStroke,
+    required this.dateLabel,
+    required this.recordLabel,
+    required this.recordRing,
+    required this.tooltipBackground,
+    required this.tooltipTitle,
+    required this.tooltipSubtitle,
+  });
+
+  static final StrengthChartStyle light = StrengthChartStyle(
+    line: AppColors.workoutsHero,
+    fillTop: AppColors.workoutsHero.withValues(alpha: 0.10),
+    grid: AppColors.fillSubtle,
+    dotFill: Colors.white,
+    dotStroke: AppColors.workoutsHero,
+    dateLabel: AppColors.textTertiary,
+    recordLabel: AppColors.accentDeep,
+    recordRing: Colors.white,
+    tooltipBackground: AppColors.workoutsHero,
+    tooltipTitle: AppColors.onHeroDark,
+    tooltipSubtitle: AppColors.onHeroDark.withValues(alpha: 0.75),
+  );
+
+  /// Koyu yeşil gradyan kart üzerinde: krem çizgi, altın rekor, krem tooltip.
+  static final StrengthChartStyle dark = StrengthChartStyle(
+    line: AppColors.onHeroDark,
+    fillTop: AppColors.onHeroDark.withValues(alpha: 0.2),
+    grid: AppColors.onHeroDark.withValues(alpha: 0.1),
+    dotFill: AppColors.workoutsHero,
+    dotStroke: AppColors.onHeroDark,
+    dateLabel: AppColors.onHeroDark.withValues(alpha: 0.55),
+    recordLabel: AppColors.accentGold,
+    recordRing: AppColors.workoutsHero,
+    tooltipBackground: AppColors.onHeroDark,
+    tooltipTitle: AppColors.workoutsHeroDeep,
+    tooltipSubtitle: AppColors.workoutsHeroDeep.withValues(alpha: 0.65),
+  );
+}
+
 /// Güç puanı (tahmini 1TM) çizgi grafiği: ardıç yeşili çizgi, rekor noktası
 /// altın. Dokununca ya da sürükleyince en yakın nokta seçilir ve tooltip çıkar.
 class StrengthLineChart extends StatefulWidget {
@@ -17,12 +76,14 @@ class StrengthLineChart extends StatefulWidget {
   /// işaretlenir.
   final StrengthPoint? record;
   final TextStyle? labelStyle;
+  final StrengthChartStyle? style;
 
   const StrengthLineChart({
     super.key,
     required this.points,
     this.record,
     this.labelStyle,
+    this.style,
   });
 
   static const double height = 168;
@@ -138,6 +199,7 @@ class _StrengthLineChartState extends State<StrengthLineChart>
                           progress: _progress.value,
                           selected: _selected,
                           labelStyle: labelStyle,
+                          style: widget.style ?? StrengthChartStyle.light,
                         ),
                       ),
                 ),
@@ -195,6 +257,7 @@ class _StrengthPainter extends CustomPainter {
   final double progress;
   final int? selected;
   final TextStyle labelStyle;
+  final StrengthChartStyle style;
 
   _StrengthPainter({
     required this.points,
@@ -202,6 +265,7 @@ class _StrengthPainter extends CustomPainter {
     required this.progress,
     required this.selected,
     required this.labelStyle,
+    required this.style,
   });
 
   static const double _lineWidth = 2.5;
@@ -216,7 +280,7 @@ class _StrengthPainter extends CustomPainter {
     // Yatay kılavuz çizgileri
     final gridPaint =
         Paint()
-          ..color = AppColors.fillSubtle
+          ..color = style.grid
           ..strokeWidth = 1;
     for (var i = 0; i < 3; i++) {
       final y = g.plotTop + (g.plotBottom - g.plotTop) * i / 2;
@@ -240,12 +304,17 @@ class _StrengthPainter extends CustomPainter {
     canvas.clipRect(Rect.fromLTRB(0, 0, clipRight, size.height));
     canvas.drawPath(
       fill,
-      Paint()..color = AppColors.workoutsHero.withValues(alpha: 0.07),
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [style.fillTop, style.fillTop.withValues(alpha: 0)],
+        ).createShader(Rect.fromLTRB(0, g.plotTop, size.width, g.plotBottom)),
     );
     canvas.drawPath(
       line,
       Paint()
-        ..color = AppColors.workoutsHero
+        ..color = style.line
         ..style = PaintingStyle.stroke
         ..strokeWidth = _lineWidth
         ..strokeCap = StrokeCap.round
@@ -277,18 +346,18 @@ class _StrengthPainter extends CustomPainter {
           center,
           5,
           Paint()
-            ..color = Colors.white
+            ..color = style.recordRing
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2,
         );
       } else {
         final radius = i == selected ? _selectedRadius : _dotRadius;
-        canvas.drawCircle(center, radius, Paint()..color = Colors.white);
+        canvas.drawCircle(center, radius, Paint()..color = style.dotFill);
         canvas.drawCircle(
           center,
           radius,
           Paint()
-            ..color = AppColors.workoutsHero
+            ..color = style.dotStroke
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2,
         );
@@ -301,7 +370,7 @@ class _StrengthPainter extends CustomPainter {
         canvas,
         'Rekor',
         labelStyle.copyWith(
-          color: AppColors.accentDeep,
+          color: style.recordLabel,
           fontWeight: FontWeight.w600,
           fontSize: 10,
         ),
@@ -312,7 +381,7 @@ class _StrengthPainter extends CustomPainter {
 
     // Tarih etiketleri
     final dateFormat = DateFormat('d MMM', 'tr_TR');
-    final small = labelStyle.copyWith(fontSize: 10);
+    final small = labelStyle.copyWith(fontSize: 10, color: style.dateLabel);
     _paintText(
       canvas,
       dateFormat.format(points.first.date),
@@ -363,7 +432,7 @@ class _StrengthPainter extends CustomPainter {
           TextSpan(
             text: '${formatKg(p.score)} kg\n',
             style: labelStyle.copyWith(
-              color: AppColors.onHeroDark,
+              color: style.tooltipTitle,
               fontWeight: FontWeight.w700,
               fontSize: 13,
               height: 1.25,
@@ -373,7 +442,7 @@ class _StrengthPainter extends CustomPainter {
             text:
                 '${formatKg(p.weight)} kg × ${p.reps} · ${dateFormat.format(p.date)}',
             style: labelStyle.copyWith(
-              color: AppColors.onHeroDark.withValues(alpha: 0.75),
+              color: style.tooltipSubtitle,
               fontSize: 10,
               height: 1.25,
             ),
@@ -393,7 +462,7 @@ class _StrengthPainter extends CustomPainter {
       Rect.fromLTWH(left, top, w, h),
       const Radius.circular(10),
     );
-    canvas.drawRRect(rect, Paint()..color = AppColors.workoutsHero);
+    canvas.drawRRect(rect, Paint()..color = style.tooltipBackground);
     painter.paint(canvas, Offset(left + padX, top + padY));
   }
 
@@ -425,7 +494,8 @@ class _StrengthPainter extends CustomPainter {
       old.progress != progress ||
       old.selected != selected ||
       old.points != points ||
-      old.record != record;
+      old.record != record ||
+      old.style != style;
 }
 
 enum _LabelAlign { start, center, end }

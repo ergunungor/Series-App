@@ -183,6 +183,7 @@ class _WorkoutInsightsSectionState extends State<WorkoutInsightsSection> {
     final delta = series.length >= 2 ? latest.score - series.first.score : 0.0;
 
     return _InsightCard(
+      dark: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -197,6 +198,7 @@ class _WorkoutInsightsSectionState extends State<WorkoutInsightsSection> {
                     child: _ExerciseChip(
                       label: formatExerciseName(option.name),
                       selected: option.name == exercise,
+                      dark: true,
                       onTap: () => setState(() => _selected = option.name),
                     ),
                   ),
@@ -214,13 +216,13 @@ class _WorkoutInsightsSectionState extends State<WorkoutInsightsSection> {
                     Text(
                       'Güç puanı (tahmini 1TM)',
                       style: AppTypography.body12Regular.copyWith(
-                        color: AppColors.textTertiary,
+                        color: AppColors.onHeroDark.withValues(alpha: 0.6),
                       ),
                     ),
                     Text(
                       '${formatKg(latest.score)} kg',
                       style: AppTypography.heading1.copyWith(
-                        color: AppColors.textPrimary,
+                        color: AppColors.onHeroDark,
                         fontSize: 26,
                         fontWeight: FontWeight.w700,
                         letterSpacing: -0.5,
@@ -229,14 +231,18 @@ class _WorkoutInsightsSectionState extends State<WorkoutInsightsSection> {
                   ],
                 ),
               ),
-              if (delta.abs() >= 0.05) _DeltaPill(delta: delta),
+              if (delta.abs() >= 0.05) _DeltaPill(delta: delta, dark: true),
             ],
           ),
           const SizedBox(height: 8),
           if (series.length >= 2)
-            StrengthLineChart(points: series, record: record)
+            StrengthLineChart(
+              points: series,
+              record: record,
+              style: StrengthChartStyle.dark,
+            )
           else
-            const _FirstRecordNote(),
+            const _FirstRecordNote(dark: true),
         ],
       ),
     );
@@ -250,7 +256,10 @@ class _WorkoutInsightsSectionState extends State<WorkoutInsightsSection> {
 class _InsightCard extends StatelessWidget {
   final Widget child;
 
-  const _InsightCard({required this.child});
+  /// Koyu ardıç yeşili gradyan zemin (hero ile aynı dil); false ise beyaz kart.
+  final bool dark;
+
+  const _InsightCard({required this.child, this.dark = false});
 
   static const double radius = 20;
 
@@ -260,13 +269,24 @@ class _InsightCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: dark ? null : Colors.white,
+        gradient:
+            dark
+                ? const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [AppColors.workoutsHero, AppColors.workoutsHeroDeep],
+                )
+                : null,
         borderRadius: BorderRadius.circular(radius),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+            color:
+                dark
+                    ? AppColors.workoutsHero.withValues(alpha: 0.28)
+                    : Colors.black.withValues(alpha: 0.04),
+            blurRadius: dark ? 24 : 16,
+            offset: Offset(0, dark ? 12 : 4),
           ),
         ],
       ),
@@ -279,11 +299,13 @@ class _ExerciseChip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final bool dark;
 
   const _ExerciseChip({
     required this.label,
     required this.selected,
     required this.onTap,
+    this.dark = false,
   });
 
   static const double _height = 34;
@@ -298,13 +320,21 @@ class _ExerciseChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? AppColors.workoutsHero : AppColors.fillSubtle,
+          color:
+              dark
+                  ? (selected
+                      ? AppColors.accentGold
+                      : AppColors.onHeroDark.withValues(alpha: 0.1))
+                  : (selected ? AppColors.workoutsHero : AppColors.fillSubtle),
           borderRadius: BorderRadius.circular(_height / 2),
         ),
         child: Text(
           label,
           style: AppTypography.body12Medium.copyWith(
-            color: selected ? AppColors.onHeroDark : AppColors.textPrimary,
+            color:
+                dark
+                    ? (selected ? AppColors.espresso : AppColors.onHeroDark)
+                    : (selected ? AppColors.onHeroDark : AppColors.textPrimary),
           ),
         ),
       ),
@@ -314,8 +344,9 @@ class _ExerciseChip extends StatelessWidget {
 
 class _DeltaPill extends StatelessWidget {
   final double delta;
+  final bool dark;
 
-  const _DeltaPill({required this.delta});
+  const _DeltaPill({required this.delta, this.dark = false});
 
   @override
   Widget build(BuildContext context) {
@@ -323,13 +354,25 @@ class _DeltaPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: positive ? AppColors.workoutsTint : AppColors.fillSubtle,
+        color:
+            dark
+                ? (positive
+                    ? AppColors.accentGold.withValues(alpha: 0.18)
+                    : AppColors.onHeroDark.withValues(alpha: 0.1))
+                : (positive ? AppColors.workoutsTint : AppColors.fillSubtle),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         '${positive ? '+' : '−'}${formatKg(delta.abs())} kg',
         style: AppTypography.body12Medium.copyWith(
-          color: positive ? AppColors.workoutsAccent : AppColors.textTertiary,
+          color:
+              dark
+                  ? (positive
+                      ? AppColors.accentGold
+                      : AppColors.onHeroDark.withValues(alpha: 0.7))
+                  : (positive
+                      ? AppColors.workoutsAccent
+                      : AppColors.textTertiary),
         ),
       ),
     );
@@ -337,7 +380,9 @@ class _DeltaPill extends StatelessWidget {
 }
 
 class _FirstRecordNote extends StatelessWidget {
-  const _FirstRecordNote();
+  final bool dark;
+
+  const _FirstRecordNote({this.dark = false});
 
   @override
   Widget build(BuildContext context) {
@@ -347,13 +392,16 @@ class _FirstRecordNote extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       alignment: Alignment.centerLeft,
       decoration: BoxDecoration(
-        color: AppColors.fillSubtle,
+        color:
+            dark
+                ? AppColors.onHeroDark.withValues(alpha: 0.08)
+                : AppColors.fillSubtle,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Text(
         'İlk kaydın alındı. Bir sonraki antrenmanda kıyaslayacağız.',
         style: AppTypography.body14Regular.copyWith(
-          color: AppColors.textPrimary,
+          color: dark ? AppColors.onHeroDark : AppColors.textPrimary,
         ),
       ),
     );
