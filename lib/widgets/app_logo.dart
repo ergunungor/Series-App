@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../theme/app_colors.dart';
+
 enum AppLogoSize { small, medium, large }
 
 enum AppLogoType { light, dark }
@@ -30,10 +32,10 @@ class AppLogo extends StatelessWidget {
       'assets/images/logo.svg',
       width: dimension,
       height: dimension,
-      colorFilter:
-          type == AppLogoType.light
-              ? const ColorFilter.mode(Colors.white, BlendMode.srcIn)
-              : null,
+      colorFilter: ColorFilter.mode(
+        type == AppLogoType.light ? Colors.white : AppColors.primary,
+        BlendMode.srcIn,
+      ),
     );
   }
 }
