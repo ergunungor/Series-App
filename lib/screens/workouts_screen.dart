@@ -409,6 +409,12 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                   ),
                 ),
               ),
+              const SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: _pagePadding),
+                sliver: SliverToBoxAdapter(
+                  child: InsightSectionTitle(title: 'Geçmiş kayıtlar'),
+                ),
+              ),
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: _pagePadding),
                 sliver: SliverList(

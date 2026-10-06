@@ -42,7 +42,7 @@ class WorkoutInsightsSection extends StatefulWidget {
 }
 
 class _WorkoutInsightsSectionState extends State<WorkoutInsightsSection> {
-  static const double _cardGap = 12;
+  static const double _groupGap = 20;
   static const int _maxChips = 6;
   static const double _carWeightKg = 1500;
   static const int _growthWindowDays = 28;
@@ -133,7 +133,7 @@ class _WorkoutInsightsSectionState extends State<WorkoutInsightsSection> {
 
   Widget _reveal(int step, Widget child) {
     final padded = Padding(
-      padding: const EdgeInsets.only(bottom: _cardGap),
+      padding: const EdgeInsets.only(bottom: _groupGap),
       child: child,
     );
     if (!_animate) return padded;
@@ -149,13 +149,27 @@ class _WorkoutInsightsSectionState extends State<WorkoutInsightsSection> {
     final children = <Widget>[];
     var step = 0;
     if (_selected != null) {
-      children.add(_reveal(step++, _buildStrengthCard(_selected!)));
+      children.add(
+        _reveal(
+          step++,
+          _Group(title: 'Güç gelişimi', child: _buildStrengthCard(_selected!)),
+        ),
+      );
     }
     if (_funFact != null) {
       children.add(_reveal(step++, _FunFactCard(text: _funFact!)));
     }
     if (_weekly.any((c) => c > 0)) {
-      children.add(_reveal(step++, _buildWeeklyCard()));
+      children.add(
+        _reveal(
+          step++,
+          _Group(
+            title: 'Haftalık antrenman',
+            trailing: 'Son ${_weekly.length} hafta',
+            child: _buildWeeklyCard(),
+          ),
+        ),
+      );
     }
     return Column(children: children);
   }
@@ -227,35 +241,7 @@ class _WorkoutInsightsSectionState extends State<WorkoutInsightsSection> {
   }
 
   Widget _buildWeeklyCard() {
-    return _InsightCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  'Haftalık antrenman',
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.body12Regular.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
-                ),
-              ),
-              Text(
-                'Son ${_weekly.length} hafta',
-                style: AppTypography.body12Regular.copyWith(
-                  color: AppColors.textTertiary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          WeeklyBarsChart(counts: _weekly),
-        ],
-      ),
-    );
+    return _InsightCard(child: WeeklyBarsChart(counts: _weekly));
   }
 }
 
@@ -427,6 +413,54 @@ class _FunFactCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Kartın üstünde duran küçük, silik bölüm başlığı. Ekrandaki diğer bölümlerde
+/// (ör. kayıt listesi) de kullanılır.
+class InsightSectionTitle extends StatelessWidget {
+  final String title;
+  final String? trailing;
+
+  const InsightSectionTitle({super.key, required this.title, this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    final style = AppTypography.body12Medium.copyWith(
+      color: AppColors.textTertiary,
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: style.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+          if (trailing != null) Text(trailing!, style: style),
+        ],
+      ),
+    );
+  }
+}
+
+class _Group extends StatelessWidget {
+  final String title;
+  final String? trailing;
+  final Widget child;
+
+  const _Group({required this.title, this.trailing, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [InsightSectionTitle(title: title, trailing: trailing), child],
     );
   }
 }

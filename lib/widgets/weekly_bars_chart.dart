@@ -15,7 +15,7 @@ class WeeklyBarsChart extends StatefulWidget {
 
   const WeeklyBarsChart({super.key, required this.counts, this.labelStyle});
 
-  static const double height = 104;
+  static const double height = 124;
 
   @override
   State<WeeklyBarsChart> createState() => _WeeklyBarsChartState();
@@ -104,9 +104,13 @@ class _BarsPainter extends CustomPainter {
 
   static const double _gap = 10;
   static const double _radius = 7;
-  static const double _topLabelSpace = 18;
+  static const double _topLabelSpace = 36;
   static const double _bottomLabelSpace = 16;
   static const double _emptyBarHeight = 6;
+  static const double _pillGap = 6;
+  static const double _pillRadius = 25;
+  static const double _pillPadX = 9;
+  static const double _pillPadY = 3;
   // Çubuklar soldan sağa sırayla büyür; her biri toplam sürenin bir diliminde.
   static const double _staggerSpan = 0.5;
 
@@ -141,15 +145,10 @@ class _BarsPainter extends CustomPainter {
       );
 
       if (i == selected && t >= 1) {
-        _paintText(
+        _paintValuePill(
           canvas,
           '${counts[i]}',
-          labelStyle.copyWith(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
-          ),
-          Offset(left + barWidth / 2, baseline - full - 16),
+          Offset(left + barWidth / 2, baseline - full - _pillGap),
         );
       }
     }
@@ -163,6 +162,35 @@ class _BarsPainter extends CustomPainter {
         size.height - _bottomLabelSpace + 4,
       ),
     );
+  }
+
+  /// Seçili çubuğun sayısı: çubuktan [_pillGap] kadar ayrık, arkasında yuvarlak
+  /// köşeli koyu hap. [bottomCenter] haptın alt orta noktası.
+  void _paintValuePill(Canvas canvas, String text, Offset bottomCenter) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: labelStyle.copyWith(
+          color: AppColors.onHeroDark,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final w = painter.width + _pillPadX * 2;
+    final h = painter.height + _pillPadY * 2;
+    final rect = Rect.fromLTWH(
+      bottomCenter.dx - w / 2,
+      bottomCenter.dy - h,
+      w,
+      h,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(_pillRadius)),
+      Paint()..color = AppColors.workoutsHero,
+    );
+    painter.paint(canvas, Offset(rect.left + _pillPadX, rect.top + _pillPadY));
   }
 
   void _paintText(Canvas canvas, String text, TextStyle style, Offset center) {
