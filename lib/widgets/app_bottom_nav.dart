@@ -95,8 +95,8 @@ class _AppBottomNavState extends State<AppBottomNav>
   static const double _collapsedIcon = 25;
   static const double _labelFontSize = 11.5;
 
-  // Dokunurken bar hover gibi hafifçe büyür.
-  static const double _pressedScale = 1.05;
+  // Dokunurken bar hover gibi hafifçe (%7) büyür.
+  static const double _pressedScale = 1.07;
   // Basarken hızlı (kısa dokunuşta da görünsün), bırakırken yavaş ve yumuşak.
   static const Duration _pressInDuration = Duration(milliseconds: 140);
   static const Duration _pressOutDuration = Duration(milliseconds: 380);
