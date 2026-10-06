@@ -326,6 +326,44 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     );
   }
 
+  // Kaydırıcı değeri: büyük kiremit rakam ve soluk birim.
+  Widget _sliderValue(String value, String unit) => Text.rich(
+    TextSpan(
+      children: [
+        TextSpan(text: value),
+        TextSpan(
+          text: ' $unit',
+          style: AppTypography.body18Medium.copyWith(
+            color: AppColors.textTertiary,
+            letterSpacing: 0,
+          ),
+        ),
+      ],
+    ),
+    style: AppTypography.heading1.copyWith(
+      color: AppColors.homeHero,
+      fontSize: 56,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -2,
+      height: 1.1,
+    ),
+  );
+
+  Widget _sliderTheme(Slider slider) => SliderTheme(
+    data: SliderTheme.of(context).copyWith(
+      trackHeight: 8,
+      activeTrackColor: AppColors.homeHero,
+      inactiveTrackColor: AppColors.borderSubtle,
+      thumbColor: AppColors.homeHero,
+      overlayColor: AppColors.homeHero.withValues(alpha: 0.12),
+      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 13),
+      trackShape: const RoundedRectSliderTrackShape(),
+      activeTickMarkColor: Colors.transparent,
+      inactiveTickMarkColor: Colors.transparent,
+    ),
+    child: slider,
+  );
+
   Widget _ageStep() => SurveyStepScaffold(
     currentStep: _currentStep,
     totalSteps: totalSteps,
@@ -613,18 +651,17 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     onBack: _goBack,
     content: Column(
       children: [
-        Text(
-          '${_data.logistics.daysPerWeek} gün',
-          style: AppTypography.heading1.copyWith(color: AppColors.brandPrimary),
-        ),
-        Slider(
-          value: _data.logistics.daysPerWeek.toDouble(),
-          min: 1,
-          max: 7,
-          divisions: 6,
-          activeColor: AppColors.brandPrimary,
-          onChanged:
-              (v) => setState(() => _data.logistics.daysPerWeek = v.round()),
+        _sliderValue('${_data.logistics.daysPerWeek}', 'gün'),
+        const SizedBox(height: 8),
+        _sliderTheme(
+          Slider(
+            value: _data.logistics.daysPerWeek.toDouble(),
+            min: 1,
+            max: 7,
+            divisions: 6,
+            onChanged:
+                (v) => setState(() => _data.logistics.daysPerWeek = v.round()),
+          ),
         ),
       ],
     ),
@@ -639,18 +676,18 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     onBack: _goBack,
     content: Column(
       children: [
-        Text(
-          '${_data.logistics.maxDurationMin} dk',
-          style: AppTypography.heading1.copyWith(color: AppColors.brandPrimary),
-        ),
-        Slider(
-          value: _data.logistics.maxDurationMin.toDouble(),
-          min: 15,
-          max: 90,
-          divisions: 15,
-          activeColor: AppColors.brandPrimary,
-          onChanged:
-              (v) => setState(() => _data.logistics.maxDurationMin = v.round()),
+        _sliderValue('${_data.logistics.maxDurationMin}', 'dk'),
+        const SizedBox(height: 8),
+        _sliderTheme(
+          Slider(
+            value: _data.logistics.maxDurationMin.toDouble(),
+            min: 15,
+            max: 90,
+            divisions: 15,
+            onChanged:
+                (v) =>
+                    setState(() => _data.logistics.maxDurationMin = v.round()),
+          ),
         ),
       ],
     ),
@@ -670,6 +707,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
       maxLines: 4,
       minLines: 2,
       keyboardType: TextInputType.multiline,
+      cursorColor: AppColors.homeHero,
       style: AppTypography.body16Regular.copyWith(color: AppColors.textPrimary),
       decoration: InputDecoration(
         hintText: 'Örn: motivasyon eksikliği, zaman yönetimi...',
@@ -679,16 +717,22 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
         filled: true,
         fillColor: Colors.white,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: AppColors.brandSecondary),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(
+            color: AppColors.borderSubtle,
+            width: 1.5,
+          ),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: AppColors.brandSecondary),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(
+            color: AppColors.borderSubtle,
+            width: 1.5,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: AppColors.brandPrimary, width: 1.5),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: AppColors.homeHero, width: 1.5),
         ),
         contentPadding: const EdgeInsets.all(16),
       ),
