@@ -16,6 +16,7 @@ import '../models/workout_history.dart';
 import '../models/exercise.dart';
 import '../services/exercise_service.dart';
 import 'workouts_screen.dart'; // workoutRefreshNotifier'ı kullanabilmek için
+import '../widgets/app_logo.dart';
 import '../widgets/detail_hero.dart' show HeroStatusBarScope;
 import '../widgets/exercise_timer_widget.dart';
 import '../widgets/kiremit_hero_surface.dart';
@@ -1176,6 +1177,15 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            // Series logosu halkanın üstünde (beyaz silüet).
+                            Opacity(
+                              opacity: 0.9,
+                              child: const AppLogo(
+                                explicitSize: 56,
+                                type: AppLogoType.light,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
                             SizedBox(
                               width: _restRingSize,
                               height: _restRingSize,
