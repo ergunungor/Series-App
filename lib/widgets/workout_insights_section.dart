@@ -90,9 +90,11 @@ class _WorkoutInsightsSectionState extends State<WorkoutInsightsSection> {
     final cars = (volume / _carWeightKg).round();
     if (cars >= 1) {
       final tons = volume / 1000;
+      // 8.0 → "8", 4.25 → "4,3"; 10 ton ve üstü tam sayı.
       final tonsLabel = (tons < 10
               ? tons.toStringAsFixed(1)
               : '${tons.round()}')
+          .replaceAll(RegExp(r'\.0$'), '')
           .replaceAll('.', ',');
       facts.add(
         'Toplam $tonsLabel ton kaldırdın. Bu yaklaşık $cars arabaya denk.',
