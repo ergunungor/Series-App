@@ -38,7 +38,7 @@ class AppBottomNav extends StatefulWidget {
 
   /// Büyük hâldeki kapsül yüksekliği ve alt marj. Ekranlar alt boşluklarını
   /// buna bağlar ([clearance]); bar küçülüp büyüyünce içerik kaymaz.
-  static const double expandedHeight = 64;
+  static const double expandedHeight = 72;
   static const double bottomMargin = 16;
   static const double clearance = expandedHeight + bottomMargin;
 
@@ -85,14 +85,19 @@ class _AppBottomNavState extends State<AppBottomNav>
 
   // Büyük (yazılı) ve küçük (yalnızca ikon) hâl ölçüleri; animasyon bunlar
   // arasında tek bir değerle (0..1) ilerler.
-  static const double _expandedSlot = 74;
-  static const double _collapsedSlot = 48;
-  static const double _expandedPad = 6;
-  static const double _collapsedPad = 4;
-  static const double _expandedItem = 52;
-  static const double _collapsedItem = 40;
-  static const double _expandedIcon = 25;
-  static const double _collapsedIcon = 22;
+  static const double _expandedSlot = 80;
+  static const double _collapsedSlot = 56;
+  static const double _expandedPad = 7;
+  static const double _collapsedPad = 5;
+  static const double _expandedItem = 58;
+  static const double _collapsedItem = 46;
+  static const double _expandedIcon = 27;
+  static const double _collapsedIcon = 25;
+  static const double _labelFontSize = 11.5;
+
+  // Dokunurken bar hover gibi hafifçe büyür.
+  static const double _pressedScale = 1.05;
+  static const Duration _pressDuration = Duration(milliseconds: 150);
 
   // Boşta kalma ve animasyon süreleri
   static const Duration _idleDelay = Duration(milliseconds: 3500);
@@ -129,6 +134,7 @@ class _AppBottomNavState extends State<AppBottomNav>
   late final AnimationController _expand;
   Timer? _idleTimer;
   bool _isExpanded = true;
+  bool _isPressed = false;
   // VoiceOver ya da "hareketi azalt" açıkken bar hep büyük kalır.
   bool _isLocked = false;
 
@@ -212,7 +218,13 @@ class _AppBottomNavState extends State<AppBottomNav>
   // Parmak bara değdiği an büyümeye başlar; dokunuş bitince sayaç yeniden kurulur.
   void _handlePointerDown() {
     _idleTimer?.cancel();
+    setState(() => _isPressed = true);
     _setExpanded(true);
+  }
+
+  void _handlePointerUp() {
+    if (_isPressed) setState(() => _isPressed = false);
+    _restartIdleTimer();
   }
 
   void _handleTap(int index) {
@@ -306,7 +318,7 @@ class _AppBottomNavState extends State<AppBottomNav>
                               item.label,
                               maxLines: 1,
                               style: AppTypography.body12Medium.copyWith(
-                                fontSize: 11,
+                                fontSize: _labelFontSize,
                                 height: 1.2,
                                 color: color,
                                 fontWeight:
@@ -337,10 +349,9 @@ class _AppBottomNavState extends State<AppBottomNav>
     final count = AppBottomNav._items.length;
 
     // Gölge kırpmanın dışında kalmalı; bu yüzden ClipRRect'in bir üstünde.
-    return Container(
+    final bar = Container(
       width: slot * count + pad * 2,
       height: itemHeight + pad * 2,
-      margin: const EdgeInsets.only(bottom: AppBottomNav.bottomMargin),
       decoration: BoxDecoration(
         borderRadius: radius,
         boxShadow: [
@@ -392,6 +403,16 @@ class _AppBottomNavState extends State<AppBottomNav>
         ),
       ),
     );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppBottomNav.bottomMargin),
+      child: AnimatedScale(
+        scale: _isPressed ? _pressedScale : 1,
+        duration: _pressDuration,
+        curve: Curves.easeOut,
+        child: bar,
+      ),
+    );
   }
 
   @override
@@ -401,8 +422,8 @@ class _AppBottomNavState extends State<AppBottomNav>
     return Center(
       child: Listener(
         onPointerDown: (_) => _handlePointerDown(),
-        onPointerUp: (_) => _restartIdleTimer(),
-        onPointerCancel: (_) => _restartIdleTimer(),
+        onPointerUp: (_) => _handlePointerUp(),
+        onPointerCancel: (_) => _handlePointerUp(),
         // Sekme değişince ikon ve yazı rengi yumuşakça yeni sayfanın rengine
         // geçer; ilk build'de animasyon yok.
         child: TweenAnimationBuilder<Color?>(
