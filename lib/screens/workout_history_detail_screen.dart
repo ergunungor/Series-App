@@ -1,16 +1,13 @@
 import 'dart:math' as math;
 
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../models/workout_history.dart';
 import '../utils/exercise_name.dart';
 import '../utils/workout_stats.dart';
-import '../widgets/app_logo.dart';
-import '../widgets/pressable_scale.dart';
+import '../widgets/detail_hero.dart';
 import '../widgets/reveal.dart';
 
 class WorkoutHistoryDetailScreen extends StatefulWidget {
@@ -26,15 +23,11 @@ class WorkoutHistoryDetailScreen extends StatefulWidget {
 class _WorkoutHistoryDetailScreenState
     extends State<WorkoutHistoryDetailScreen> {
   static const double _pagePadding = 16;
-  static const double _heroRadius = 32;
   static const double _cardRadius = 22;
   static const double _cardGap = 12;
   static const Duration _revealDuration = Duration(milliseconds: 500);
   static const Duration _revealStagger = Duration(milliseconds: 100);
   static const int _revealedCards = 4;
-
-  final GlobalKey _heroKey = GlobalKey();
-  bool _isStatusBarLight = true;
 
   late final Map<String, List<LoggedSet>> _byExercise = _groupByExercise();
 
@@ -49,60 +42,7 @@ class _WorkoutHistoryDetailScreenState
     return byExercise;
   }
 
-  // Hero ekranın üstünden çıkınca saat/pil rengini koyuya çevirir.
-  bool _handleScroll(ScrollNotification notification) {
-    if (notification is! ScrollUpdateNotification || notification.depth != 0) {
-      return false;
-    }
-    final heroHeight = _heroKey.currentContext?.size?.height;
-    if (heroHeight == null) return false;
-
-    final isLight =
-        notification.metrics.pixels <
-        heroHeight - MediaQuery.paddingOf(context).top;
-    if (isLight != _isStatusBarLight) {
-      setState(() => _isStatusBarLight = isLight);
-    }
-    return false;
-  }
-
-  Widget _heroStat(String value, String label, {bool isFirst = false}) {
-    return Expanded(
-      child: Padding(
-        padding: EdgeInsets.only(left: isFirst ? 0 : 14, right: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              value,
-              style: AppTypography.heading2.copyWith(
-                color: AppColors.onHeroDark,
-                fontWeight: FontWeight.w700,
-                height: 1,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: AppTypography.body12Regular.copyWith(
-                color: AppColors.onHeroDark.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _heroDivider() {
-    return Container(
-      width: 0.5,
-      color: AppColors.onHeroDark.withValues(alpha: 0.18),
-    );
-  }
-
-  Widget _buildHero() {
+  Widget _buildHero(GlobalKey heroKey) {
     final session = widget.session;
     final dateLabel = DateFormat(
       'd MMMM yyyy, HH:mm',
@@ -111,116 +51,25 @@ class _WorkoutHistoryDetailScreenState
     final volume = WorkoutStats.totalVolumeKg([session]).round();
     final durationSeconds = session.durationSeconds;
 
-    final hero = Container(
-      key: _heroKey,
-      clipBehavior: Clip.antiAlias,
-      padding: EdgeInsets.fromLTRB(
-        _pagePadding,
-        MediaQuery.paddingOf(context).top + 12,
-        _pagePadding,
-        28,
-      ),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppColors.workoutsHero, AppColors.workoutsHeroDeep],
-        ),
-        borderRadius: BorderRadius.vertical(
-          bottom: Radius.circular(_heroRadius),
-        ),
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            right: -32,
-            bottom: -44,
-            child: Opacity(
-              opacity: 0.06,
-              child: const AppLogo(explicitSize: 190, type: AppLogoType.light),
-            ),
+    return DetailHero(
+      heroKey: heroKey,
+      gradientColors: const [
+        AppColors.workoutsHero,
+        AppColors.workoutsHeroDeep,
+      ],
+      onBack: () => Navigator.of(context).pop(),
+      title: session.workoutName,
+      titleMaxLines: 3,
+      subtitle: dateLabel,
+      stats: [
+        DetailHeroStat('${session.exerciseCount}', 'hareket'),
+        DetailHeroStat('${session.setCount}', 'set'),
+        DetailHeroStat('$volume', 'kg'),
+        if (durationSeconds != null)
+          DetailHeroStat(
+            '${math.max(1, (durationSeconds / 60).round())}',
+            'dk',
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              PressableScale(
-                pressedScale: 0.92,
-                onTap: () => Navigator.of(context).pop(),
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.onHeroDark.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    CupertinoIcons.back,
-                    size: 20,
-                    color: AppColors.onHeroDark,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 28),
-              Text(
-                session.workoutName,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.heading1.copyWith(
-                  color: AppColors.onHeroDark,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.4,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                dateLabel,
-                style: AppTypography.body14Regular.copyWith(
-                  color: AppColors.onHeroDark.withValues(alpha: 0.7),
-                ),
-              ),
-              const SizedBox(height: 24),
-              IntrinsicHeight(
-                child: Row(
-                  children: [
-                    _heroStat(
-                      '${session.exerciseCount}',
-                      'hareket',
-                      isFirst: true,
-                    ),
-                    _heroDivider(),
-                    _heroStat('${session.setCount}', 'set'),
-                    _heroDivider(),
-                    _heroStat('$volume', 'kg'),
-                    if (durationSeconds != null) ...[
-                      _heroDivider(),
-                      _heroStat(
-                        '${math.max(1, (durationSeconds / 60).round())}',
-                        'dk',
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-
-    // Aşağı çekildiğinde (bounce) hero'nun üstü açık kalmasın diye aynı
-    // renkte, ekran yüksekliğinde bir blok ekliyoruz.
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Positioned(
-          top: -MediaQuery.sizeOf(context).height,
-          left: 0,
-          right: 0,
-          height: MediaQuery.sizeOf(context).height,
-          child: const ColoredBox(color: AppColors.workoutsHero),
-        ),
-        hero,
       ],
     );
   }
@@ -231,50 +80,43 @@ class _WorkoutHistoryDetailScreenState
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: AnnotatedRegion<SystemUiOverlayStyle>(
-        // Hero durum çubuğunun arkasındayken açık, liste altına geçince koyu
-        value:
-            _isStatusBarLight
-                ? SystemUiOverlayStyle.light
-                : SystemUiOverlayStyle.dark,
-        child: NotificationListener<ScrollNotification>(
-          onNotification: _handleScroll,
-          child: ListView(
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.paddingOf(context).bottom + 24,
-            ),
-            children: [
-              _buildHero(),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  _pagePadding,
-                  24,
-                  _pagePadding,
-                  12,
-                ),
-                child: Text(
-                  'Hareketler',
-                  style: AppTypography.body18Medium.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+      body: HeroStatusBarScope(
+        builder:
+            (context, heroKey) => ListView(
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
               ),
-              for (var i = 0; i < entries.length; i++)
-                _revealed(
-                  i,
-                  _ExerciseCard(
-                    name: entries[i].key,
-                    sets: entries[i].value,
-                    radius: _cardRadius,
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.paddingOf(context).bottom + 24,
+              ),
+              children: [
+                _buildHero(heroKey),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    _pagePadding,
+                    24,
+                    _pagePadding,
+                    12,
+                  ),
+                  child: Text(
+                    'Hareketler',
+                    style: AppTypography.body18Medium.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-            ],
-          ),
-        ),
+                for (var i = 0; i < entries.length; i++)
+                  _revealed(
+                    i,
+                    _ExerciseCard(
+                      name: entries[i].key,
+                      sets: entries[i].value,
+                      radius: _cardRadius,
+                    ),
+                  ),
+              ],
+            ),
       ),
     );
   }

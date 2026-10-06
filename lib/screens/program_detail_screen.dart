@@ -8,8 +8,7 @@ import '../services/program_service.dart';
 import '../services/program_repository.dart';
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import '../widgets/pressable_scale.dart';
-import 'package:flutter/services.dart';
-import '../widgets/app_logo.dart';
+import '../widgets/detail_hero.dart';
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'dart:async';
@@ -34,26 +33,6 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
     'Daha yoğun yap',
     'Ekipmansız olsun',
   ];
-
-  final GlobalKey _heroKey = GlobalKey();
-  bool _isStatusBarLight = true;
-
-  // Hero ekranın üstünden çıkınca saat/pil rengini koyuya çevirir.
-  bool _handleScroll(ScrollNotification notification) {
-    if (notification is! ScrollUpdateNotification || notification.depth != 0) {
-      return false;
-    }
-    final heroHeight = _heroKey.currentContext?.size?.height;
-    if (heroHeight == null) return false;
-
-    final isLight =
-        notification.metrics.pixels <
-        heroHeight - MediaQuery.paddingOf(context).top;
-    if (isLight != _isStatusBarLight) {
-      setState(() => _isStatusBarLight = isLight);
-    }
-    return false;
-  }
 
   // --- LİMİT KONTROL METOTLARI ---
   Future<bool> _canUseAI(String userId) async {
@@ -402,43 +381,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
     );
   }
 
-  Widget _heroStat(String value, String label, {bool isFirst = false}) {
-    return Expanded(
-      child: Padding(
-        padding: EdgeInsets.only(left: isFirst ? 0 : 14, right: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              value,
-              style: AppTypography.heading2.copyWith(
-                color: AppColors.onHeroDark,
-                fontWeight: FontWeight.w700,
-                height: 1,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: AppTypography.body12Regular.copyWith(
-                color: AppColors.onHeroDark.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _heroDivider() {
-    return Container(
-      width: 0.5,
-      color: AppColors.onHeroDark.withValues(alpha: 0.18),
-    );
-  }
-
-  Widget _buildHero() {
+  Widget _buildHero(GlobalKey heroKey) {
     final program = widget.program;
     final exerciseCount = program.workouts.fold<int>(
       0,
@@ -449,136 +392,47 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
       (sum, w) => sum + w.estimatedDurationMin,
     );
 
-    final hero = Container(
-      key: _heroKey,
-      clipBehavior: Clip.antiAlias,
-      padding: EdgeInsets.fromLTRB(
-        _pagePadding,
-        MediaQuery.paddingOf(context).top + 12,
-        _pagePadding,
-        28,
-      ),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppColors.heroDarkStart, AppColors.heroDarkEnd],
-        ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            right: -32,
-            bottom: -44,
-            child: Opacity(
-              opacity: 0.06,
-              child: const AppLogo(explicitSize: 190, type: AppLogoType.light),
+    return DetailHero(
+      heroKey: heroKey,
+      gradientColors: const [AppColors.heroDarkStart, AppColors.heroDarkEnd],
+      onBack: () => context.pop(),
+      trailing: PressableScale(
+        onTap: _showReviseSheet,
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.accentGold.withValues(alpha: 0.16),
+            border: Border.all(
+              color: AppColors.accentGold.withValues(alpha: 0.45),
             ),
+            borderRadius: BorderRadius.circular(22),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  PressableScale(
-                    pressedScale: 0.92,
-                    onTap: () => context.pop(),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: AppColors.onHeroDark.withValues(alpha: 0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        CupertinoIcons.back,
-                        size: 20,
-                        color: AppColors.onHeroDark,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  PressableScale(
-                    onTap: _showReviseSheet,
-                    child: Container(
-                      height: 44,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: AppColors.accentGold.withValues(alpha: 0.16),
-                        border: Border.all(
-                          color: AppColors.accentGold.withValues(alpha: 0.45),
-                        ),
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.auto_awesome,
-                            size: 16,
-                            color: AppColors.accentGold,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Düzenle',
-                            style: AppTypography.body14Medium.copyWith(
-                              color: AppColors.accentGold,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+              const Icon(
+                Icons.auto_awesome,
+                size: 16,
+                color: AppColors.accentGold,
               ),
-              const SizedBox(height: 28),
+              const SizedBox(width: 6),
               Text(
-                program.name,
-                style: AppTypography.heading1.copyWith(
-                  color: AppColors.onHeroDark,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.4,
-                ),
-              ),
-              const SizedBox(height: 24),
-              IntrinsicHeight(
-                child: Row(
-                  children: [
-                    _heroStat(
-                      '${program.workouts.length}',
-                      'gün',
-                      isFirst: true,
-                    ),
-                    _heroDivider(),
-                    _heroStat('$exerciseCount', 'hareket'),
-                    _heroDivider(),
-                    _heroStat('$totalMinutes', 'dk toplam'),
-                  ],
+                'Düzenle',
+                style: AppTypography.body14Medium.copyWith(
+                  color: AppColors.accentGold,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
-        ],
-      ),
-    );
-
-    // Üst kenar boşluğa çekilince (bounce) hero'nun üstü açık kalmasın diye,
-    // hero'nun üstüne aynı renkte uzun bir blok ekliyoruz. Normalde ekran dışında,
-    // sadece aşağı çekilirken görünür.
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Positioned(
-          top: -MediaQuery.sizeOf(context).height,
-          left: 0,
-          right: 0,
-          height: MediaQuery.sizeOf(context).height,
-          child: const ColoredBox(color: AppColors.heroDarkStart),
         ),
-        hero,
+      ),
+      title: program.name,
+      stats: [
+        DetailHeroStat('${program.workouts.length}', 'gün'),
+        DetailHeroStat('$exerciseCount', 'hareket'),
+        DetailHeroStat('$totalMinutes', 'dk toplam'),
       ],
     );
   }
@@ -589,65 +443,58 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
       children: [
         Scaffold(
           backgroundColor: AppColors.background,
-          body: AnnotatedRegion<SystemUiOverlayStyle>(
-            // Hero durum çubuğunun arkasındayken açık, liste altına geçince koyu
-            value:
-                _isStatusBarLight
-                    ? SystemUiOverlayStyle.light
-                    : SystemUiOverlayStyle.dark,
-            child: NotificationListener<ScrollNotification>(
-              onNotification: _handleScroll,
-              child: ListView(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.paddingOf(context).bottom + 24,
-                ),
-                children: [
-                  _buildHero(),
-                  if (widget.program.description.isNotEmpty)
+          body: HeroStatusBarScope(
+            builder:
+                (context, heroKey) => ListView(
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.paddingOf(context).bottom + 24,
+                  ),
+                  children: [
+                    _buildHero(heroKey),
+                    if (widget.program.description.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          _pagePadding,
+                          20,
+                          _pagePadding,
+                          0,
+                        ),
+                        child: Text(
+                          widget.program.description,
+                          style: AppTypography.body14Regular.copyWith(
+                            color: AppColors.textTertiary,
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(
                         _pagePadding,
-                        20,
+                        24,
                         _pagePadding,
-                        0,
+                        8,
                       ),
                       child: Text(
-                        widget.program.description,
-                        style: AppTypography.body14Regular.copyWith(
-                          color: AppColors.textTertiary,
-                          height: 1.5,
+                        'Antrenman günleri',
+                        style: AppTypography.body18Medium.copyWith(
+                          color: AppColors.espresso,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      _pagePadding,
-                      24,
-                      _pagePadding,
-                      8,
-                    ),
-                    child: Text(
-                      'Antrenman günleri',
-                      style: AppTypography.body18Medium.copyWith(
-                        color: AppColors.espresso,
-                        fontWeight: FontWeight.w700,
+                    for (var i = 0; i < widget.program.workouts.length; i++)
+                      _DayTimelineItem(
+                        workout: widget.program.workouts[i],
+                        isFirst: i == 0,
+                        isLast: i == widget.program.workouts.length - 1,
+                        onTap:
+                            () => context.push(
+                              '/workout-day-detail',
+                              extra: widget.program.workouts[i],
+                            ),
                       ),
-                    ),
-                  ),
-                  for (var i = 0; i < widget.program.workouts.length; i++)
-                    _DayTimelineItem(
-                      workout: widget.program.workouts[i],
-                      isFirst: i == 0,
-                      isLast: i == widget.program.workouts.length - 1,
-                      onTap:
-                          () => context.push(
-                            '/workout-day-detail',
-                            extra: widget.program.workouts[i],
-                          ),
-                    ),
-                ],
-              ),
-            ),
+                  ],
+                ),
           ),
         ),
         if (_isLoading) const Positioned.fill(child: _AiLoadingOverlay()),

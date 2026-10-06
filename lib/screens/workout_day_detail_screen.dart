@@ -1,12 +1,10 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../models/program.dart';
 import '../widgets/app_confirm_dialog.dart';
-import '../widgets/app_logo.dart';
+import '../widgets/detail_hero.dart';
 import '../widgets/pressable_scale.dart';
 import '../utils/exercise_name.dart';
 
@@ -113,179 +111,36 @@ class _WorkoutDayDetailScreenState extends State<WorkoutDayDetailScreen> {
     );
   }
 
-  final GlobalKey _heroKey = GlobalKey();
-  bool _isStatusBarLight = true;
-
-  // Hero ekranın üstünden çıkınca saat/pil rengini koyuya çevirir.
-  bool _handleScroll(ScrollNotification notification) {
-    if (notification is! ScrollUpdateNotification || notification.depth != 0) {
-      return false;
-    }
-    final heroHeight = _heroKey.currentContext?.size?.height;
-    if (heroHeight == null) return false;
-
-    final isLight =
-        notification.metrics.pixels <
-        heroHeight - MediaQuery.paddingOf(context).top;
-    if (isLight != _isStatusBarLight) {
-      setState(() => _isStatusBarLight = isLight);
-    }
-    return false;
-  }
-
-  Widget _heroStat(String value, String label, {bool isFirst = false}) {
-    return Expanded(
-      child: Padding(
-        padding: EdgeInsets.only(left: isFirst ? 0 : 14, right: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              value,
-              style: AppTypography.heading2.copyWith(
-                color: AppColors.onHeroDark,
-                fontWeight: FontWeight.w700,
-                height: 1,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: AppTypography.body12Regular.copyWith(
-                color: AppColors.onHeroDark.withValues(alpha: 0.6),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _heroDivider() {
-    return Container(
-      width: 0.5,
-      color: AppColors.onHeroDark.withValues(alpha: 0.18),
-    );
-  }
-
-  Widget _buildHero() {
+  Widget _buildHero(GlobalKey heroKey) {
     final workout = widget.workout;
 
-    final hero = Container(
-      key: _heroKey,
-      clipBehavior: Clip.antiAlias,
-      padding: EdgeInsets.fromLTRB(
-        _pagePadding,
-        MediaQuery.paddingOf(context).top + 12,
-        _pagePadding,
-        28,
-      ),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppColors.heroDarkStart, AppColors.heroDarkEnd],
-        ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            right: -32,
-            bottom: -44,
-            child: Opacity(
-              opacity: 0.06,
-              child: const AppLogo(explicitSize: 190, type: AppLogoType.light),
-            ),
+    return DetailHero(
+      heroKey: heroKey,
+      gradientColors: const [AppColors.heroDarkStart, AppColors.heroDarkEnd],
+      onBack: () => Navigator.of(context).pop(),
+      trailing: Container(
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.accentGold.withValues(alpha: 0.16),
+          border: Border.all(
+            color: AppColors.accentGold.withValues(alpha: 0.45),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  PressableScale(
-                    pressedScale: 0.92,
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: AppColors.onHeroDark.withValues(alpha: 0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        CupertinoIcons.back,
-                        size: 20,
-                        color: AppColors.onHeroDark,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    height: 36,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.accentGold.withValues(alpha: 0.16),
-                      border: Border.all(
-                        color: AppColors.accentGold.withValues(alpha: 0.45),
-                      ),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Text(
-                      '${workout.dayNumber}. gün',
-                      style: AppTypography.body14Medium.copyWith(
-                        color: AppColors.accentGold,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 28),
-              Text(
-                workout.name,
-                style: AppTypography.heading1.copyWith(
-                  color: AppColors.onHeroDark,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.4,
-                ),
-              ),
-              const SizedBox(height: 24),
-              IntrinsicHeight(
-                child: Row(
-                  children: [
-                    _heroStat(
-                      '${workout.exercises.length}',
-                      'hareket',
-                      isFirst: true,
-                    ),
-                    _heroDivider(),
-                    _heroStat('${workout.estimatedDurationMin}', 'dk'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-
-    // Aşağı çekildiğinde (bounce) hero'nun üstü açık kalmasın diye aynı
-    // renkte, ekran yüksekliğinde bir blok ekliyoruz.
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Positioned(
-          top: -MediaQuery.sizeOf(context).height,
-          left: 0,
-          right: 0,
-          height: MediaQuery.sizeOf(context).height,
-          child: const ColoredBox(color: AppColors.heroDarkStart),
+          borderRadius: BorderRadius.circular(18),
         ),
-        hero,
+        child: Text(
+          '${workout.dayNumber}. gün',
+          style: AppTypography.body14Medium.copyWith(
+            color: AppColors.accentGold,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      title: workout.name,
+      stats: [
+        DetailHeroStat('${workout.exercises.length}', 'hareket'),
+        DetailHeroStat('${workout.estimatedDurationMin}', 'dk'),
       ],
     );
   }
@@ -319,67 +174,60 @@ class _WorkoutDayDetailScreenState extends State<WorkoutDayDetailScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: AnnotatedRegion<SystemUiOverlayStyle>(
-        // Hero durum çubuğunun arkasındayken açık, liste altına geçince koyu
-        value:
-            _isStatusBarLight
-                ? SystemUiOverlayStyle.light
-                : SystemUiOverlayStyle.dark,
-        child: Stack(
-          children: [
-            NotificationListener<ScrollNotification>(
-              onNotification: _handleScroll,
-              child: ListView(
-                // Son satır, butonun ve geçiş şeridinin altında kalmasın
-                padding: EdgeInsets.only(
-                  bottom:
-                      MediaQuery.paddingOf(context).bottom +
-                      _ctaHeight +
-                      _ctaGap +
-                      _ctaFade,
-                ),
-                children: [
-                  _buildHero(),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      _pagePadding,
-                      24,
-                      _pagePadding,
-                      12,
-                    ),
-                    child: Text(
-                      'Hareketler',
-                      style: AppTypography.body18Medium.copyWith(
-                        color: AppColors.espresso,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+      body: Stack(
+        children: [
+          HeroStatusBarScope(
+            builder:
+                (context, heroKey) => ListView(
+                  // Son satır, butonun ve geçiş şeridinin altında kalmasın
+                  padding: EdgeInsets.only(
+                    bottom:
+                        MediaQuery.paddingOf(context).bottom +
+                        _ctaHeight +
+                        _ctaGap +
+                        _ctaFade,
                   ),
-                  if (rows.isNotEmpty)
-                    Container(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: _pagePadding,
+                  children: [
+                    _buildHero(heroKey),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        _pagePadding,
+                        24,
+                        _pagePadding,
+                        12,
                       ),
-                      clipBehavior: Clip.antiAlias,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(22),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                      child: Text(
+                        'Hareketler',
+                        style: AppTypography.body18Medium.copyWith(
+                          color: AppColors.espresso,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                      child: Column(children: rows),
                     ),
-                ],
-              ),
-            ),
-            Positioned(left: 0, right: 0, bottom: 0, child: _buildStartBar()),
-          ],
-        ),
+                    if (rows.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: _pagePadding,
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(children: rows),
+                      ),
+                  ],
+                ),
+          ),
+          Positioned(left: 0, right: 0, bottom: 0, child: _buildStartBar()),
+        ],
       ),
     );
   }
