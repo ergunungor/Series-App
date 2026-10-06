@@ -10,6 +10,7 @@ import '../widgets/pressable_scale.dart';
 import '../widgets/reveal.dart';
 import '../widgets/screen_title_block.dart';
 import '../widgets/series_wordmark.dart';
+import '../widgets/app_bottom_nav.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -21,8 +22,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   // Diğer sekmelerle aynı yatay sayfa boşluğu ve giriş ritmi.
   static const double _pagePadding = 16;
-  // AppBottomNav'ın kapladığı alan (86 + 16 alt marj); Programlar ile aynı.
-  static const double _navBarClearance = 102;
+  static const double _navBarClearance = AppBottomNav.clearance;
   static const double _cardRadius = 24;
   static const double _groupGap = 16;
   static const Duration _revealDuration = Duration(milliseconds: 500);

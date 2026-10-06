@@ -14,6 +14,7 @@ import '../widgets/app_logo.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/reveal.dart';
 import '../widgets/screen_title_block.dart';
+import '../widgets/app_bottom_nav.dart';
 
 class ProgramsScreen extends StatefulWidget {
   const ProgramsScreen({super.key});
@@ -25,9 +26,8 @@ class ProgramsScreen extends StatefulWidget {
 class _ProgramsScreenState extends State<ProgramsScreen> {
   // Home ile aynı yatay sayfa boşluğu; sekmeler arası geçişte içerik kaymasın.
   static const double _pagePadding = 16;
-  // AppBottomNav'ın kapladığı alan: 86 yükseklik + 16 alt marj. Nav dosyasına
-  // dokunmadığımız için burada tutuluyor; nav ölçüleri değişirse güncellenmeli.
-  static const double _navBarClearance = 102;
+  // AppBottomNav'ın büyük hâldeki kapladığı alan (yükseklik + alt marj).
+  static const double _navBarClearance = AppBottomNav.clearance;
   static const double _fabGap = 16;
   // Giriş animasyonu (Home ile aynı ritim). Grid'de sadece ilk ekrandaki
   // kartlar animasyonlanır; geri kalanı lazy olduğu için kaydırınca tekrar oynardı.

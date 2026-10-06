@@ -14,6 +14,7 @@ import 'package:lottie/lottie.dart';
 import '../widgets/reveal.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/series_wordmark.dart';
+import '../widgets/app_bottom_nav.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -147,7 +148,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     // Cihazın kendi alt çentik boşluğu (iOS Home Indicator vb.) + BottomNav payı (80px) + nefes payı (24px)
-    final bottomInset = MediaQuery.of(context).padding.bottom + 136;
+    final bottomInset =
+        MediaQuery.of(context).padding.bottom + AppBottomNav.clearance + 34;
 
     return Scaffold(
       backgroundColor: AppColors.background,

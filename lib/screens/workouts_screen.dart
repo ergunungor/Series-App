@@ -14,6 +14,7 @@ import '../widgets/reveal.dart';
 import '../widgets/screen_title_block.dart';
 import '../widgets/workout_insights_section.dart';
 import '../widgets/series_wordmark.dart';
+import '../widgets/app_bottom_nav.dart';
 import 'package:lottie/lottie.dart';
 
 final ValueNotifier<bool> workoutRefreshNotifier = ValueNotifier(false);
@@ -355,7 +356,8 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).padding.bottom + 104;
+    final bottomInset =
+        MediaQuery.of(context).padding.bottom + AppBottomNav.clearance;
 
     return Scaffold(
       backgroundColor: AppColors.background,
