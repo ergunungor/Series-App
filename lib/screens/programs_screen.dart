@@ -13,6 +13,7 @@ import '../widgets/app_confirm_dialog.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/reveal.dart';
+import '../widgets/screen_title_block.dart';
 
 class ProgramsScreen extends StatefulWidget {
   const ProgramsScreen({super.key});
@@ -169,67 +170,49 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
           duration: const Duration(milliseconds: 250),
           child:
               _isSelectionMode
-                  ? Row(
+                  ? SizedBox(
                     key: const ValueKey('selection_header'),
-                    children: [
-                      _GlassIconButton(
-                        icon: CupertinoIcons.xmark,
-                        onTap: _exitSelectionMode,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(
-                          '${_selectedIds.length} Seçili',
-                          style: AppTypography.heading2.copyWith(
-                            color: AppColors.textPrimary,
+                    height: ScreenTitleBlock.height,
+                    child: Row(
+                      children: [
+                        _GlassIconButton(
+                          icon: CupertinoIcons.xmark,
+                          onTap: _exitSelectionMode,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            '${_selectedIds.length} Seçili',
+                            style: AppTypography.heading2.copyWith(
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                         ),
-                      ),
-                      _GlassIconButton(
-                        icon: CupertinoIcons.check_mark_circled,
-                        onTap: _selectAll,
-                      ),
-                      const SizedBox(width: 12),
-                      _GlassIconButton(
-                        icon: CupertinoIcons.trash,
-                        color: CupertinoColors.destructiveRed,
-                        onTap: _selectedIds.isEmpty ? () {} : _deleteSelected,
-                      ),
-                    ],
-                  )
-                  : Row(
-                    key: const ValueKey('normal_header'),
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Kütüphane',
-                              style: AppTypography.body18Medium.copyWith(
-                                color: AppColors.textTertiary,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Programlar',
-                              style: AppTypography.heading1.copyWith(
-                                color: AppColors.espresso,
-                                fontSize: 34,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.6,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_programs.isNotEmpty)
                         _GlassIconButton(
                           icon: CupertinoIcons.check_mark_circled,
-                          onTap: _enterSelectionMode,
+                          onTap: _selectAll,
                         ),
-                    ],
+                        const SizedBox(width: 12),
+                        _GlassIconButton(
+                          icon: CupertinoIcons.trash,
+                          color: CupertinoColors.destructiveRed,
+                          onTap: _selectedIds.isEmpty ? () {} : _deleteSelected,
+                        ),
+                      ],
+                    ),
+                  )
+                  : ScreenTitleBlock(
+                    key: const ValueKey('normal_header'),
+                    eyebrow: 'Kütüphane',
+                    title: 'Programlar',
+                    titleColor: AppColors.espresso,
+                    trailing:
+                        _programs.isNotEmpty
+                            ? _GlassIconButton(
+                              icon: CupertinoIcons.check_mark_circled,
+                              onTap: _enterSelectionMode,
+                            )
+                            : null,
                   ),
         ),
       ),
@@ -495,7 +478,9 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                               final originalIndex = _programs.indexOf(program);
                               setState(() => _programs.removeAt(originalIndex));
                               try {
-                                await ProgramRepository.deleteProgram(program.id);
+                                await ProgramRepository.deleteProgram(
+                                  program.id,
+                                );
                               } catch (e) {
                                 debugPrint(e.toString());
                               }

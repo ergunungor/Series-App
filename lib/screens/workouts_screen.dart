@@ -11,6 +11,7 @@ import '../services/workout_history_repository.dart';
 import '../widgets/app_confirm_dialog.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/reveal.dart';
+import '../widgets/screen_title_block.dart';
 import '../widgets/series_wordmark.dart';
 import 'package:lottie/lottie.dart';
 
@@ -29,7 +30,6 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
 
   // Home/Programlar ile aynı yatay sayfa boşluğu ve giriş ritmi.
   static const double _pagePadding = 16;
-  static const double _headerHeight = 72;
   static const double _cardGap = 12;
   static const Duration _revealDuration = Duration(milliseconds: 500);
   static const Duration _revealStagger = Duration(milliseconds: 100);
@@ -165,114 +165,92 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(_pagePadding, 16, _pagePadding, 16),
-        child: SizedBox(
-          height: _headerHeight,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: _isSelectionMode ? _buildSelectionHeader() : _buildTitle(),
-          ),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: _isSelectionMode ? _buildSelectionHeader() : _buildTitle(),
         ),
       ),
     );
   }
 
   Widget _buildSelectionHeader() {
-    return Row(
+    return SizedBox(
       key: const ValueKey('selection_header'),
-      children: [
-        _CircleIconButton(
-          icon: CupertinoIcons.xmark,
-          onTap: _exitSelectionMode,
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Text(
-            '${_selectedKeys.length} seçili',
-            style: AppTypography.heading2.copyWith(
-              color: AppColors.textPrimary,
+      height: ScreenTitleBlock.height,
+      child: Row(
+        children: [
+          _CircleIconButton(
+            icon: CupertinoIcons.xmark,
+            onTap: _exitSelectionMode,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              '${_selectedKeys.length} seçili',
+              style: AppTypography.heading2.copyWith(
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
-        ),
-        _MenuButton(
-          onSelected: (value) {
-            if (value == 'select_all') _selectAll();
-            if (value == 'delete') _deleteSelected();
-          },
-          itemBuilder:
-              (context) => [
-                const PopupMenuItem(
-                  value: 'select_all',
-                  child: Text(
-                    'Tümünü Seç',
-                    style: TextStyle(color: AppColors.textPrimary),
+          _MenuButton(
+            onSelected: (value) {
+              if (value == 'select_all') _selectAll();
+              if (value == 'delete') _deleteSelected();
+            },
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem(
+                    value: 'select_all',
+                    child: Text(
+                      'Tümünü Seç',
+                      style: TextStyle(color: AppColors.textPrimary),
+                    ),
                   ),
-                ),
-                const PopupMenuItem(
-                  value: 'share',
-                  enabled: false,
-                  child: Text(
-                    'Paylaş (yakında)',
-                    style: TextStyle(color: AppColors.textTertiary),
+                  const PopupMenuItem(
+                    value: 'share',
+                    enabled: false,
+                    child: Text(
+                      'Paylaş (yakında)',
+                      style: TextStyle(color: AppColors.textTertiary),
+                    ),
                   ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Text('Sil', style: TextStyle(color: AppColors.error)),
-                ),
-              ],
-        ),
-      ],
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Text(
+                      'Sil',
+                      style: TextStyle(color: AppColors.error),
+                    ),
+                  ),
+                ],
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildTitle() {
-    return Row(
+    return ScreenTitleBlock(
       key: const ValueKey('normal_header'),
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Geçmiş',
-                style: AppTypography.body18Medium.copyWith(
-                  color: AppColors.textTertiary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Antrenmanlarım',
-                style: AppTypography.heading1.copyWith(
-                  color: AppColors.textPrimary,
-                  fontSize: 34,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.6,
+      eyebrow: 'Geçmiş',
+      title: 'Antrenmanlarım',
+      trailing: _MenuButton(
+        onSelected: (value) {
+          if (value == 'select' && _sessions.isNotEmpty) {
+            setState(() => _isSelectionMode = true);
+          }
+        },
+        itemBuilder:
+            (context) => [
+              PopupMenuItem(
+                value: 'select',
+                enabled: _sessions.isNotEmpty,
+                child: const Text(
+                  'Seç',
+                  style: TextStyle(color: AppColors.textPrimary),
                 ),
               ),
             ],
-          ),
-        ),
-        _MenuButton(
-          onSelected: (value) {
-            if (value == 'select' && _sessions.isNotEmpty) {
-              setState(() => _isSelectionMode = true);
-            }
-          },
-          itemBuilder:
-              (context) => [
-                PopupMenuItem(
-                  value: 'select',
-                  enabled: _sessions.isNotEmpty,
-                  child: const Text(
-                    'Seç',
-                    style: TextStyle(color: AppColors.textPrimary),
-                  ),
-                ),
-              ],
-        ),
-      ],
+      ),
     );
   }
 
@@ -397,11 +375,9 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
             if (_isLoading || _sessions.isNotEmpty)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    _pagePadding,
-                    0,
-                    _pagePadding,
-                    _cardGap + 4,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: _pagePadding,
+                    vertical: 16,
                   ),
                   child: AnimatedSwitcher(
                     duration: _heroSwitchDuration,
