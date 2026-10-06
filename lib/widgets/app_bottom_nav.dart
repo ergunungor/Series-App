@@ -97,7 +97,7 @@ class _AppBottomNavState extends State<AppBottomNav>
 
   // Dokunurken bar hover gibi hafifçe büyür.
   static const double _pressedScale = 1.05;
-  static const Duration _pressDuration = Duration(milliseconds: 150);
+  static const Duration _pressDuration = Duration(milliseconds: 380);
 
   // Boşta kalma ve animasyon süreleri
   static const Duration _idleDelay = Duration(milliseconds: 3500);
@@ -409,7 +409,7 @@ class _AppBottomNavState extends State<AppBottomNav>
       child: AnimatedScale(
         scale: _isPressed ? _pressedScale : 1,
         duration: _pressDuration,
-        curve: Curves.easeOut,
+        curve: Curves.easeInOutCubic,
         child: bar,
       ),
     );
