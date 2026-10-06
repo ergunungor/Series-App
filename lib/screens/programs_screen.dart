@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -951,43 +952,119 @@ class _PremiumEmptyState extends StatelessWidget {
   }
 }
 
-class _LiquidGlassFab extends StatelessWidget {
+/// "Program Ekle" butonu: Programlar sekmesi her göründüğünde yazılı hâliyle
+/// çıkar, [_collapseDelay] sonra yalnızca "+" dairesine daralır.
+class _LiquidGlassFab extends StatefulWidget {
   final VoidCallback onTap;
   const _LiquidGlassFab({required this.onTap});
 
   static const double height = 52;
 
   @override
+  State<_LiquidGlassFab> createState() => _LiquidGlassFabState();
+}
+
+class _LiquidGlassFabState extends State<_LiquidGlassFab> {
+  static const Duration _collapseDelay = Duration(milliseconds: 300);
+  static const Duration _morphDuration = Duration(milliseconds: 380);
+  static const double _compactPadding = 16; // 16 + 20 ikon + 16 = 52 daire
+  static const double _expandedPadding = 22;
+
+  bool _isCompact = false;
+  bool _wasTabActive = false;
+  Timer? _collapseTimer;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Sekme kabuğu görünmeyen sekmelerin ticker'larını kapatır; sekme tekrar
+    // görününce (true'ya dönünce) buton yeniden yazılı açılıp daralır.
+    final isActive = TickerMode.valuesOf(context).enabled;
+    if (isActive && !_wasTabActive) {
+      _collapseTimer?.cancel();
+      if (_isCompact) setState(() => _isCompact = false);
+      _collapseTimer = Timer(_collapseDelay, () {
+        if (mounted) setState(() => _isCompact = true);
+      });
+    }
+    _wasTabActive = isActive;
+  }
+
+  @override
+  void dispose() {
+    _collapseTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return PressableScale(
-      onTap: onTap,
-      child: Container(
-        height: height,
-        padding: const EdgeInsets.symmetric(horizontal: 22),
-        decoration: BoxDecoration(
-          color: AppColors.accentGold,
-          borderRadius: BorderRadius.circular(height / 2),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.goldDeep.withValues(alpha: 0.35),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(CupertinoIcons.add, color: AppColors.espresso, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              'Program Ekle',
-              style: AppTypography.body16Medium.copyWith(
-                color: AppColors.espresso,
-                fontWeight: FontWeight.w700,
+    return Semantics(
+      label: 'Program Ekle',
+      button: true,
+      excludeSemantics: true,
+      child: PressableScale(
+        onTap: widget.onTap,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween<double>(end: _isCompact ? 0 : 1),
+          duration: _morphDuration,
+          curve: Curves.easeInOutCubic,
+          builder:
+              (context, t, _) => Container(
+                height: _LiquidGlassFab.height,
+                padding: EdgeInsets.symmetric(
+                  horizontal:
+                      _compactPadding +
+                      (_expandedPadding - _compactPadding) * t,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.accentGold,
+                  borderRadius: BorderRadius.circular(
+                    _LiquidGlassFab.height / 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.goldDeep.withValues(alpha: 0.35),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      CupertinoIcons.add,
+                      color: AppColors.espresso,
+                      size: 20,
+                    ),
+                    // Yazı: genişliği ve opaklığı t ile birlikte kapanır.
+                    ClipRect(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: t,
+                        child: Opacity(
+                          opacity: t,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(width: 8),
+                              Text(
+                                'Program Ekle',
+                                maxLines: 1,
+                                softWrap: false,
+                                style: AppTypography.body16Medium.copyWith(
+                                  color: AppColors.espresso,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
         ),
       ),
     );
