@@ -8,6 +8,7 @@ import '../models/program.dart';
 import '../widgets/app_confirm_dialog.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/pressable_scale.dart';
+import '../utils/exercise_name.dart';
 
 class WorkoutDayDetailScreen extends StatefulWidget {
   final WorkoutDay workout;
@@ -307,7 +308,7 @@ class _WorkoutDayDetailScreenState extends State<WorkoutDayDetailScreen> {
       rows.add(
         _ExerciseRow(
           number: i + 1,
-          name: exercise.name,
+          name: formatExerciseName(exercise.name),
           setsLabel: '${exercise.sets} × $repsOrDuration',
           // restSeconds null gelirse varsayılan 60sn
           restLabel: '${exercise.restSeconds ?? 60}sn dinlenme',

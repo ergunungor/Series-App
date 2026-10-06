@@ -15,6 +15,7 @@ import '../models/exercise.dart';
 import '../services/exercise_service.dart';
 import 'workouts_screen.dart'; // workoutRefreshNotifier'ı kullanabilmek için
 import '../widgets/exercise_timer_widget.dart';
+import '../utils/exercise_name.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 class WorkoutSessionScreen extends StatefulWidget {
@@ -265,7 +266,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                         ),
                       ),
                       title: Text(
-                        exercise.name, // Hareketin ismi
+                        formatExerciseName(exercise.name), // Hareketin ismi
                         style: AppTypography.body16Medium.copyWith(
                           color:
                               isCompleted
@@ -520,15 +521,17 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     // değere güncellenmiş durumda. Bu yüzden moladayken direkt "şu anki"
     // state'i (yani sıradaki hedefi) ekrana yazdırıyoruz.
     if (_isResting) {
-      return '${_currentExercise.name} · Set ${_setIndex + 1}/${_currentExercise.sets}';
+      return '${formatExerciseName(_currentExercise.name)} · Set ${_setIndex + 1}/${_currentExercise.sets}';
     }
 
     // Egzersiz ekranındayken (molada değilken) standart "sıradaki" hesaplaması:
     if (_setIndex + 1 < _currentExercise.sets) {
-      return '${_currentExercise.name} · Set ${_setIndex + 2}/${_currentExercise.sets}';
+      return '${formatExerciseName(_currentExercise.name)} · Set ${_setIndex + 2}/${_currentExercise.sets}';
     }
     if (_exerciseIndex + 1 < widget.workout.exercises.length) {
-      return widget.workout.exercises[_exerciseIndex + 1].name;
+      return formatExerciseName(
+        widget.workout.exercises[_exerciseIndex + 1].name,
+      );
     }
     return 'Son hareket';
   }

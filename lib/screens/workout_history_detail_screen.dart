@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../models/workout_history.dart';
+import '../utils/exercise_name.dart';
 
 class WorkoutHistoryDetailScreen extends StatelessWidget {
   final WorkoutHistorySession session;
@@ -79,7 +80,7 @@ class WorkoutHistoryDetailScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                entry.key,
+                                formatExerciseName(entry.key),
                                 style: AppTypography.body16Medium.copyWith(
                                   color: AppColors.textPrimary,
                                 ),
