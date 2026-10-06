@@ -1446,11 +1446,12 @@ class _SetFieldState extends State<_SetField> {
           ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
               widget.label,
+              textAlign: TextAlign.center,
               style: AppTypography.body12Medium.copyWith(
                 color: AppColors.textTertiary,
                 fontSize: 10,
@@ -1462,6 +1463,7 @@ class _SetFieldState extends State<_SetField> {
               controller: widget.controller,
               focusNode: _focusNode,
               keyboardType: widget.keyboardType,
+              textAlign: TextAlign.center,
               cursorColor: AppColors.homeHero,
               style: AppTypography.heading2.copyWith(
                 color: AppColors.textPrimary,
