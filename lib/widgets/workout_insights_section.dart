@@ -437,52 +437,125 @@ class _FunFactCard extends StatelessWidget {
 
   const _FunFactCard({required this.text});
 
-  static const double _iconSize = 36;
+  static const double _radius = 22;
+  static const double _iconSize = 30;
+
+  // Cümledeki rakamlı ifadeleri (42 ton, 28 araba, 118 kg, %9) vurgulamak için.
+  static final RegExp _numberToken = RegExp(
+    r'%\d+|\d[\d,.]*(?:\s?(?:ton|kg|araba))?',
+  );
+
+  List<InlineSpan> _spans() {
+    final base = AppTypography.body16Medium.copyWith(
+      color: AppColors.espresso,
+      fontWeight: FontWeight.w500,
+      height: 1.45,
+    );
+    final spans = <InlineSpan>[];
+    var cursor = 0;
+    for (final match in _numberToken.allMatches(text)) {
+      if (match.start > cursor) {
+        spans.add(
+          TextSpan(text: text.substring(cursor, match.start), style: base),
+        );
+      }
+      spans.add(
+        TextSpan(
+          text: match.group(0),
+          style: base.copyWith(
+            color: AppColors.goldDeep,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      );
+      cursor = match.end;
+    }
+    if (cursor < text.length) {
+      spans.add(TextSpan(text: text.substring(cursor), style: base));
+    }
+    return spans;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: AppColors.goldTint,
-        borderRadius: BorderRadius.circular(_InsightCard.radius),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.goldTint, Color(0xFFFBF4E4)],
+        ),
+        borderRadius: BorderRadius.circular(_radius),
+        border: Border.all(color: AppColors.accentGold.withValues(alpha: 0.4)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.goldDeep.withValues(alpha: 0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      child: Row(
+      child: Stack(
         children: [
-          Container(
-            width: _iconSize,
-            height: _iconSize,
-            decoration: const BoxDecoration(
-              color: AppColors.accentGold,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.bolt_rounded,
-              size: 20,
-              color: AppColors.espresso,
+          // Sağ altta silik büyük şimşek: kartın görsel imzası.
+          Positioned(
+            right: -14,
+            bottom: -22,
+            child: Transform.rotate(
+              angle: -0.2,
+              child: Icon(
+                Icons.bolt_rounded,
+                size: 120,
+                color: AppColors.accentGold.withValues(alpha: 0.2),
+              ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: 'Fun fact: ',
-                    style: AppTypography.body14Medium.copyWith(
-                      color: AppColors.espresso,
-                      fontWeight: FontWeight.w700,
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: _iconSize,
+                      height: _iconSize,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0xFFEDC36C), AppColors.accentGold],
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.bolt_rounded,
+                        size: 18,
+                        color: AppColors.espresso,
+                      ),
                     ),
-                  ),
-                  TextSpan(
-                    text: text,
-                    style: AppTypography.body14Regular.copyWith(
-                      color: AppColors.espresso,
+                    const SizedBox(width: 10),
+                    Text(
+                      'FUN FACT',
+                      style: AppTypography.body12Medium.copyWith(
+                        color: AppColors.goldDeep,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                        letterSpacing: 2,
+                        height: 1,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Padding(
+                  // Sağ altta filigran şimşeğin yazıyla çakışmaması için.
+                  padding: const EdgeInsets.only(right: 36),
+                  child: Text.rich(TextSpan(children: _spans())),
+                ),
+              ],
             ),
           ),
         ],

@@ -22,7 +22,7 @@ class WeeklyBarsChart extends StatefulWidget {
 }
 
 class _WeeklyBarsChartState extends State<WeeklyBarsChart>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const Duration _growDuration = Duration(milliseconds: 700);
 
   late final AnimationController _controller = AnimationController(
@@ -31,8 +31,32 @@ class _WeeklyBarsChartState extends State<WeeklyBarsChart>
   )..forward();
   late int _selected = widget.counts.length - 1;
 
+  // Dokunma ("hover") geri bildirimi: parmak değdiği çubuk hafifçe yükselir,
+  // koyulaşır ve altında yumuşak bir gölge belirir; parmak kalkınca geri döner.
+  late final AnimationController _hover = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 180),
+  );
+  int? _hoverIndex;
+
+  int _indexAt(double dx, double width) => (dx / width * widget.counts.length)
+      .floor()
+      .clamp(0, widget.counts.length - 1);
+
+  void _press(double dx, double width) {
+    final index = _indexAt(dx, width);
+    if (index != _hoverIndex) {
+      _hoverIndex = index;
+      _select(index);
+    }
+    _hover.forward();
+  }
+
+  void _release() => _hover.reverse();
+
   @override
   void dispose() {
+    _hover.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -61,14 +85,17 @@ class _WeeklyBarsChartState extends State<WeeklyBarsChart>
               final width = constraints.maxWidth;
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTapDown:
-                    (d) => _select(
-                      (d.localPosition.dx / width * counts.length)
-                          .floor()
-                          .clamp(0, counts.length - 1),
-                    ),
+                onTapDown: (d) => _press(d.localPosition.dx, width),
+                onTapUp: (_) => _release(),
+                onTapCancel: _release,
+                // Parmağı çubuklar üzerinde kaydırınca vurgu ve seçim onu izler.
+                onHorizontalDragStart: (d) => _press(d.localPosition.dx, width),
+                onHorizontalDragUpdate:
+                    (d) => _press(d.localPosition.dx, width),
+                onHorizontalDragEnd: (_) => _release(),
+                onHorizontalDragCancel: _release,
                 child: AnimatedBuilder(
-                  animation: _controller,
+                  animation: Listenable.merge([_controller, _hover]),
                   builder:
                       (context, _) => CustomPaint(
                         size: Size(width, WeeklyBarsChart.height),
@@ -76,6 +103,8 @@ class _WeeklyBarsChartState extends State<WeeklyBarsChart>
                           counts: counts,
                           selected: _selected,
                           progress: _controller.value,
+                          hoverIndex: _hoverIndex,
+                          hoverT: Curves.easeOut.transform(_hover.value),
                           labelStyle: labelStyle,
                         ),
                       ),
@@ -93,12 +122,16 @@ class _BarsPainter extends CustomPainter {
   final List<int> counts;
   final int selected;
   final double progress;
+  final int? hoverIndex;
+  final double hoverT;
   final TextStyle labelStyle;
 
   _BarsPainter({
     required this.counts,
     required this.selected,
     required this.progress,
+    required this.hoverIndex,
+    required this.hoverT,
     required this.labelStyle,
   });
 
@@ -112,6 +145,10 @@ class _BarsPainter extends CustomPainter {
   static const double _pillPadX = 7;
   // Çubuklar soldan sağa sırayla büyür; her biri toplam sürenin bir diliminde.
   static const double _staggerSpan = 0.5;
+  // Dokunulan çubuğun yükselmesi, yana genişlemesi ve koyulaşması.
+  static const double _hoverLift = 8;
+  static const double _hoverGrow = 3;
+  static const Color _hoverNeutral = Color(0xFFDDD6CC);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -130,24 +167,42 @@ class _BarsPainter extends CustomPainter {
           counts[i] == 0
               ? _emptyBarHeight
               : math.max(_emptyBarHeight, plotHeight * counts[i] / maxCount);
-      final h = full * t;
-      final left = i * (barWidth + _gap);
+      final isHovered = i == hoverIndex;
+      final hv = isHovered ? hoverT : 0.0;
+      final lift = _hoverLift * hv;
+      final grow = _hoverGrow * hv;
+      final h = full * t + (t >= 1 ? lift : 0);
+      final left = i * (barWidth + _gap) - grow;
       final isCurrent = i == n - 1;
       final rect = RRect.fromRectAndRadius(
-        Rect.fromLTWH(left, baseline - h, barWidth, h),
+        Rect.fromLTWH(left, baseline - h, barWidth + grow * 2, h),
         const Radius.circular(_radius),
       );
+      final baseColor =
+          isCurrent ? AppColors.workoutsHero : AppColors.fillSubtle;
+      final hoverColor = isCurrent ? AppColors.workoutsHeroDeep : _hoverNeutral;
+      if (hv > 0) {
+        // Dokunulan çubuğun altında yumuşak gölge.
+        canvas.drawRRect(
+          rect.shift(const Offset(0, 4)),
+          Paint()
+            ..color = AppColors.workoutsHero.withValues(alpha: 0.16 * hv)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+        );
+      }
       canvas.drawRRect(
         rect,
-        Paint()
-          ..color = isCurrent ? AppColors.workoutsHero : AppColors.fillSubtle,
+        Paint()..color = Color.lerp(baseColor, hoverColor, hv)!,
       );
 
       if (i == selected && t >= 1) {
         _paintValuePill(
           canvas,
           '${counts[i]}',
-          Offset(left + barWidth / 2, baseline - full - _pillGap),
+          Offset(
+            left + (barWidth + grow * 2) / 2,
+            baseline - full - lift - _pillGap,
+          ),
         );
       }
     }
@@ -210,6 +265,8 @@ class _BarsPainter extends CustomPainter {
   @override
   bool shouldRepaint(_BarsPainter old) =>
       old.progress != progress ||
+      old.hoverIndex != hoverIndex ||
+      old.hoverT != hoverT ||
       old.selected != selected ||
       old.counts != counts;
 }
