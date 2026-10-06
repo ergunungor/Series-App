@@ -39,6 +39,8 @@ class ExerciseLogRepository {
     required String workoutId,
     required String workoutName,
     required List<SetLog> logs,
+    // Sayaç süresi (sn). Seansın tüm satırlarına aynı değer yazılır.
+    int? durationSeconds,
   }) async {
     if (logs.isEmpty) return;
 
@@ -56,6 +58,8 @@ class ExerciseLogRepository {
                 'reps_performed': log.repsPerformed,
                 'weight_used': log.weightUsed,
                 'completed_at': DateTime.now().toIso8601String(),
+                if (durationSeconds != null && durationSeconds > 0)
+                  'duration_seconds': durationSeconds,
               },
             )
             .toList();

@@ -13,6 +13,7 @@ class WorkoutHistoryRepository {
     final Map<String, String> nameBySession = {};
     final Map<String, String> workoutIdBySession = {};
     final Map<String, DateTime> dateBySession = {};
+    final Map<String, int> durationBySession = {};
 
     for (final row in (rows as List)) {
       final workoutId = row['workout_id'].toString();
@@ -31,6 +32,8 @@ class WorkoutHistoryRepository {
       workoutIdBySession[key] = workoutId;
       // İlk gelen (en güncel) tarihi seans tarihi olarak saklıyoruz:
       dateBySession.putIfAbsent(key, () => parsedDate);
+      final duration = (row['duration_seconds'] as num?)?.toInt();
+      if (duration != null) durationBySession.putIfAbsent(key, () => duration);
     }
 
     final result =
@@ -41,6 +44,7 @@ class WorkoutHistoryRepository {
                 workoutName: nameBySession[entry.key]!,
                 completedAt: dateBySession[entry.key]!,
                 sets: entry.value,
+                durationSeconds: durationBySession[entry.key],
               ),
             )
             .toList();

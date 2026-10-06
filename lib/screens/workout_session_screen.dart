@@ -463,6 +463,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
           workoutId: widget.workout.id,
           workoutName: widget.workout.name,
           logs: _logs,
+          durationSeconds: _elapsedSeconds,
         );
         success = true;
       } catch (error) {

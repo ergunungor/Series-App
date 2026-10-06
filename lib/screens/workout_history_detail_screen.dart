@@ -109,6 +109,7 @@ class _WorkoutHistoryDetailScreenState
       'tr_TR',
     ).format(session.completedAt);
     final volume = WorkoutStats.totalVolumeKg([session]).round();
+    final durationSeconds = session.durationSeconds;
 
     final hero = Container(
       key: _heroKey,
@@ -191,6 +192,13 @@ class _WorkoutHistoryDetailScreenState
                     _heroStat('${session.setCount}', 'set'),
                     _heroDivider(),
                     _heroStat('$volume', 'kg'),
+                    if (durationSeconds != null) ...[
+                      _heroDivider(),
+                      _heroStat(
+                        '${math.max(1, (durationSeconds / 60).round())}',
+                        'dk',
+                      ),
+                    ],
                   ],
                 ),
               ),
