@@ -653,52 +653,70 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   // "Sıradaki" satırı (yaklaşık 20px) ile dock butonları arası.
   static const double _nextRowHeight = 20;
   static const double _nextToDockGap = 14;
+  // Klavye açıkken sabitlenen grubun kapladığı alan (fade 32 + satır + butonlar).
+  static const double _keyboardDockReserve =
+      32 + _nextRowHeight + _nextToDockGap + _ctaHeight + _dockBottomGap + 24;
 
   Widget _buildExerciseView() {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: HeroStatusBarScope(
         builder:
-            // fit: expand: SingleChildScrollView içerik kısaysa küçüldüğü için
-            // dock'un ekranın gerçek altına yapışması bununla sağlanıyor.
             (context, heroKey) => Stack(
               fit: StackFit.expand,
               children: [
-                SingleChildScrollView(
+                CustomScrollView(
                   physics: const BouncingScrollPhysics(),
-                  padding: EdgeInsets.only(
-                    bottom:
-                        _ctaHeight +
-                        bottomSafe +
-                        _dockBottomGap +
-                        _nextRowHeight +
-                        _nextToDockGap +
-                        _sectionGap,
-                  ),
-                  child: Column(
-                    children: [
-                      _buildExerciseHero(heroKey),
-                      _buildGifCard(),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          _pagePadding,
-                          _sectionGap,
-                          _pagePadding,
-                          0,
-                        ),
-                        child: _buildSetArea(),
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Column(
+                        children: [
+                          _buildExerciseHero(heroKey),
+                          _buildGifCard(),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              _pagePadding,
+                              _sectionGap,
+                              _pagePadding,
+                              0,
+                            ),
+                            child: _buildSetArea(),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                    // Kalan alanı doldurur: "Sıradaki" + butonlar grubu, içerik ile
+                    // ekran altı arasında dikey olarak ortalanır. İçerik uzunsa
+                    // (küçük ekran) aşağıda kaydırılır.
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child:
+                          keyboardOpen
+                              // Klavye açıkken grup altta sabit (aşağıdaki
+                              // Positioned); burada yalnızca yer ayrılır.
+                              ? const SizedBox(height: _keyboardDockReserve)
+                              : Padding(
+                                padding: EdgeInsets.fromLTRB(
+                                  _pagePadding,
+                                  _sectionGap,
+                                  _pagePadding,
+                                  bottomSafe,
+                                ),
+                                child: Center(child: _buildBottomGroup()),
+                              ),
+                    ),
+                  ],
+                ),
+                if (keyboardOpen)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _buildDock(bottomSafe),
                   ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: _buildDock(bottomSafe),
-                ),
               ],
             ),
       ),
@@ -1105,13 +1123,52 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     );
   }
 
-  // Alt dock: iki chevron dairesi ve ortada esneyen altın "Seti Tamamla"
-  // butonu; üç eleman aynı dikey eksende. Arkasında listenin kesik görünmemesi
-  // için yumuşak geçiş.
-  Widget _buildDock(double bottomSafe) {
+  // "Sıradaki" satırı + iki chevron dairesi ve ortada esneyen altın "Seti
+  // Tamamla" butonu; butonlar aynı dikey eksende.
+  Widget _buildBottomGroup() {
     final canGoPrev = _exerciseIndex > 0;
     final canGoNext = _exerciseIndex < widget.workout.exercises.length - 1;
 
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildNextRow(),
+        const SizedBox(height: _nextToDockGap),
+        Row(
+          children: [
+            _DockChevron(
+              icon: Icons.chevron_left_rounded,
+              size: _chevronSize,
+              onTap: canGoPrev ? () => _goToExercise(_exerciseIndex - 1) : null,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _SetCta(
+                height: _ctaHeight,
+                onTap:
+                    _isPaused
+                        ? null
+                        : () {
+                          HapticFeedback.mediumImpact();
+                          _confirmSet();
+                        },
+              ),
+            ),
+            const SizedBox(width: 10),
+            _DockChevron(
+              icon: Icons.chevron_right_rounded,
+              size: _chevronSize,
+              onTap: canGoNext ? () => _goToExercise(_exerciseIndex + 1) : null,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // Klavye açıkken grup ekranın altına (klavyenin üstüne) sabitlenir; arkasında
+  // içeriğin kesik görünmemesi için yumuşak geçiş.
+  Widget _buildDock(double bottomSafe) {
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -1129,49 +1186,9 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
           _pagePadding,
           32,
           _pagePadding,
-          bottomSafe + _dockBottomGap,
+          _dockBottomGap,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildNextRow(),
-            const SizedBox(height: _nextToDockGap),
-            Row(
-              children: [
-                _DockChevron(
-                  icon: Icons.chevron_left_rounded,
-                  size: _chevronSize,
-                  onTap:
-                      canGoPrev
-                          ? () => _goToExercise(_exerciseIndex - 1)
-                          : null,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _SetCta(
-                    height: _ctaHeight,
-                    onTap:
-                        _isPaused
-                            ? null
-                            : () {
-                              HapticFeedback.mediumImpact();
-                              _confirmSet();
-                            },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                _DockChevron(
-                  icon: Icons.chevron_right_rounded,
-                  size: _chevronSize,
-                  onTap:
-                      canGoNext
-                          ? () => _goToExercise(_exerciseIndex + 1)
-                          : null,
-                ),
-              ],
-            ),
-          ],
-        ),
+        child: _buildBottomGroup(),
       ),
     );
   }
