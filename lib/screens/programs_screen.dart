@@ -34,6 +34,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   static const Duration _revealStagger = Duration(milliseconds: 100);
   static const int _revealedGridItems = 4;
   static const int _introSteps = 1 + _revealedGridItems; // hero + kartlar
+  static const Duration _heroSwitchDuration = Duration(milliseconds: 350);
 
   List<ActiveProgram> _programs = [];
   bool _isLoading = true;
@@ -394,6 +395,41 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     final otherPrograms =
         _programs.where((p) => p.id != _activeProgramId).toList();
 
+    final Widget? hero =
+        activeProgram == null
+            ? null
+            : _DismissibleWrapper(
+              key: ValueKey(activeProgram.id),
+              program: activeProgram,
+              isSelectionMode: _isSelectionMode,
+              onDeleteConfirmed: () async {
+                final originalIndex = _programs.indexOf(activeProgram);
+                setState(() => _programs.removeAt(originalIndex));
+                try {
+                  await ProgramRepository.deleteProgram(activeProgram.id);
+                } catch (e) {
+                  debugPrint(e.toString());
+                }
+              },
+              child: _FeaturedActiveCard(
+                program: activeProgram,
+                isSelected: _selectedIds.contains(activeProgram.id),
+                isSelectionMode: _isSelectionMode,
+                onTap: () {
+                  if (_isSelectionMode) {
+                    _toggleSelection(activeProgram.id);
+                  } else {
+                    context
+                        .push<bool>('/program-detail', extra: activeProgram)
+                        .then((v) {
+                          if (v == true) _fetch();
+                        });
+                  }
+                },
+                onLongPress: _enterSelectionMode,
+              ),
+            );
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
@@ -411,139 +447,103 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
               _buildHeader(),
               _buildGenerationStatus(),
 
-              if (_isLoading)
-                const SliverToBoxAdapter(child: _ProgramsSkeleton())
-              else if (_programs.isEmpty &&
-                  generationStateNotifier.value == GenerationStatus.idle)
-                SliverFillRemaining(
-                  child: _PremiumEmptyState(
-                    onCreate: () => context.push<bool>('/onboarding-survey'),
-                  ),
-                )
-              else ...[
-                // Hero Active Program
-                if (activeProgram != null)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: _pagePadding,
-                        vertical: 16,
-                      ),
-                      child: Reveal(
-                        duration: _revealDuration,
-                        child: _DismissibleWrapper(
-                          program: activeProgram,
-                          isSelectionMode: _isSelectionMode,
-                          onDeleteConfirmed: () async {
-                            final originalIndex = _programs.indexOf(
-                              activeProgram,
-                            );
-                            setState(() => _programs.removeAt(originalIndex));
-                            try {
-                              await ProgramRepository.deleteProgram(
-                                activeProgram.id,
-                              );
-                            } catch (e) {
-                              debugPrint(e.toString());
-                            }
-                          },
-                          child: _FeaturedActiveCard(
-                            program: activeProgram,
-                            isSelected: _selectedIds.contains(activeProgram.id),
-                            isSelectionMode: _isSelectionMode,
-                            onTap: () {
-                              if (_isSelectionMode) {
-                                _toggleSelection(activeProgram.id);
-                              } else {
-                                context
-                                    .push<bool>(
-                                      '/program-detail',
-                                      extra: activeProgram,
-                                    )
-                                    .then((v) {
-                                      if (v == true) _fetch();
-                                    });
-                              }
-                            },
-                            onLongPress: _enterSelectionMode,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                // Grid Other Programs
-                if (otherPrograms.isNotEmpty)
-                  SliverPadding(
+              // Hero alanı: Home'daki gibi iskelet ↔ içerik crossfade (aynı ölçü,
+              // layout zıplamaz).
+              if (_isLoading || hero != null)
+                SliverToBoxAdapter(
+                  child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: _pagePadding,
+                      vertical: 16,
                     ),
-                    sliver: SliverGrid(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 0.85,
-                          ),
-                      delegate: SliverChildBuilderDelegate((context, index) {
-                        final program = otherPrograms[index];
-                        final card = _DismissibleWrapper(
-                          program: program,
-                          isSelectionMode: _isSelectionMode,
-                          onDeleteConfirmed: () async {
-                            final originalIndex = _programs.indexOf(program);
-                            setState(() => _programs.removeAt(originalIndex));
-                            try {
-                              await ProgramRepository.deleteProgram(program.id);
-                            } catch (e) {
-                              debugPrint(e.toString());
-                            }
-                          },
-                          child: _GridProgramCard(
-                            program: program,
-                            isSelected: _selectedIds.contains(program.id),
-                            isSelectionMode: _isSelectionMode,
-                            onTap: () {
-                              if (_isSelectionMode) {
-                                _toggleSelection(program.id);
-                              } else {
-                                context
-                                    .push<bool>(
-                                      '/program-detail',
-                                      extra: program,
-                                    )
-                                    .then((v) {
-                                      if (v == true) _fetch();
-                                    });
-                              }
-                            },
-                            onLongPress: _enterSelectionMode,
-                          ),
-                        );
-                        if (!_isIntroActive || index >= _revealedGridItems) {
-                          return card;
-                        }
-                        return Reveal(
-                          delay: _revealStagger * (1 + index),
-                          duration: _revealDuration,
-                          child: card,
-                        );
-                      }, childCount: otherPrograms.length),
+                    child: AnimatedSwitcher(
+                      duration: _heroSwitchDuration,
+                      child: _isLoading ? const _FeaturedSkeleton() : hero,
                     ),
-                  ),
-
-                // Bottom padding to avoid FAB overlap
-                SliverToBoxAdapter(
-                  child: SizedBox(
-                    height:
-                        MediaQuery.paddingOf(context).bottom +
-                        _navBarClearance +
-                        _LiquidGlassFab.height +
-                        _fabGap * 2,
                   ),
                 ),
-              ],
+
+              if (!_isLoading)
+                if (_programs.isEmpty &&
+                    generationStateNotifier.value == GenerationStatus.idle)
+                  SliverFillRemaining(
+                    child: _PremiumEmptyState(
+                      onCreate: () => context.push<bool>('/onboarding-survey'),
+                    ),
+                  )
+                else ...[
+                  // Grid Other Programs
+                  if (otherPrograms.isNotEmpty)
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: _pagePadding,
+                      ),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 16,
+                              crossAxisSpacing: 16,
+                              childAspectRatio: 0.85,
+                            ),
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final program = otherPrograms[index];
+                          final card = _DismissibleWrapper(
+                            program: program,
+                            isSelectionMode: _isSelectionMode,
+                            onDeleteConfirmed: () async {
+                              final originalIndex = _programs.indexOf(program);
+                              setState(() => _programs.removeAt(originalIndex));
+                              try {
+                                await ProgramRepository.deleteProgram(program.id);
+                              } catch (e) {
+                                debugPrint(e.toString());
+                              }
+                            },
+                            child: _GridProgramCard(
+                              program: program,
+                              isSelected: _selectedIds.contains(program.id),
+                              isSelectionMode: _isSelectionMode,
+                              onTap: () {
+                                if (_isSelectionMode) {
+                                  _toggleSelection(program.id);
+                                } else {
+                                  context
+                                      .push<bool>(
+                                        '/program-detail',
+                                        extra: program,
+                                      )
+                                      .then((v) {
+                                        if (v == true) _fetch();
+                                      });
+                                }
+                              },
+                              onLongPress: _enterSelectionMode,
+                            ),
+                          );
+                          if (!_isIntroActive || index >= _revealedGridItems) {
+                            return card;
+                          }
+                          return Reveal(
+                            delay: _revealStagger * (1 + index),
+                            duration: _revealDuration,
+                            child: card,
+                          );
+                        }, childCount: otherPrograms.length),
+                      ),
+                    ),
+
+                  // Bottom padding to avoid FAB overlap
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height:
+                          MediaQuery.paddingOf(context).bottom +
+                          _navBarClearance +
+                          _LiquidGlassFab.height +
+                          _fabGap * 2,
+                    ),
+                  ),
+                ],
             ],
           ),
 
@@ -579,55 +579,22 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   }
 }
 
-/// Programlar yüklenirken gösterilen iskelet: gerçek düzenle (hero + 2 sütun
-/// grid) aynı ölçüde, tek bir shimmer süpürmesiyle; içerik gelince zıplama olmaz.
-class _ProgramsSkeleton extends StatelessWidget {
-  static const double _gap = 16;
-  static const double _gridAspectRatio = 0.85;
-  static const int _gridRows = 2;
-  static const int _gridColumns = 2;
-
-  const _ProgramsSkeleton();
-
-  Widget _box(BorderRadius radius) {
-    return DecoratedBox(
-      decoration: BoxDecoration(color: Colors.white, borderRadius: radius),
-    );
-  }
+/// Aktif program kartı yüklenirken gösterilen iskelet. Kartla aynı ölçüde olduğu
+/// için içerik gelince layout zıplamaz.
+class _FeaturedSkeleton extends StatelessWidget {
+  const _FeaturedSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(_FeaturedActiveCard._radius);
-
-    return Padding(
-      padding: const EdgeInsets.all(_ProgramsScreenState._pagePadding),
-      child: Shimmer.fromColors(
-        baseColor: AppColors.borderSubtle,
-        highlightColor: Colors.white,
-        child: Column(
-          children: [
-            SizedBox(
-              height: _FeaturedActiveCard._height,
-              width: double.infinity,
-              child: _box(radius),
-            ),
-            for (var row = 0; row < _gridRows; row++) ...[
-              const SizedBox(height: _gap),
-              Row(
-                children: [
-                  for (var col = 0; col < _gridColumns; col++) ...[
-                    if (col > 0) const SizedBox(width: _gap),
-                    Expanded(
-                      child: AspectRatio(
-                        aspectRatio: _gridAspectRatio,
-                        child: _box(radius),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ],
+    return Shimmer.fromColors(
+      baseColor: AppColors.borderSubtle,
+      highlightColor: Colors.white,
+      child: Container(
+        height: _FeaturedActiveCard._height,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(_FeaturedActiveCard._radius),
         ),
       ),
     );
@@ -1049,6 +1016,7 @@ class _DismissibleWrapper extends StatelessWidget {
   final VoidCallback onDeleteConfirmed;
 
   const _DismissibleWrapper({
+    super.key,
     required this.program,
     required this.isSelectionMode,
     required this.child,
