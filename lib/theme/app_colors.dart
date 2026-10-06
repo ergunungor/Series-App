@@ -42,7 +42,7 @@ class AppColors {
   static const Color navSelectedBg = Color(0xFFEDEDED);
 
   // Hero kart gradient başlangıcı (bitişi: brandTertiary)
-  static const Color heroGradientStart = Color(0xFFB3241B);
+  static const Color heroGradientStart = Color(0xFF8A2A20);
 
   // Nötr katman tonları (ikon karoları, buton zeminleri, hairline çizgiler)
   static const Color fillSubtle = surfaceMuted;

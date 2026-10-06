@@ -44,7 +44,7 @@ class _WorkoutCardState extends State<WorkoutCard> {
         borderRadius: BorderRadius.circular(_cardRadius),
         boxShadow: [
           BoxShadow(
-            color: AppColors.brandPrimary.withValues(alpha: 0.28),
+            color: AppColors.heroGradientStart.withValues(alpha: 0.28),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
