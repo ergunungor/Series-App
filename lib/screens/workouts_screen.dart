@@ -1,5 +1,7 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_colors.dart';
@@ -7,6 +9,9 @@ import '../theme/app_typography.dart';
 import '../models/workout_history.dart';
 import '../services/workout_history_repository.dart';
 import '../widgets/app_confirm_dialog.dart';
+import '../widgets/pressable_scale.dart';
+import '../widgets/reveal.dart';
+import '../widgets/series_wordmark.dart';
 import 'package:lottie/lottie.dart';
 
 final ValueNotifier<bool> workoutRefreshNotifier = ValueNotifier(false);
@@ -21,6 +26,20 @@ class WorkoutsScreen extends StatefulWidget {
 class _WorkoutsScreenState extends State<WorkoutsScreen> {
   List<WorkoutHistorySession> _sessions = [];
   bool _isLoading = true;
+
+  // Home/Programlar ile aynı yatay sayfa boşluğu ve giriş ritmi.
+  static const double _pagePadding = 16;
+  static const double _headerHeight = 72;
+  static const double _cardGap = 12;
+  static const Duration _revealDuration = Duration(milliseconds: 500);
+  static const Duration _revealStagger = Duration(milliseconds: 100);
+  static const Duration _heroSwitchDuration = Duration(milliseconds: 350);
+  static const int _revealedItems = 5;
+  static const int _skeletonCount = 3;
+
+  // İlk içerik gösterildikten sonra kapanır; kaydırınca Reveal tekrar oynamasın.
+  bool _isIntroActive = true;
+  bool _isIntroTimerArmed = false;
 
   bool _isSelectionMode = false;
   final Set<String> _selectedKeys = {};
@@ -58,11 +77,20 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
           _sessions = sessions;
           _isLoading = false;
         });
+        _armIntroTimer();
       }
     } catch (error) {
       debugPrint('Geçmiş çekme hatası: $error');
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _armIntroTimer() {
+    if (_isIntroTimerArmed) return;
+    _isIntroTimerArmed = true;
+    Future.delayed(_revealStagger * (_revealedItems + 1) + _revealDuration, () {
+      if (mounted) _isIntroActive = false;
+    });
   }
 
   Future<bool> _confirmDeleteSession(WorkoutHistorySession session) async {
@@ -134,68 +162,99 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
   }
 
   Widget _buildHeader() {
-    if (_isSelectionMode) {
-      return Row(
-        children: [
-          IconButton(
-            onPressed: _exitSelectionMode,
-            icon: Icon(Icons.close, color: AppColors.brandTertiary),
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(_pagePadding, 16, _pagePadding, 16),
+        child: SizedBox(
+          height: _headerHeight,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: _isSelectionMode ? _buildSelectionHeader() : _buildTitle(),
           ),
-          Expanded(
-            child: Text(
-              '${_selectedKeys.length} seçili',
-              style: AppTypography.heading2.copyWith(
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-          PopupMenuButton<String>(
-            color: Colors.white,
-            icon: Icon(Icons.more_vert, color: AppColors.brandTertiary),
-            onSelected: (value) {
-              if (value == 'select_all') _selectAll();
-              if (value == 'delete') _deleteSelected();
-            },
-            itemBuilder:
-                (context) => [
-                  const PopupMenuItem(
-                    value: 'select_all',
-                    child: Text(
-                      'Tümünü Seç',
-                      style: TextStyle(color: AppColors.brandPrimary),
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'share',
-                    enabled: false,
-                    child: Text(
-                      'Paylaş (yakında)',
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Sil', style: TextStyle(color: Colors.red)),
-                  ),
-                ],
-          ),
-        ],
-      );
-    }
+        ),
+      ),
+    );
+  }
 
+  Widget _buildSelectionHeader() {
     return Row(
+      key: const ValueKey('selection_header'),
       children: [
+        _CircleIconButton(
+          icon: CupertinoIcons.xmark,
+          onTap: _exitSelectionMode,
+        ),
+        const SizedBox(width: 16),
         Expanded(
           child: Text(
-            'Antrenmanlarım',
-            style: AppTypography.heading1.copyWith(
+            '${_selectedKeys.length} seçili',
+            style: AppTypography.heading2.copyWith(
               color: AppColors.textPrimary,
             ),
           ),
         ),
-        PopupMenuButton<String>(
-          color: Colors.white,
-          icon: Icon(Icons.more_vert, color: AppColors.brandTertiary),
+        _MenuButton(
+          onSelected: (value) {
+            if (value == 'select_all') _selectAll();
+            if (value == 'delete') _deleteSelected();
+          },
+          itemBuilder:
+              (context) => [
+                const PopupMenuItem(
+                  value: 'select_all',
+                  child: Text(
+                    'Tümünü Seç',
+                    style: TextStyle(color: AppColors.textPrimary),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'share',
+                  enabled: false,
+                  child: Text(
+                    'Paylaş (yakında)',
+                    style: TextStyle(color: AppColors.textTertiary),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Sil', style: TextStyle(color: AppColors.error)),
+                ),
+              ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTitle() {
+    return Row(
+      key: const ValueKey('normal_header'),
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Geçmiş',
+                style: AppTypography.body18Medium.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Antrenmanlarım',
+                style: AppTypography.heading1.copyWith(
+                  color: AppColors.textPrimary,
+                  fontSize: 34,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.6,
+                ),
+              ),
+            ],
+          ),
+        ),
+        _MenuButton(
           onSelected: (value) {
             if (value == 'select' && _sessions.isNotEmpty) {
               setState(() => _isSelectionMode = true);
@@ -208,12 +267,109 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
                   enabled: _sessions.isNotEmpty,
                   child: const Text(
                     'Seç',
-                    style: TextStyle(color: AppColors.brandPrimary),
+                    style: TextStyle(color: AppColors.textPrimary),
                   ),
                 ),
               ],
         ),
       ],
+    );
+  }
+
+  Widget _buildHero() {
+    final now = DateTime.now();
+    final weekStart = DateTime(
+      now.year,
+      now.month,
+      now.day - (now.weekday - 1),
+    );
+    final totalSets = _sessions.fold<int>(0, (sum, s) => sum + s.setCount);
+    final thisWeek =
+        _sessions.where((s) => !s.completedAt.isBefore(weekStart)).length;
+    return _SummaryHero(
+      workouts: _sessions.length,
+      sets: totalSets,
+      thisWeek: thisWeek,
+    );
+  }
+
+  Widget _buildSessionItem(int index) {
+    final session = _sessions[index];
+    final key = _keyOf(session);
+    final isSelected = _selectedKeys.contains(key);
+
+    final Widget card;
+    if (_isSelectionMode) {
+      card = _HistoryCard(
+        session: session,
+        isSelectionMode: true,
+        isSelected: isSelected,
+        onTap: () => _toggleSelection(key),
+      );
+    } else {
+      card = Dismissible(
+        key: ValueKey(key),
+        direction: DismissDirection.endToStart,
+        confirmDismiss: (_) => _confirmDeleteSession(session),
+        onDismissed: (_) {
+          final removedIndex = index;
+          setState(() => _sessions.removeAt(removedIndex));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(
+                SnackBar(
+                  content: Text('"${session.workoutName}" kaydı silindi'),
+                  backgroundColor: AppColors.workoutsHero,
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 3),
+                  action: SnackBarAction(
+                    label: 'Geri Al',
+                    textColor: AppColors.accentGold,
+                    onPressed: () {
+                      setState(() => _sessions.insert(removedIndex, session));
+                    },
+                  ),
+                ),
+              )
+              .closed
+              .then((reason) async {
+                if (reason == SnackBarClosedReason.action) return;
+                try {
+                  await WorkoutHistoryRepository.deleteSession(session);
+                } catch (error) {
+                  debugPrint('Antrenman kaydı silme hatası: $error');
+                }
+              });
+        },
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          decoration: BoxDecoration(
+            color: AppColors.error,
+            borderRadius: BorderRadius.circular(_HistoryCard.radius),
+          ),
+          child: const Icon(CupertinoIcons.trash, color: Colors.white),
+        ),
+        child: _HistoryCard(
+          session: session,
+          isSelectionMode: false,
+          isSelected: false,
+          onTap: () => context.push('/workout-history-detail', extra: session),
+          onLongPress: () => _enterSelectionMode(key),
+        ),
+      );
+    }
+
+    final item = Padding(
+      key: ValueKey('item_$key'),
+      padding: const EdgeInsets.only(bottom: _cardGap),
+      child: card,
+    );
+    if (!_isIntroActive || index >= _revealedItems) return item;
+    return Reveal(
+      key: ValueKey('reveal_$key'),
+      delay: _revealStagger * (1 + index),
+      duration: _revealDuration,
+      child: item,
     );
   }
 
@@ -223,130 +379,282 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-          child: Column(
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 28),
-              Expanded(
-                child:
-                    _isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : _sessions.isEmpty
-                        ? const _EmptyHistory()
-                        : RefreshIndicator(
-                          color: AppColors.brandPrimary,
-                          backgroundColor: Colors.white,
-                          onRefresh: _fetch,
-                          child: ListView.separated(
-                            physics: const AlwaysScrollableScrollPhysics(
-                              parent: BouncingScrollPhysics(),
-                            ),
-                            padding: EdgeInsets.fromLTRB(0, 0, 0, bottomInset),
-                            itemCount: _sessions.length,
-                            separatorBuilder:
-                                (_, __) => const SizedBox(height: 12),
-                            itemBuilder: (context, index) {
-                              final session = _sessions[index];
-                              final key = _keyOf(session);
-                              final isSelected = _selectedKeys.contains(key);
-
-                              if (_isSelectionMode) {
-                                return _HistoryCard(
-                                  session: session,
-                                  isSelectionMode: true,
-                                  isSelected: isSelected,
-                                  onTap: () => _toggleSelection(key),
-                                );
-                              }
-
-                              return Dismissible(
-                                key: ValueKey(key),
-                                direction: DismissDirection.endToStart,
-                                confirmDismiss:
-                                    (_) => _confirmDeleteSession(session),
-                                onDismissed: (_) {
-                                  final removedIndex = index;
-                                  setState(
-                                    () => _sessions.removeAt(removedIndex),
-                                  );
-                                  ScaffoldMessenger.of(context)
-                                      .showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            '"${session.workoutName}" kaydı silindi',
-                                          ),
-                                          backgroundColor:
-                                              AppColors.brandTertiary,
-                                          behavior: SnackBarBehavior.floating,
-                                          duration: const Duration(seconds: 3),
-                                          action: SnackBarAction(
-                                            label: 'Geri Al',
-                                            textColor: Colors.white,
-                                            onPressed: () {
-                                              setState(
-                                                () => _sessions.insert(
-                                                  removedIndex,
-                                                  session,
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                      )
-                                      .closed
-                                      .then((reason) async {
-                                        if (reason ==
-                                            SnackBarClosedReason.action) {
-                                          return;
-                                        }
-                                        try {
-                                          await WorkoutHistoryRepository.deleteSession(
-                                            session,
-                                          );
-                                        } catch (error) {
-                                          debugPrint(
-                                            'Antrenman kaydı silme hatası: $error',
-                                          );
-                                        }
-                                      });
-                                },
-                                background: Container(
-                                  alignment: Alignment.centerRight,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: const Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                child: _HistoryCard(
-                                  session: session,
-                                  isSelectionMode: false,
-                                  isSelected: false,
-                                  onTap:
-                                      () => context.push(
-                                        '/workout-history-detail',
-                                        extra: session,
-                                      ),
-                                  onLongPress: () => _enterSelectionMode(key),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+      body: RefreshIndicator(
+        color: AppColors.workoutsHero,
+        backgroundColor: Colors.white,
+        onRefresh: _fetch,
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          slivers: [
+            const SliverSafeArea(
+              sliver: SliverToBoxAdapter(child: SizedBox(height: 12)),
+              bottom: false,
+            ),
+            const SliverToBoxAdapter(child: SeriesWordmark()),
+            _buildHeader(),
+            if (_isLoading || _sessions.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    _pagePadding,
+                    0,
+                    _pagePadding,
+                    _cardGap + 4,
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: _heroSwitchDuration,
+                    child: _isLoading ? const _HeroSkeleton() : _buildHero(),
+                  ),
+                ),
               ),
+            if (_isLoading)
+              const SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: _pagePadding),
+                sliver: SliverToBoxAdapter(child: _ListSkeleton()),
+              )
+            else if (_sessions.isEmpty)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: _EmptyHistory(),
+              )
+            else ...[
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: _pagePadding),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _buildSessionItem(index),
+                    childCount: _sessions.length,
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(child: SizedBox(height: bottomInset)),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+BoxDecoration _cardDecoration(double radius) => BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(radius),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.04),
+      blurRadius: 16,
+      offset: const Offset(0, 4),
+    ),
+  ],
+);
+
+/// 44px dairesel ikon butonu (Programlar'daki `_GlassIconButton` ile aynı ölçü).
+class _CircleIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  const _CircleIconButton({required this.icon, this.onTap});
+
+  static const double size = 44;
+  static const double _pressedScale = 0.92;
+
+  @override
+  Widget build(BuildContext context) {
+    final circle = Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(
+        color: AppColors.fillSubtle,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, size: 20, color: AppColors.workoutsHero),
+    );
+    if (onTap == null) return circle;
+    return PressableScale(
+      pressedScale: _pressedScale,
+      onTap: onTap,
+      child: circle,
+    );
+  }
+}
+
+/// Üç nokta menüsü: aynı daire buton görünümü, ripple yok.
+class _MenuButton extends StatelessWidget {
+  final PopupMenuItemSelected<String> onSelected;
+  final PopupMenuItemBuilder<String> itemBuilder;
+
+  const _MenuButton({required this.onSelected, required this.itemBuilder});
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+      ),
+      child: PopupMenuButton<String>(
+        padding: EdgeInsets.zero,
+        color: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        onSelected: onSelected,
+        itemBuilder: itemBuilder,
+        child: const _CircleIconButton(icon: CupertinoIcons.ellipsis),
+      ),
+    );
+  }
+}
+
+class _SummaryHero extends StatelessWidget {
+  final int workouts;
+  final int sets;
+  final int thisWeek;
+
+  const _SummaryHero({
+    required this.workouts,
+    required this.sets,
+    required this.thisWeek,
+  });
+
+  static const double radius = 24;
+  static const double height = 112;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const ValueKey('summary_hero'),
+      height: height,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppColors.workoutsHero, AppColors.workoutsHeroDeep],
+        ),
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.workoutsHero.withValues(alpha: 0.28),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _Stat(value: workouts, label: 'Antrenman')),
+          const _StatDivider(),
+          Expanded(child: _Stat(value: sets, label: 'Set')),
+          const _StatDivider(),
+          Expanded(
+            child: _Stat(
+              value: thisWeek,
+              label: 'Bu hafta',
+              valueColor: AppColors.accentGold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  final int value;
+  final String label;
+  final Color valueColor;
+
+  const _Stat({
+    required this.value,
+    required this.label,
+    this.valueColor = AppColors.onHeroDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          '$value',
+          style: AppTypography.heading1.copyWith(
+            color: valueColor,
+            fontSize: 32,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.6,
           ),
         ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: AppTypography.body12Medium.copyWith(
+            color: AppColors.onHeroDark.withValues(alpha: 0.7),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatDivider extends StatelessWidget {
+  const _StatDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 40,
+      color: AppColors.onHeroDark.withValues(alpha: 0.14),
+    );
+  }
+}
+
+class _HeroSkeleton extends StatelessWidget {
+  const _HeroSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: AppColors.borderSubtle,
+      highlightColor: Colors.white,
+      child: Container(
+        key: const ValueKey('hero_skeleton'),
+        height: _SummaryHero.height,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(_SummaryHero.radius),
+        ),
+      ),
+    );
+  }
+}
+
+class _ListSkeleton extends StatelessWidget {
+  const _ListSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: AppColors.borderSubtle,
+      highlightColor: Colors.white,
+      child: Column(
+        children: [
+          for (var i = 0; i < _WorkoutsScreenState._skeletonCount; i++)
+            Container(
+              height: _HistoryCard.height,
+              margin: const EdgeInsets.only(
+                bottom: _WorkoutsScreenState._cardGap,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(_HistoryCard.radius),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -404,6 +712,10 @@ class _HistoryCard extends StatelessWidget {
     this.onLongPress,
   });
 
+  static const double radius = 20;
+  static const double height = 94;
+  static const double _selectedBorderWidth = 2;
+
   @override
   Widget build(BuildContext context) {
     final dateLabel = DateFormat(
@@ -411,86 +723,87 @@ class _HistoryCard extends StatelessWidget {
       'tr_TR',
     ).format(session.completedAt);
 
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color:
-                  isSelected
-                      ? AppColors.brandPrimary
-                      : AppColors.brandSecondary,
-              width: isSelected ? 2 : 1,
-            ),
-            borderRadius: BorderRadius.circular(20),
+    return PressableScale(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: _cardDecoration(radius),
+        // Seçim çerçevesi layout'u kaydırmasın diye hep var, seçili değilken şeffaf.
+        foregroundDecoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(
+            color: isSelected ? AppColors.workoutsHero : Colors.transparent,
+            width: _selectedBorderWidth,
           ),
-          child: Row(
-            children: [
-              if (isSelectionMode) ...[
-                Icon(
-                  isSelected ? Icons.check_circle : Icons.circle_outlined,
+        ),
+        child: Row(
+          children: [
+            if (isSelectionMode)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Icon(
+                  isSelected
+                      ? CupertinoIcons.checkmark_circle_fill
+                      : CupertinoIcons.circle,
                   color:
                       isSelected
-                          ? AppColors.brandPrimary
+                          ? AppColors.workoutsHero
                           : AppColors.textTertiary,
                 ),
-                const SizedBox(width: 12),
-              ] else ...[
-                Container(
-                  width: 44,
-                  height: 44,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.background,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.check_circle,
-                    color: AppColors.brandPrimary,
-                    size: 22,
-                  ),
+              )
+            else
+              Container(
+                width: 44,
+                height: 44,
+                margin: const EdgeInsets.only(right: 12),
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: AppColors.fillSubtle,
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(width: 12),
-              ],
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      session.workoutName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.body16Medium.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      dateLabel,
-                      style: AppTypography.body12Regular.copyWith(
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${session.exerciseCount} egzersiz · ${session.setCount} set',
-                      style: AppTypography.body12Medium.copyWith(
-                        color: AppColors.brandPrimary,
-                      ),
-                    ),
-                  ],
+                child: const Icon(
+                  CupertinoIcons.checkmark_alt_circle_fill,
+                  color: AppColors.success,
+                  size: 22,
                 ),
               ),
-              if (!isSelectionMode)
-                Icon(Icons.chevron_right, color: AppColors.textTertiary),
-            ],
-          ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    session.workoutName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.body16Medium.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    dateLabel,
+                    style: AppTypography.body12Regular.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${session.exerciseCount} egzersiz · ${session.setCount} set',
+                    style: AppTypography.body12Medium.copyWith(
+                      color: AppColors.workoutsAccent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (!isSelectionMode)
+              const Icon(
+                CupertinoIcons.chevron_right,
+                size: 16,
+                color: AppColors.textTertiary,
+              ),
+          ],
         ),
       ),
     );

@@ -21,6 +21,11 @@ class AppColors {
   static const Color warning = accentDeep;
   static const Color error = Color(0xFFB3261E);
 
+  // Antrenmanlar ekranı (ardıç yeşili)
+  static const Color workoutsHero = Color(0xFF24382E);
+  static const Color workoutsHeroDeep = Color(0xFF141F19);
+  static const Color workoutsAccent = Color(0xFF2F5D46);
+
   // --- Eski palet (migrasyon bitince silinecek) ---
   static const Color brandPrimary = Color(0xFF960000); // ana bordo
   static const Color brandSecondary = Color(0xFFD8D8D8);
