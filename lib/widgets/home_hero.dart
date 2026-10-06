@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
+import 'kiremit_hero_surface.dart';
 import 'pressable_scale.dart';
 import 'series_wordmark.dart';
 
@@ -36,141 +37,67 @@ class HomeHero extends StatelessWidget {
   });
 
   static const double _pagePadding = 20;
-  static const double _radius = 32;
   static const double _ctaHeight = 54;
-  // Işığın üstten ne kadarlık kısmında (hero yüksekliğinin oranı) soluk başladığı.
-  static const double _glowFadeStop = 0.4;
   static const Duration _switchDuration = Duration(milliseconds: 350);
 
   @override
   Widget build(BuildContext context) {
     final hasWorkout = workoutName != null;
 
-    final hero = Container(
-      key: heroKey,
-      width: double.infinity,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppColors.homeHero, AppColors.homeHeroDeep],
+    return KiremitHeroSurface(
+      heroKey: heroKey,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          _pagePadding,
+          MediaQuery.paddingOf(context).top + 12,
+          _pagePadding,
+          hasWorkout || isLoading ? 20 : 28,
         ),
-        borderRadius: const BorderRadius.vertical(
-          bottom: Radius.circular(_radius),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.homeHeroDeep.withValues(alpha: 0.5),
-            blurRadius: 40,
-            spreadRadius: -18,
-            offset: const Offset(0, 24),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Sağ üstten gelen yumuşak ışık. Üst kenarda şeffafa solar: aşağı
-          // çekince (refresh/bounce) hero'nun üstündeki düz renkli bloğa
-          // bıçak gibi bir kesik olmadan bağlanır.
-          Positioned.fill(
-            child: IgnorePointer(
-              child: ShaderMask(
-                blendMode: BlendMode.dstIn,
-                shaderCallback:
-                    (rect) => const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Colors.black],
-                      stops: [0, _glowFadeStop],
-                    ).createShader(rect),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: const Alignment(0.95, -0.6),
-                      radius: 1.35,
-                      colors: [
-                        AppColors.homeHeroGlow,
-                        AppColors.homeHeroGlow.withValues(alpha: 0),
-                      ],
-                    ),
-                  ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SeriesWordmark(color: AppColors.onHeroDark.withValues(alpha: 0.9)),
+            const SizedBox(height: 22),
+            Text(
+              'Hoş geldin',
+              style: AppTypography.body18Medium.copyWith(
+                color: AppColors.onHeroDark.withValues(alpha: 0.65),
+              ),
+            ),
+            const SizedBox(height: 2),
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOut,
+              opacity: firstName.isEmpty ? 0 : 1,
+              child: Text(
+                // Boşken de bir satır yüksekliği korunsun diye ' ' kullanıyoruz
+                firstName.isEmpty ? ' ' : firstName,
+                style: AppTypography.heading1.copyWith(
+                  color: AppColors.onHeroDark,
+                  fontSize: 36,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -1,
                 ),
               ),
             ),
-          ),
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              _pagePadding,
-              MediaQuery.paddingOf(context).top + 12,
-              _pagePadding,
-              hasWorkout || isLoading ? 20 : 28,
+            AnimatedSwitcher(
+              duration: _switchDuration,
+              child:
+                  isLoading
+                      ? const _WorkoutSkeleton()
+                      : hasWorkout
+                      ? _WorkoutBlock(
+                        name: workoutName!,
+                        exerciseCount: exerciseCount,
+                        durationMin: durationMin,
+                        onStart: onStart,
+                        footer: footer,
+                      )
+                      : const SizedBox.shrink(),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SeriesWordmark(
-                  color: AppColors.onHeroDark.withValues(alpha: 0.9),
-                ),
-                const SizedBox(height: 22),
-                Text(
-                  'Hoş geldin',
-                  style: AppTypography.body18Medium.copyWith(
-                    color: AppColors.onHeroDark.withValues(alpha: 0.65),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                AnimatedOpacity(
-                  duration: const Duration(milliseconds: 350),
-                  curve: Curves.easeOut,
-                  opacity: firstName.isEmpty ? 0 : 1,
-                  child: Text(
-                    // Boşken de bir satır yüksekliği korunsun diye ' ' kullanıyoruz
-                    firstName.isEmpty ? ' ' : firstName,
-                    style: AppTypography.heading1.copyWith(
-                      color: AppColors.onHeroDark,
-                      fontSize: 36,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -1,
-                    ),
-                  ),
-                ),
-                AnimatedSwitcher(
-                  duration: _switchDuration,
-                  child:
-                      isLoading
-                          ? const _WorkoutSkeleton()
-                          : hasWorkout
-                          ? _WorkoutBlock(
-                            name: workoutName!,
-                            exerciseCount: exerciseCount,
-                            durationMin: durationMin,
-                            onStart: onStart,
-                            footer: footer,
-                          )
-                          : const SizedBox.shrink(),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-
-    // Üst kenar boşluğa çekilince (bounce) hero'nun üstü açık kalmasın diye
-    // aynı renkte uzun bir blok.
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Positioned(
-          top: -MediaQuery.sizeOf(context).height,
-          left: 0,
-          right: 0,
-          height: MediaQuery.sizeOf(context).height,
-          child: const ColoredBox(color: AppColors.homeHero),
+          ],
         ),
-        hero,
-      ],
+      ),
     );
   }
 }

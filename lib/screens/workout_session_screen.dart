@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
@@ -9,12 +10,15 @@ import '../widgets/app_confirm_dialog.dart';
 import '../models/program.dart';
 import '../models/set_log.dart';
 import '../services/exercise_log_repository.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shimmer/shimmer.dart';
 import '../models/workout_history.dart';
 import '../models/exercise.dart';
 import '../services/exercise_service.dart';
 import 'workouts_screen.dart'; // workoutRefreshNotifier'ı kullanabilmek için
+import '../widgets/detail_hero.dart' show HeroStatusBarScope;
 import '../widgets/exercise_timer_widget.dart';
+import '../widgets/kiremit_hero_surface.dart';
+import '../widgets/pressable_scale.dart';
 import '../utils/exercise_name.dart';
 import 'package:audioplayers/audioplayers.dart';
 
@@ -635,404 +639,506 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     );
   }
 
-  Widget _buildExerciseView() {
-    return Scaffold(
-      backgroundColor: AppColors.textSecondary,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            child: Column(
-              children: [
-                // 1. ÜST BAR (Timer ve Bitir Butonu)
-                _buildSessionBar(Colors.white),
-                const SizedBox(height: 16),
+  // --- Hareket ekranı (kiremit hero + krem kart) ---
+  static const double _pagePadding = 20;
+  static const double _gifHeight = 200;
+  // GIF kartının kiremit hero'nun üstüne taşan kısmı.
+  static const double _gifOverlap = 56;
+  static const double _ctaHeight = 64;
+  static const double _chevronSize = 52;
 
-                // 2. ÜST BEYAZ KART (Hareket Adı ve 180x180 GIF Alanı)
-                // 2. ÜST BEYAZ KART (Hareket Adı, Metin/GIF ve Opsiyonel Timer)
-                Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 20,
-                    horizontal: 16,
+  Widget _buildExerciseView() {
+    final bottomSafe = MediaQuery.paddingOf(context).bottom;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: HeroStatusBarScope(
+        builder:
+            (context, heroKey) => Stack(
+              children: [
+                SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: EdgeInsets.only(
+                    bottom: _ctaHeight + bottomSafe + 56,
                   ),
                   child: Column(
                     children: [
-                      Text(
-                        _currentExercise.name.toUpperCase(),
-                        style: AppTypography.heading2.copyWith(
-                          color: AppColors.brandPrimary,
+                      _buildExerciseHero(heroKey),
+                      _buildGifCard(),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          _pagePadding,
+                          20,
+                          _pagePadding,
+                          0,
                         ),
-                        textAlign: TextAlign.center,
+                        child: _buildSetArea(),
                       ),
-                      const SizedBox(height: 16),
-
-                      // -- GIF VEYA TALİMAT METNİ ALANI --
-                      // NOT: _currentExercise.instructions kısmını senin backend/Flutter modelindeki değişken adına göre değiştirebilirsin.
-                      if (_currentExercise.instructions != null &&
-                          _currentExercise.instructions!.isNotEmpty)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.background,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            _currentExercise.instructions!,
-                            style: AppTypography.body14Regular.copyWith(
-                              color: AppColors.textPrimary,
-                              height: 1.5,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        )
-                      else
-                        // Orijinal 180x180 GIF Yükleme Alanı
-                        SizedBox(
-                          width: 180,
-                          height: 180,
-                          child: Center(
-                            child:
-                                _isLoadingGif
-                                    ? const CircularProgressIndicator(
-                                      color: AppColors.brandPrimary,
-                                    )
-                                    : (_apiExerciseInfo == null
-                                        ? Icon(
-                                          Icons.fitness_center,
-                                          size: 50,
-                                          color: Colors.grey[400],
-                                        )
-                                        : ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          child: Image.network(
-                                            _apiExerciseInfo!.gifUrl,
-                                            width: 180,
-                                            height: 180,
-                                            fit: BoxFit.cover,
-                                            gaplessPlayback: true,
-                                          ),
-                                        )),
-                          ),
-                        ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: _buildDock(bottomSafe),
+                ),
+              ],
+            ),
+      ),
+    );
+  }
 
-                // 3. ALT BEYAZ KART (Süreli hareketse Timer, normal hareketse Tekrar/Ağırlık kutuları)
+  Widget _buildExerciseHero(GlobalKey heroKey) {
+    final total = widget.workout.exercises.length;
+    return KiremitHeroSurface(
+      heroKey: heroKey,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          _pagePadding,
+          MediaQuery.paddingOf(context).top + 8,
+          _pagePadding,
+          _gifOverlap + 24,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildTopBar(),
+            const SizedBox(height: 14),
+            _buildProgressSegments(total),
+            const SizedBox(height: 18),
+            Row(
+              children: [
                 Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: AppColors.accentGold,
+                    shape: BoxShape.circle,
                   ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 24,
-                  ),
-                  child:
-                      _getExerciseDuration(_currentExercise) > 0
-                          ? Column(
-                            children: [
-                              Text(
-                                'SÜRELİ HAREKET',
-                                style: AppTypography.body12Medium.copyWith(
-                                  color: Colors.grey[500],
-                                  letterSpacing: 1.2,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              // Burada bağımsız timer widget'ımızı çalıştırıyoruz
-                              ExerciseTimerWidget(
-                                durationSeconds: _getExerciseDuration(
-                                  _currentExercise,
-                                ),
-                                onComplete: _playBell,
-                              ),
-                            ],
-                          )
-                          : Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              // SOL TARAF: Set 1/3
-                              Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Set:',
-                                    style: AppTypography.body14Regular.copyWith(
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${_setIndex + 1}/${_currentExercise.sets}',
-                                    style: AppTypography.heading1.copyWith(
-                                      color: AppColors.brandPrimary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const Spacer(),
-                              // SAĞ TARAF: Tekrar ve Ağırlık Kutuları
-                              Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '${_currentExercise.sets} SET ${_currentExercise.reps} TEKRAR',
-                                    style: AppTypography.heading3.copyWith(
-                                      color: AppColors.brandPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      SizedBox(
-                                        width: 95,
-                                        child: TextField(
-                                          controller: _repsController,
-                                          textAlign: TextAlign.center,
-                                          keyboardType: TextInputType.number,
-                                          style: AppTypography.body14Medium
-                                              .copyWith(
-                                                color: Colors.grey[800],
-                                              ),
-                                          decoration: InputDecoration(
-                                            labelText: 'TEKRAR',
-                                            labelStyle: AppTypography
-                                                .body12Medium
-                                                .copyWith(
-                                                  color: Colors.grey[500],
-                                                ),
-                                            floatingLabelAlignment:
-                                                FloatingLabelAlignment.center,
-                                            floatingLabelBehavior:
-                                                FloatingLabelBehavior.always,
-                                            isDense: true,
-                                            hintText:
-                                                _lastPerformanceForCurrentSet !=
-                                                        null
-                                                    ? '${_lastPerformanceForCurrentSet!.repsPerformed} (önceki)'
-                                                    : _currentExercise.reps
-                                                        .toString(),
-                                            hintStyle: AppTypography
-                                                .body12Medium
-                                                .copyWith(
-                                                  color: Colors.grey[400],
-                                                ),
-                                            contentPadding:
-                                                const EdgeInsets.symmetric(
-                                                  horizontal: 4,
-                                                  vertical: 8,
-                                                ),
-                                            enabledBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(30),
-                                              borderSide: BorderSide(
-                                                color: Colors.grey[300]!,
-                                                width: 1.5,
-                                              ),
-                                            ),
-                                            focusedBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(30),
-                                              borderSide: BorderSide(
-                                                color: AppColors.brandPrimary,
-                                                width: 1.5,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      SizedBox(
-                                        width: 95,
-                                        child: TextField(
-                                          controller: _weightController,
-                                          textAlign: TextAlign.center,
-                                          keyboardType:
-                                              const TextInputType.numberWithOptions(
-                                                decimal: true,
-                                              ),
-                                          style: AppTypography.body14Medium
-                                              .copyWith(
-                                                color: Colors.grey[800],
-                                              ),
-                                          decoration: InputDecoration(
-                                            labelText: 'AĞIRLIK (KG)',
-                                            labelStyle: AppTypography
-                                                .body12Medium
-                                                .copyWith(
-                                                  color: Colors.grey[500],
-                                                ),
-                                            floatingLabelAlignment:
-                                                FloatingLabelAlignment.center,
-                                            floatingLabelBehavior:
-                                                FloatingLabelBehavior.always,
-                                            isDense: true,
-                                            hintText:
-                                                _lastPerformanceForCurrentSet !=
-                                                        null
-                                                    ? '${_formatWeight(_lastPerformanceForCurrentSet!.weightUsed)} (önceki)'
-                                                    : '0',
-                                            hintStyle: AppTypography
-                                                .body12Medium
-                                                .copyWith(
-                                                  color: Colors.grey[400],
-                                                ),
-                                            contentPadding:
-                                                const EdgeInsets.symmetric(
-                                                  horizontal: 4,
-                                                  vertical: 8,
-                                                ),
-                                            enabledBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(30),
-                                              borderSide: BorderSide(
-                                                color: Colors.grey[300]!,
-                                                width: 1.5,
-                                              ),
-                                            ),
-                                            focusedBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(30),
-                                              borderSide: BorderSide(
-                                                color: AppColors.brandPrimary,
-                                                width: 1.5,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(width: 7),
+                Text(
+                  'HAREKET ${_exerciseIndex + 1} / $total',
+                  style: AppTypography.body12Medium.copyWith(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 10,
+                    letterSpacing: 1.8,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              formatExerciseName(_currentExercise.name),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.heading1.copyWith(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.9,
+                height: 1.12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-                // 4. SIRADAKİ HAREKET METNİ
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Sıradaki:',
-                        style: AppTypography.body14Regular.copyWith(
-                          color: Colors.white70,
-                        ),
-                      ),
-                      Flexible(
+  // Üç eşit sütun: süre hapı sağdaki grubun genişliğinden etkilenmeden tam ortada.
+  Widget _buildTopBar() {
+    return Row(
+      children: [
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: _GlassCircleButton(
+              icon: Icons.format_list_bulleted_rounded,
+              onTap: _showExerciseListSheet,
+            ),
+          ),
+        ),
+        Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.timer_outlined, size: 16, color: Colors.white),
+              const SizedBox(width: 6),
+              Text(
+                _formatDuration(_elapsedSeconds),
+                style: AppTypography.body14Medium.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _GlassCircleButton(
+                  icon:
+                      _isPaused
+                          ? Icons.play_arrow_rounded
+                          : Icons.pause_rounded,
+                  onTap: _togglePause,
+                ),
+                PressableScale(
+                  pressedScale: 0.94,
+                  onTap: _handleFinishTap,
+                  child: SizedBox(
+                    height: 44,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 12),
+                      child: Center(
                         child: Text(
-                          _nextPreviewLabel(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.right,
-                          style: AppTypography.body14Regular.copyWith(
-                            color: Colors.white70,
+                          'Bitir',
+                          style: AppTypography.body14Medium.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 20),
-
-                // 5. ALT KONTROLLER (Oklar ve Onay Butonu)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      onPressed:
-                          _exerciseIndex > 0
-                              ? () => _goToExercise(_exerciseIndex - 1)
-                              : null,
-                      icon: Icon(
-                        Icons.chevron_left,
-                        color: Colors.white.withValues(
-                          alpha: _exerciseIndex > 0 ? 1 : 0.3,
-                        ),
-                        size: 40,
-                      ),
-                    ),
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.15),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: IconButton(
-                        onPressed: _isPaused ? null : _confirmSet,
-                        icon: Opacity(
-                          opacity: _isPaused ? 0.4 : 1.0,
-                          child: SvgPicture.asset(
-                            'assets/images/check_icon.svg',
-                            width: 36,
-                            height: 36,
-                          ),
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed:
-                          _exerciseIndex < widget.workout.exercises.length - 1
-                              ? () => _goToExercise(_exerciseIndex + 1)
-                              : null,
-                      icon: Icon(
-                        Icons.chevron_right,
-                        color: Colors.white.withValues(
-                          alpha:
-                              _exerciseIndex <
-                                      widget.workout.exercises.length - 1
-                                  ? 1
-                                  : 0.3,
-                        ),
-                        size: 40,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
               ],
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  // Hareket başına bir segment: bitenler altın dolu, mevcut hareket set
+  // ilerlemesi kadar dolu.
+  Widget _buildProgressSegments(int total) {
+    return Row(
+      children: [
+        for (var i = 0; i < total; i++)
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(left: i == 0 ? 0 : 4),
+              child: _ProgressSegment(
+                fill:
+                    i < _exerciseIndex
+                        ? 1
+                        : (i == _exerciseIndex
+                            ? _setIndex / _currentExercise.sets
+                            : 0),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // GIF kartı: kiremit hero ile krem zeminin sınırına oturur. Align'ın
+  // heightFactor'ı yerleşimde yalnızca altta kalan kısmı yer kaplatır, kartın
+  // üst kısmı hero'nun üstüne taşar.
+  Widget _buildGifCard() {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      heightFactor: (_gifHeight - _gifOverlap) / _gifHeight,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: _pagePadding),
+        child: Container(
+          height: _gifHeight,
+          width: double.infinity,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.homeHeroDeep.withValues(alpha: 0.18),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: _buildGifContent(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGifContent() {
+    // GIF yerine talimat metni (mevcut davranış)
+    if (_currentExercise.instructions != null &&
+        _currentExercise.instructions!.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(20),
+        child: Center(
+          child: SingleChildScrollView(
+            child: Text(
+              _currentExercise.instructions!,
+              textAlign: TextAlign.center,
+              style: AppTypography.body14Regular.copyWith(
+                color: AppColors.textPrimary,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child:
+          _isLoadingGif
+              ? Shimmer.fromColors(
+                key: const ValueKey('gif_loading'),
+                baseColor: AppColors.fillSubtle,
+                highlightColor: Colors.white,
+                child: Container(color: Colors.white),
+              )
+              : (_apiExerciseInfo == null
+                  ? Center(
+                    key: const ValueKey('gif_empty'),
+                    child: Icon(
+                      Icons.fitness_center_rounded,
+                      size: 52,
+                      color: AppColors.homeHero.withValues(alpha: 0.35),
+                    ),
+                  )
+                  : Padding(
+                    key: ValueKey(_apiExerciseInfo!.gifUrl),
+                    padding: const EdgeInsets.all(12),
+                    child: Image.network(
+                      _apiExerciseInfo!.gifUrl,
+                      fit: BoxFit.contain,
+                      gaplessPlayback: true,
+                    ),
+                  )),
+    );
+  }
+
+  Widget _buildSetArea() {
+    final exercise = _currentExercise;
+    final isTimed = _getExerciseDuration(exercise) > 0;
+    final last = _lastPerformanceForCurrentSet;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (isTimed)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Text(
+                  'SÜRELİ HAREKET',
+                  style: AppTypography.body12Medium.copyWith(
+                    color: AppColors.textTertiary,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Burada bağımsız timer widget'ımızı çalıştırıyoruz
+                ExerciseTimerWidget(
+                  durationSeconds: _getExerciseDuration(exercise),
+                  onComplete: _playBell,
+                ),
+              ],
+            ),
+          )
+        else ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: '${_setIndex + 1}'),
+                        TextSpan(
+                          text: ' / ${exercise.sets}',
+                          style: AppTypography.body18Medium.copyWith(
+                            color: AppColors.textTertiary,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0,
+                          ),
+                        ),
+                      ],
+                    ),
+                    style: AppTypography.heading1.copyWith(
+                      color: AppColors.textPrimary,
+                      fontSize: 44,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -1.8,
+                      height: 1,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _SetDots(total: exercise.sets, current: _setIndex),
+                ],
+              ),
+              const Spacer(),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'hedef',
+                    style: AppTypography.body12Regular.copyWith(
+                      color: AppColors.textTertiary,
+                      height: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${exercise.sets} × ${exercise.reps}',
+                    style: AppTypography.heading3.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.4,
+                      height: 1,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: _SetField(
+                  label: 'TEKRAR',
+                  controller: _repsController,
+                  keyboardType: TextInputType.number,
+                  hintText:
+                      last != null
+                          ? '${last.repsPerformed} (önceki)'
+                          : exercise.reps.toString(),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _SetField(
+                  label: 'AĞIRLIK (KG)',
+                  controller: _weightController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  hintText:
+                      last != null
+                          ? '${_formatWeight(last.weightUsed)} (önceki)'
+                          : '0',
+                ),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 20),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Sıradaki:',
+              style: AppTypography.body14Regular.copyWith(
+                color: AppColors.textTertiary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Text(
+                _nextPreviewLabel(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: AppTypography.body14Medium.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // Alt dock: iki chevron dairesi ve ortada esneyen altın "Seti Tamamla"
+  // butonu; üç eleman aynı dikey eksende. Arkasında listenin kesik görünmemesi
+  // için yumuşak geçiş.
+  Widget _buildDock(double bottomSafe) {
+    final canGoPrev = _exerciseIndex > 0;
+    final canGoNext = _exerciseIndex < widget.workout.exercises.length - 1;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppColors.background.withValues(alpha: 0),
+            AppColors.background,
+          ],
+          stops: const [0, 0.4],
+        ),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          _pagePadding,
+          32,
+          _pagePadding,
+          bottomSafe + 16,
+        ),
+        child: Row(
+          children: [
+            _DockChevron(
+              icon: Icons.chevron_left_rounded,
+              size: _chevronSize,
+              onTap: canGoPrev ? () => _goToExercise(_exerciseIndex - 1) : null,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _SetCta(
+                height: _ctaHeight,
+                onTap:
+                    _isPaused
+                        ? null
+                        : () {
+                          HapticFeedback.mediumImpact();
+                          _confirmSet();
+                        },
+              ),
+            ),
+            const SizedBox(width: 10),
+            _DockChevron(
+              icon: Icons.chevron_right_rounded,
+              size: _chevronSize,
+              onTap: canGoNext ? () => _goToExercise(_exerciseIndex + 1) : null,
+            ),
+          ],
         ),
       ),
     );
@@ -1183,6 +1289,295 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                 const SizedBox(height: 8),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Hero üzerindeki 44px yarı saydam beyaz daire buton.
+class _GlassCircleButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _GlassCircleButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      pressedScale: 0.92,
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.14),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, size: 22, color: Colors.white),
+      ),
+    );
+  }
+}
+
+class _ProgressSegment extends StatelessWidget {
+  final double fill;
+
+  const _ProgressSegment({required this.fill});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: fill.clamp(0.0, 1.0)),
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+      builder:
+          (context, value, _) => ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: Container(
+              height: 4,
+              color: Colors.white.withValues(alpha: 0.2),
+              alignment: Alignment.centerLeft,
+              child: FractionallySizedBox(
+                widthFactor: value,
+                heightFactor: 1,
+                child: const ColoredBox(color: AppColors.accentGold),
+              ),
+            ),
+          ),
+    );
+  }
+}
+
+/// Set göstergesi: bitenler ve mevcut set kiremit dolu, kalanlar silik.
+class _SetDots extends StatelessWidget {
+  final int total;
+  final int current;
+
+  const _SetDots({required this.total, required this.current});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < total; i++)
+          Padding(
+            padding: EdgeInsets.only(left: i == 0 ? 0 : 6),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+              width: 22,
+              height: 6,
+              decoration: BoxDecoration(
+                color:
+                    i <= current ? AppColors.homeHero : AppColors.borderSubtle,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Tekrar / ağırlık kutusu: beyaz kart, üstte küçük etiket, altta büyük rakam.
+/// Odakta çerçeve kiremit olur.
+class _SetField extends StatefulWidget {
+  final String label;
+  final TextEditingController controller;
+  final TextInputType keyboardType;
+  final String hintText;
+
+  const _SetField({
+    required this.label,
+    required this.controller,
+    required this.keyboardType,
+    required this.hintText,
+  });
+
+  @override
+  State<_SetField> createState() => _SetFieldState();
+}
+
+class _SetFieldState extends State<_SetField> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final focused = _focusNode.hasFocus;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _focusNode.requestFocus,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        height: 68,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: focused ? AppColors.homeHero : AppColors.borderSubtle,
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color:
+                  focused
+                      ? AppColors.homeHero.withValues(alpha: 0.12)
+                      : Colors.black.withValues(alpha: 0.03),
+              blurRadius: focused ? 16 : 8,
+              offset: Offset(0, focused ? 6 : 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              widget.label,
+              style: AppTypography.body12Medium.copyWith(
+                color: AppColors.textTertiary,
+                fontSize: 10,
+                letterSpacing: 1.2,
+                height: 1,
+              ),
+            ),
+            TextField(
+              controller: widget.controller,
+              focusNode: _focusNode,
+              keyboardType: widget.keyboardType,
+              cursorColor: AppColors.homeHero,
+              style: AppTypography.heading2.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.6,
+                height: 1,
+              ),
+              decoration: InputDecoration(
+                hintText: widget.hintText,
+                hintStyle: AppTypography.body14Medium.copyWith(
+                  color: AppColors.textTertiary.withValues(alpha: 0.7),
+                  height: 1,
+                ),
+                border: InputBorder.none,
+                isCollapsed: true,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DockChevron extends StatelessWidget {
+  final IconData icon;
+  final double size;
+  final VoidCallback? onTap;
+
+  const _DockChevron({
+    required this.icon,
+    required this.size,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Opacity(
+      opacity: enabled ? 1 : 0.4,
+      child: PressableScale(
+        pressedScale: 0.92,
+        onTap: onTap,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Icon(icon, size: 28, color: AppColors.homeHero),
+        ),
+      ),
+    );
+  }
+}
+
+/// Ana eylem: altın "Seti Tamamla" pill'i. Duraklatıldığında soluk ve basılamaz.
+class _SetCta extends StatelessWidget {
+  final double height;
+  final VoidCallback? onTap;
+
+  const _SetCta({required this.height, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Opacity(
+      opacity: enabled ? 1 : 0.45,
+      child: PressableScale(
+        pressedScale: 0.97,
+        haptics: false,
+        onTap: onTap,
+        child: Container(
+          height: height,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFEDC36C), AppColors.accentGold],
+            ),
+            borderRadius: BorderRadius.circular(height / 2),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.accentGold.withValues(alpha: 0.45),
+                blurRadius: 24,
+                spreadRadius: -4,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.check_rounded,
+                size: 26,
+                color: AppColors.espresso,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Seti Tamamla',
+                style: AppTypography.body16Medium.copyWith(
+                  color: AppColors.espresso,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
         ),
       ),
