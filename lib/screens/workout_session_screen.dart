@@ -641,7 +641,13 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
 
   // --- Hareket ekranı (kiremit hero + krem kart) ---
   static const double _pagePadding = 20;
-  static const double _gifHeight = 200;
+  // GIF kartı ve bölüm boşlukları ekran yüksekliğine göre büyür; uzun ekranda
+  // içerik ile dock arası boş kalmasın. Alt/üst sınırlar küçük ekranı korur.
+  static const double _gifMinHeight = 200;
+  static const double _gifMaxHeight = 300;
+  static const double _gifHeightRatio = 0.34;
+  static const double _sectionGapMax = 32;
+  static const double _sectionGapRatio = 0.03;
   // GIF kartının kiremit hero'nun üstüne taşan kısmı.
   static const double _gifOverlap = 56;
   static const double _ctaHeight = 64;
@@ -653,6 +659,15 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
 
   Widget _buildExerciseView() {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final gifHeight = (screenHeight * _gifHeightRatio).clamp(
+      _gifMinHeight,
+      _gifMaxHeight,
+    );
+    final sectionGap = (screenHeight * _sectionGapRatio).clamp(
+      _sectionGap,
+      _sectionGapMax,
+    );
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -667,20 +682,20 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                   physics: const BouncingScrollPhysics(),
                   padding: EdgeInsets.only(
                     bottom:
-                        _ctaHeight + bottomSafe + _dockBottomGap + _sectionGap,
+                        _ctaHeight + bottomSafe + _dockBottomGap + sectionGap,
                   ),
                   child: Column(
                     children: [
                       _buildExerciseHero(heroKey),
-                      _buildGifCard(),
+                      _buildGifCard(gifHeight),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(
+                        padding: EdgeInsets.fromLTRB(
                           _pagePadding,
-                          _sectionGap,
+                          sectionGap,
                           _pagePadding,
                           0,
                         ),
-                        child: _buildSetArea(),
+                        child: _buildSetArea(sectionGap),
                       ),
                     ],
                   ),
@@ -857,14 +872,14 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   // GIF kartı: kiremit hero ile krem zeminin sınırına oturur. Align'ın
   // heightFactor'ı yerleşimde yalnızca altta kalan kısmı yer kaplatır, kartın
   // üst kısmı hero'nun üstüne taşar.
-  Widget _buildGifCard() {
+  Widget _buildGifCard(double gifHeight) {
     return Align(
       alignment: Alignment.bottomCenter,
-      heightFactor: (_gifHeight - _gifOverlap) / _gifHeight,
+      heightFactor: (gifHeight - _gifOverlap) / gifHeight,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: _pagePadding),
         child: Container(
-          height: _gifHeight,
+          height: gifHeight,
           width: double.infinity,
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
@@ -936,7 +951,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     );
   }
 
-  Widget _buildSetArea() {
+  Widget _buildSetArea(double sectionGap) {
     final exercise = _currentExercise;
     final isTimed = _getExerciseDuration(exercise) > 0;
     final last = _lastPerformanceForCurrentSet;
@@ -1035,7 +1050,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
               ),
             ],
           ),
-          const SizedBox(height: _sectionGap),
+          SizedBox(height: sectionGap),
           Row(
             children: [
               Expanded(
@@ -1066,7 +1081,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
             ],
           ),
         ],
-        const SizedBox(height: _sectionGap),
+        SizedBox(height: sectionGap),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
