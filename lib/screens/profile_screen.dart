@@ -6,6 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/app_confirm_dialog.dart';
+import '../widgets/detail_hero.dart' show HeroStatusBarScope;
+import '../widgets/kiremit_hero_surface.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/reveal.dart';
 import '../widgets/screen_title_block.dart';
@@ -130,91 +132,107 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(
-          parent: AlwaysScrollableScrollPhysics(),
-        ),
-        slivers: [
-          const SliverSafeArea(
-            sliver: SliverToBoxAdapter(child: SizedBox(height: 12)),
-            bottom: false,
-          ),
-          const SliverToBoxAdapter(child: SeriesWordmark()),
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(_pagePadding, 16, _pagePadding, 16),
-              child: ScreenTitleBlock(eyebrow: 'Hesap', title: 'Profil'),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: _pagePadding,
-              vertical: 16,
-            ),
-            sliver: SliverToBoxAdapter(
-              child: AnimatedSwitcher(
-                duration: _switchDuration,
-                child:
-                    _isLoading
-                        ? const _ProfileSkeleton(radius: _cardRadius)
-                        : _ProfileCard(
-                          initials: _initials,
-                          name:
-                              _fullName.isEmpty
-                                  ? 'İsimsiz Kullanıcı'
-                                  : _fullName,
-                          email: _email,
-                          radius: _cardRadius,
-                        ),
+      body: HeroStatusBarScope(
+        builder:
+            (context, heroKey) => CustomScrollView(
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
               ),
-            ),
-          ),
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(
-              _pagePadding,
-              8,
-              _pagePadding,
-              MediaQuery.paddingOf(context).bottom + _navBarClearance,
-            ),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                Reveal(
-                  delay: _revealStagger,
-                  duration: _revealDuration,
-                  child: _ActionGroup(
-                    radius: _cardRadius,
-                    children: [
-                      _ActionRow(
-                        icon: CupertinoIcons.square_arrow_right,
-                        label: 'Çıkış Yap',
-                        onTap: _handleLogout,
+              slivers: [
+                SliverToBoxAdapter(child: _buildScreenHero(heroKey)),
+                const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                    _pagePadding,
+                    8,
+                    _pagePadding,
+                    MediaQuery.paddingOf(context).bottom + _navBarClearance,
+                  ),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      Reveal(
+                        delay: _revealStagger,
+                        duration: _revealDuration,
+                        child: _ActionGroup(
+                          radius: _cardRadius,
+                          children: [
+                            _ActionRow(
+                              icon: CupertinoIcons.square_arrow_right,
+                              label: 'Çıkış Yap',
+                              onTap: _handleLogout,
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
+                      const SizedBox(height: _groupGap),
+                      // Yıkıcı eylem ayrı grupta ve kırmızı: yanlışlıkla çıkışla
+                      // karışmasın (App Store için Hesabı Sil zorunlu).
+                      Reveal(
+                        delay: _revealStagger * 2,
+                        duration: _revealDuration,
+                        child: _ActionGroup(
+                          radius: _cardRadius,
+                          children: [
+                            _ActionRow(
+                              icon: CupertinoIcons.trash,
+                              label: 'Hesabı Sil',
+                              color: AppColors.error,
+                              showChevron: false,
+                              onTap: _handleDeleteAccount,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ]),
                   ),
                 ),
-                const SizedBox(height: _groupGap),
-                // Yıkıcı eylem ayrı grupta ve kırmızı: yanlışlıkla çıkışla
-                // karışmasın (App Store için Hesabı Sil zorunlu).
-                Reveal(
-                  delay: _revealStagger * 2,
-                  duration: _revealDuration,
-                  child: _ActionGroup(
-                    radius: _cardRadius,
-                    children: [
-                      _ActionRow(
-                        icon: CupertinoIcons.trash,
-                        label: 'Hesabı Sil',
-                        color: AppColors.error,
-                        showChevron: false,
-                        onTap: _handleDeleteAccount,
-                      ),
-                    ],
-                  ),
-                ),
-              ]),
+              ],
             ),
-          ),
-        ],
+      ),
+    );
+  }
+
+  // Tam ekran antrasit hero: wordmark, başlık satırı ve hesap kimliği (avatar,
+  // isim, e-posta).
+  Widget _buildScreenHero(GlobalKey heroKey) {
+    return KiremitHeroSurface(
+      heroKey: heroKey,
+      topColor: AppColors.profileHero,
+      bottomColor: AppColors.profileHeroDeep,
+      glowColor: AppColors.profileGlow,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          _pagePadding,
+          MediaQuery.paddingOf(context).top + 12,
+          _pagePadding,
+          32,
+        ),
+        child: Column(
+          children: [
+            SeriesWordmark(color: Colors.white.withValues(alpha: 0.9)),
+            // Diğer sekmelerle aynı başlık konumu (wordmark + 16 boşluk).
+            const SizedBox(height: 16),
+            ScreenTitleBlock(
+              eyebrow: 'Hesap',
+              title: 'Profil',
+              titleColor: Colors.white,
+              eyebrowColor: Colors.white.withValues(alpha: 0.65),
+            ),
+            const SizedBox(height: 28),
+            AnimatedSwitcher(
+              duration: _switchDuration,
+              child:
+                  _isLoading
+                      ? const _ProfileSkeleton()
+                      : _ProfileIdentity(
+                        initials: _initials,
+                        name:
+                            _fullName.isEmpty ? 'İsimsiz Kullanıcı' : _fullName,
+                        email: _email,
+                      ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -232,111 +250,105 @@ BoxDecoration _whiteCard(double radius) => BoxDecoration(
   ],
 );
 
-class _ProfileCard extends StatelessWidget {
+/// Hero içindeki hesap kimliği: altın halkalı avatar, isim ve e-posta.
+class _ProfileIdentity extends StatelessWidget {
   final String initials;
   final String name;
   final String email;
-  final double radius;
 
-  const _ProfileCard({
+  const _ProfileIdentity({
     required this.initials,
     required this.name,
     required this.email,
-    required this.radius,
   });
 
-  static const double _avatarSize = 72;
+  static const double avatarSize = 76;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      key: const ValueKey('profile_card'),
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppColors.profileHero, AppColors.profileHeroDeep],
-        ),
-        borderRadius: BorderRadius.circular(radius),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.profileHero.withValues(alpha: 0.28),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: _avatarSize,
-            height: _avatarSize,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.onHeroDark.withValues(alpha: 0.1),
-              border: Border.all(
-                color: AppColors.accentGold.withValues(alpha: 0.5),
-              ),
-            ),
-            child: Text(
-              initials,
-              style: AppTypography.heading1.copyWith(
-                color: AppColors.accentGold,
-                fontWeight: FontWeight.w700,
-                height: 1,
-              ),
+    return Column(
+      key: const ValueKey('profile_identity'),
+      children: [
+        Container(
+          width: avatarSize,
+          height: avatarSize,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.onHeroDark.withValues(alpha: 0.1),
+            border: Border.all(
+              color: AppColors.accentGold.withValues(alpha: 0.5),
             ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            name,
-            maxLines: 2,
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            style: AppTypography.heading2.copyWith(
-              color: AppColors.onHeroDark,
+          child: Text(
+            initials,
+            style: AppTypography.heading1.copyWith(
+              color: AppColors.accentGold,
               fontWeight: FontWeight.w700,
+              height: 1,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            email,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTypography.body14Regular.copyWith(
-              color: AppColors.onHeroDark.withValues(alpha: 0.7),
-            ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          name,
+          maxLines: 2,
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          style: AppTypography.heading2.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          email,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTypography.body14Regular.copyWith(
+            color: Colors.white.withValues(alpha: 0.7),
+          ),
+        ),
+      ],
     );
   }
 }
 
+/// Kimlik yüklenirken: koyu zeminde silik shimmer (avatar ve iki satır).
 class _ProfileSkeleton extends StatelessWidget {
-  final double radius;
-
-  const _ProfileSkeleton({required this.radius});
-
-  // Yüklenmiş kartın yaklaşık yüksekliği (24 + 72 + 16 + 26 + 4 + 20 + 24).
-  static const double _height = 186;
+  const _ProfileSkeleton();
 
   @override
   Widget build(BuildContext context) {
+    Widget bar(double width, double height) => Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(height / 2 > 8 ? 8 : height / 2),
+      ),
+    );
+
     return Shimmer.fromColors(
       key: const ValueKey('profile_skeleton'),
-      baseColor: AppColors.borderSubtle,
-      highlightColor: Colors.white,
-      child: Container(
-        height: _height,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(radius),
-        ),
+      baseColor: Colors.white.withValues(alpha: 0.1),
+      highlightColor: Colors.white.withValues(alpha: 0.24),
+      child: Column(
+        children: [
+          Container(
+            width: _ProfileIdentity.avatarSize,
+            height: _ProfileIdentity.avatarSize,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Yüklenmiş içerikle aynı yükseklikler: isim 26, e-posta 20.
+          SizedBox(height: 26, child: Center(child: bar(160, 18))),
+          const SizedBox(height: 4),
+          SizedBox(height: 20, child: Center(child: bar(200, 12))),
+        ],
       ),
     );
   }

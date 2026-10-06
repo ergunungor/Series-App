@@ -40,5 +40,6 @@ class AppColors {
 
   // --- Profil: sıcak antrasit ---
   static const Color profileHero = Color(0xFF25262B);
+  static const Color profileGlow = Color(0xFF4A4C57);
   static const Color profileHeroDeep = Color(0xFF17181C);
 }
