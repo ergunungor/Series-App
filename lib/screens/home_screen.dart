@@ -774,7 +774,7 @@ class _NoProgramCard extends StatelessWidget {
           Text(
             'Buralar biraz ıssız...',
             style: AppTypography.heading3.copyWith(
-              color: AppColors.brandTertiary,
+              color: AppColors.homeHeroDeep,
               fontWeight: FontWeight.w700,
             ),
           ),

@@ -51,7 +51,7 @@ class StrengthChartStyle {
     dotFill: Colors.white,
     dotStroke: AppColors.workoutsHero,
     dateLabel: AppColors.textTertiary,
-    recordLabel: AppColors.accentDeep,
+    recordLabel: AppColors.goldDeep,
     recordFill: AppColors.accentGold,
     recordRing: Colors.white,
     gridDashed: false,

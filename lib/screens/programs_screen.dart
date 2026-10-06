@@ -195,7 +195,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                         const SizedBox(width: 12),
                         _GlassIconButton(
                           icon: CupertinoIcons.trash,
-                          color: CupertinoColors.destructiveRed,
+                          color: AppColors.error,
                           onTap: _selectedIds.isEmpty ? () {} : _deleteSelected,
                         ),
                       ],
@@ -321,7 +321,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
             ),
             child: const Icon(
               CupertinoIcons.exclamationmark_triangle_fill,
-              color: CupertinoColors.destructiveRed,
+              color: AppColors.error,
               size: 20,
             ),
           ),
@@ -1031,7 +1031,7 @@ class _DismissibleWrapper extends StatelessWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 32),
         decoration: BoxDecoration(
-          color: CupertinoColors.destructiveRed,
+          color: AppColors.error,
           borderRadius: BorderRadius.circular(24), // Hero ve Grid'e uyan radius
         ),
         child: const Icon(CupertinoIcons.trash, color: Colors.white, size: 28),
@@ -1064,7 +1064,7 @@ class _GlassIconButton extends StatelessWidget {
           color: AppColors.fillSubtle,
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, size: 20, color: color ?? AppColors.brandTertiary),
+        child: Icon(icon, size: 20, color: color ?? AppColors.espresso),
       ),
     );
   }

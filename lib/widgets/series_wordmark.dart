@@ -8,7 +8,7 @@ class SeriesWordmark extends StatelessWidget {
   /// Koyu hero üzerinde krem kullanmak için değiştirilebilir.
   final Color color;
 
-  const SeriesWordmark({super.key, this.color = AppColors.brandTertiary});
+  const SeriesWordmark({super.key, this.color = AppColors.homeHeroDeep});
 
   static const double _letterSpacing = 4;
 

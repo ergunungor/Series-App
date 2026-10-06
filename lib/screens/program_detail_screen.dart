@@ -179,9 +179,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Hata oluştu: $errorMessage'),
-            backgroundColor:
-                AppColors
-                    .brandPrimary, // Hata için istersen kırmızı (Colors.red) da yapabilirsin
+            backgroundColor: AppColors.error, // hata rengi
             duration: const Duration(seconds: 4),
           ),
         );

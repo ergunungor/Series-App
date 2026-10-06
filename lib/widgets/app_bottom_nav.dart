@@ -46,7 +46,7 @@ class AppBottomNav extends StatefulWidget {
     AppBottomNavItem(
       icon: Icons.home_rounded,
       label: 'Ana Sayfa',
-      color: AppColors.heroGradientStart,
+      color: AppColors.homeHero,
     ),
     AppBottomNavItem(
       icon: Icons.calendar_month_rounded,
