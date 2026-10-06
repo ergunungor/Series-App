@@ -84,7 +84,8 @@ class _FadeBranchContainerState extends State<FadeBranchContainer>
                     child: TickerMode(
                       enabled: i == current,
                       child: FadeTransition(
-                        opacity: i == current ? _opacity : kAlwaysCompleteAnimation,
+                        opacity:
+                            i == current ? _opacity : kAlwaysCompleteAnimation,
                         child: widget.children[i],
                       ),
                     ),

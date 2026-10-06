@@ -10,6 +10,7 @@ import '../utils/exercise_name.dart';
 import '../utils/workout_stats.dart';
 import 'pressable_scale.dart';
 import 'reveal.dart';
+import 'section_title.dart';
 import 'strength_line_chart.dart';
 import 'weekly_bars_chart.dart';
 
@@ -490,38 +491,6 @@ class _FunFactCard extends StatelessWidget {
   }
 }
 
-/// Kartın üstünde duran küçük, silik bölüm başlığı. Ekrandaki diğer bölümlerde
-/// (ör. kayıt listesi) de kullanılır.
-class InsightSectionTitle extends StatelessWidget {
-  final String title;
-  final String? trailing;
-
-  const InsightSectionTitle({super.key, required this.title, this.trailing});
-
-  @override
-  Widget build(BuildContext context) {
-    final style = AppTypography.body12Medium.copyWith(
-      color: AppColors.textTertiary,
-    );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: style.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ),
-          if (trailing != null) Text(trailing!, style: style),
-        ],
-      ),
-    );
-  }
-}
-
 class _Group extends StatelessWidget {
   final String title;
   final String? trailing;
@@ -533,7 +502,7 @@ class _Group extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [InsightSectionTitle(title: title, trailing: trailing), child],
+      children: [SectionTitle(title: title, trailing: trailing), child],
     );
   }
 }

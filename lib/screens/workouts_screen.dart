@@ -12,6 +12,7 @@ import '../widgets/app_confirm_dialog.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/reveal.dart';
 import '../widgets/screen_title_block.dart';
+import '../widgets/section_title.dart';
 import '../widgets/workout_insights_section.dart';
 import '../widgets/series_wordmark.dart';
 import '../widgets/app_bottom_nav.dart';
@@ -414,7 +415,7 @@ class _WorkoutsScreenState extends State<WorkoutsScreen> {
               const SliverPadding(
                 padding: EdgeInsets.symmetric(horizontal: _pagePadding),
                 sliver: SliverToBoxAdapter(
-                  child: InsightSectionTitle(title: 'Geçmiş kayıtlar'),
+                  child: SectionTitle(title: 'Geçmiş kayıtlar'),
                 ),
               ),
               SliverPadding(

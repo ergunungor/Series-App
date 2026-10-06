@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/detail_hero.dart';
@@ -17,6 +18,7 @@ import 'package:lottie/lottie.dart';
 import '../widgets/reveal.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/app_bottom_nav.dart';
+import '../widgets/section_title.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -162,6 +164,42 @@ class _HomeScreenState extends State<HomeScreen> {
     };
   }
 
+  // Program değiştirme akışı: önceki IconButton'daki kodun aynısı.
+  Future<void> _changeActiveProgram() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    final allPrograms = await ProgramRepository.fetchPrograms(user.id);
+    if (!mounted) return;
+    final selected = await showSelectActiveProgramSheet(
+      context: context,
+      programs: allPrograms,
+      currentActiveId: _activeProgram?.id,
+    );
+    if (selected != null) {
+      await ProgramRepository.setActiveProgram(user.id, selected.id);
+      _fetchActiveProgram();
+
+      // HER SEFERİNDE DEĞERİ DEĞİŞTİRİYORUZ (SAYAÇ ARTIYOR)
+      programRefreshNotifier.value++;
+    }
+  }
+
+  Widget _buildLastWorkoutRow(WorkoutHistorySession session) {
+    final date = DateFormat('d MMMM', 'tr_TR').format(session.completedAt);
+    return _RowCard(
+      leading: const _CheckTile(),
+      title: session.workoutName,
+      subtitle:
+          '$date · ${session.exerciseCount} egzersiz · ${session.setCount} set',
+      trailing: const Icon(
+        Icons.chevron_right_rounded,
+        size: 24,
+        color: AppColors.textTertiary,
+      ),
+      onTap: () => context.push('/workout-history-detail', extra: session),
+    );
+  }
+
   Future<void> _handleRefresh() async {
     await Future.wait([_fetchUserData(), _fetchActiveProgram()]);
   }
@@ -240,87 +278,43 @@ class _HomeScreenState extends State<HomeScreen> {
                                   () => context.push('/onboarding-survey'),
                             ),
                           if (_activeProgram != null) ...[
-                            const SizedBox(height: 32),
                             Reveal(
                               delay: _revealStagger,
                               duration: _revealDuration,
-                              child: _WeeklyProgress(
-                                completed: _weeklyCompleted,
-                                total: _weeklyTotal,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Reveal(
-                              delay: _revealStagger * 2,
-                              duration: _revealDuration,
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    'Aktif Program',
-                                    style: AppTypography.body16Medium.copyWith(
-                                      color: AppColors.brandTertiary,
+                                  const SectionTitle(title: 'Aktif program'),
+                                  _RowCard(
+                                    leading: const _LogoTile(),
+                                    title: _activeProgram!.name,
+                                    subtitle: 'Programa git',
+                                    trailing: _SwapButton(
+                                      onTap: _changeActiveProgram,
                                     ),
-                                  ),
-                                  IconButton(
-                                    onPressed: () async {
-                                      final user =
-                                          Supabase
-                                              .instance
-                                              .client
-                                              .auth
-                                              .currentUser;
-                                      if (user == null) return;
-                                      final allPrograms =
-                                          await ProgramRepository.fetchPrograms(
-                                            user.id,
-                                          );
-                                      if (!context.mounted) return;
-                                      final selected =
-                                          await showSelectActiveProgramSheet(
-                                            context: context,
-                                            programs: allPrograms,
-                                            currentActiveId: _activeProgram?.id,
-                                          );
-                                      if (selected != null) {
-                                        await ProgramRepository.setActiveProgram(
-                                          user.id,
-                                          selected.id,
-                                        );
-                                        _fetchActiveProgram();
-
-                                        // HER SEFERİNDE DEĞERİ DEĞİŞTİRİYORUZ (SAYAÇ ARTIYOR)
-                                        programRefreshNotifier.value++;
-                                      }
-                                    },
-                                    style: IconButton.styleFrom(
-                                      backgroundColor: AppColors.fillSubtle,
-                                      minimumSize: const Size(44, 44),
-                                    ),
-                                    icon: Icon(
-                                      Icons.swap_horiz_rounded,
-                                      size: 20,
-                                      color: AppColors.brandTertiary,
-                                    ),
-                                    tooltip: 'Programı değiştir',
+                                    onTap:
+                                        () => context.push(
+                                          '/program-detail',
+                                          extra: _activeProgram,
+                                        ),
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Reveal(
-                              delay: _revealStagger * 3,
-                              duration: _revealDuration,
-                              child: _ActiveProgramTile(
-                                name: _activeProgram!.name,
-                                onTap:
-                                    () => context.push(
-                                      '/program-detail',
-                                      extra: _activeProgram,
-                                    ),
+                            if (_history.isNotEmpty) ...[
+                              const SizedBox(height: 20),
+                              Reveal(
+                                delay: _revealStagger * 2,
+                                duration: _revealDuration,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SectionTitle(title: 'Son antrenman'),
+                                    _buildLastWorkoutRow(_history.first),
+                                  ],
+                                ),
                               ),
-                            ),
+                            ],
                           ],
                         ],
                       ),
@@ -334,228 +328,152 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _ActiveProgramTile extends StatefulWidget {
-  final String name;
+/// Ana Sayfa'daki beyaz satır kartı: solda karo, ortada iki satır metin,
+/// sağda opsiyonel eylem. Basınca küçülür.
+class _RowCard extends StatelessWidget {
+  final Widget leading;
+  final String title;
+  final String subtitle;
+  final Widget trailing;
   final VoidCallback onTap;
 
-  const _ActiveProgramTile({required this.name, required this.onTap});
+  const _RowCard({
+    required this.leading,
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+    required this.onTap,
+  });
 
-  @override
-  State<_ActiveProgramTile> createState() => _ActiveProgramTileState();
-}
-
-class _ActiveProgramTileState extends State<_ActiveProgramTile> {
-  static const double _radius = 20;
-  static const double _logoTileSize = 52;
-  static const double _pressedScale = 0.98;
-  static const Duration _pressDuration = Duration(milliseconds: 120);
-
-  bool _isPressed = false;
-
-  void _setPressed(bool value) {
-    if (_isPressed != value) setState(() => _isPressed = value);
-  }
+  static const double _radius = 22;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => _setPressed(true),
-        onTapUp: (_) => _setPressed(false),
-        onTapCancel: () => _setPressed(false),
-        onTap: widget.onTap,
-        child: AnimatedScale(
-          scale: _isPressed ? _pressedScale : 1.0,
-          duration: _pressDuration,
-          curve: Curves.easeOut,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(_radius),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+    return PressableScale(
+      pressedScale: 0.98,
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(_radius),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: _logoTileSize,
-                  height: _logoTileSize,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.fillSubtle,
-                    borderRadius: BorderRadius.circular(16),
+          ],
+        ),
+        child: Row(
+          children: [
+            leading,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.body16Medium.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  child: const AppLogo(
-                    explicitSize: 30,
-                    type: AppLogoType.dark,
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.body12Regular.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        widget.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.body16Medium.copyWith(
-                          color: AppColors.brandTertiary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Programa git',
-                        style: AppTypography.body14Regular.copyWith(
-                          color: AppColors.textTertiary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 24,
-                  color: AppColors.textTertiary,
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+            const SizedBox(width: 8),
+            trailing,
+          ],
         ),
       ),
     );
   }
 }
 
-class _WeeklyProgress extends StatelessWidget {
-  final int completed;
-  final int total;
+const double _tileSize = 46;
 
-  const _WeeklyProgress({required this.completed, required this.total});
-
-  static const double _segmentHeight = 8;
-  static const double _segmentGap = 6;
-  static const Duration _fillDuration = Duration(milliseconds: 700);
+class _LogoTile extends StatelessWidget {
+  const _LogoTile();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+      width: _tileSize,
+      height: _tileSize,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: AppColors.fillSubtle,
+        borderRadius: BorderRadius.circular(15),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Expanded(
-                child: Text(
-                  'Haftalık Performans',
-                  style: AppTypography.body16Medium.copyWith(
-                    color: AppColors.brandTertiary,
-                  ),
-                ),
-              ),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: '$completed',
-                      style: AppTypography.body16Medium.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    TextSpan(
-                      text: '/$total',
-                      style: AppTypography.body16Regular.copyWith(
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+      child: const AppLogo(explicitSize: 28, type: AppLogoType.dark),
+    );
+  }
+}
+
+class _CheckTile extends StatelessWidget {
+  const _CheckTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: _tileSize,
+      height: _tileSize,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.workoutsTint,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: const Icon(
+        Icons.check_rounded,
+        size: 22,
+        color: AppColors.success,
+      ),
+    );
+  }
+}
+
+/// Programı değiştir butonu: 44px yuvarlak, basınca küçülür.
+class _SwapButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _SwapButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Programı değiştir',
+      button: true,
+      child: PressableScale(
+        pressedScale: 0.92,
+        onTap: onTap,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: const BoxDecoration(
+            color: AppColors.fillSubtle,
+            shape: BoxShape.circle,
           ),
-          const SizedBox(height: 12),
-          AnimatedOpacity(
-            duration: const Duration(milliseconds: 300),
-            opacity: total == 0 ? 0 : 1,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0, end: completed.toDouble()),
-              duration: _fillDuration,
-              curve: Curves.easeOutCubic,
-              builder: (context, progress, _) {
-                return SizedBox(
-                  height: _segmentHeight,
-                  child: Row(
-                    children: List.generate(total, (index) {
-                      // Her segment kendi dolum oranını (0..1) bu tek animasyondan alır:
-                      // progress 0→3 giderken 1. segment dolar, sonra 2., sonra 3.
-                      final fill =
-                          (progress - index).clamp(0.0, 1.0).toDouble();
-                      return Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            left: index == 0 ? 0 : _segmentGap,
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(
-                              _segmentHeight / 2,
-                            ),
-                            child: Container(
-                              color: AppColors.progressTrack,
-                              alignment: Alignment.centerLeft,
-                              child: FractionallySizedBox(
-                                widthFactor: fill,
-                                heightFactor: 1,
-                                child: const DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        AppColors.heroGradientStart,
-                                        AppColors.brandPrimary,
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                );
-              },
-            ),
+          child: const Icon(
+            Icons.swap_horiz_rounded,
+            size: 20,
+            color: AppColors.homeHero,
           ),
-        ],
+        ),
       ),
     );
   }
@@ -623,10 +541,7 @@ class _NoProgramCard extends StatelessWidget {
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    AppColors.heroGradientStart,
-                    AppColors.brandTertiary,
-                  ],
+                  colors: [AppColors.homeHero, AppColors.homeHeroDeep],
                 ),
                 borderRadius: BorderRadius.circular(14),
               ),
