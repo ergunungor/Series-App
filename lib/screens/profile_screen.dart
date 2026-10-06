@@ -1,10 +1,15 @@
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shimmer/shimmer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
-import '../widgets/app_top_bar.dart';
 import '../widgets/app_confirm_dialog.dart';
+import '../widgets/pressable_scale.dart';
+import '../widgets/reveal.dart';
+import '../widgets/screen_title_block.dart';
+import '../widgets/series_wordmark.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -14,6 +19,16 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  // Diğer sekmelerle aynı yatay sayfa boşluğu ve giriş ritmi.
+  static const double _pagePadding = 16;
+  // AppBottomNav'ın kapladığı alan (86 + 16 alt marj); Programlar ile aynı.
+  static const double _navBarClearance = 102;
+  static const double _cardRadius = 24;
+  static const double _groupGap = 16;
+  static const Duration _revealDuration = Duration(milliseconds: 500);
+  static const Duration _revealStagger = Duration(milliseconds: 100);
+  static const Duration _switchDuration = Duration(milliseconds: 350);
+
   String _fullName = '';
   String _email = '';
   bool _isLoading = true;
@@ -113,119 +128,287 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Süzülen alt barın yüksekliği kadar (yaklaşık 120px) dinamik bir alt boşluk yaratıyoruz
-    final bottomInset = MediaQuery.of(context).padding.bottom + 120;
-
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false, // Alt güvenli alanı kapatıyoruz ki boşluğu biz yönetelim
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset),
-          child: Column(
-            children: [
-              const AppTopBar(),
-              const SizedBox(height: 28),
-              if (_isLoading)
-                const Expanded(
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else
-                Expanded(
-                  child: Column(
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        slivers: [
+          const SliverSafeArea(
+            sliver: SliverToBoxAdapter(child: SizedBox(height: 12)),
+            bottom: false,
+          ),
+          const SliverToBoxAdapter(child: SeriesWordmark()),
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(_pagePadding, 16, _pagePadding, 16),
+              child: ScreenTitleBlock(eyebrow: 'Hesap', title: 'Profil'),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: _pagePadding,
+              vertical: 16,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: AnimatedSwitcher(
+                duration: _switchDuration,
+                child:
+                    _isLoading
+                        ? const _ProfileSkeleton(radius: _cardRadius)
+                        : _ProfileCard(
+                          initials: _initials,
+                          name:
+                              _fullName.isEmpty
+                                  ? 'İsimsiz Kullanıcı'
+                                  : _fullName,
+                          email: _email,
+                          radius: _cardRadius,
+                        ),
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              _pagePadding,
+              8,
+              _pagePadding,
+              MediaQuery.paddingOf(context).bottom + _navBarClearance,
+            ),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                Reveal(
+                  delay: _revealStagger,
+                  duration: _revealDuration,
+                  child: _ActionGroup(
+                    radius: _cardRadius,
                     children: [
-                      const SizedBox(height: 16),
-                      Container(
-                        width: 96,
-                        height: 96,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.brandTertiary,
-                          border: Border.all(
-                            color: AppColors.brandSecondary,
-                            width: 2,
-                          ),
-                        ),
-                        child: Text(
-                          _initials,
-                          style: AppTypography.heading1.copyWith(
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        _fullName.isEmpty ? 'İsimsiz Kullanıcı' : _fullName,
-                        style: AppTypography.heading2.copyWith(
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _email,
-                        style: AppTypography.body14Regular.copyWith(
-                          color: AppColors.textTertiary,
-                        ),
-                      ),
-                      const Spacer(),
-
-                      // Çıkış Yap Butonu
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _handleLogout,
-                          icon: const Icon(
-                            Icons.logout,
-                            color: AppColors.textPrimary,
-                          ),
-                          label: Text(
-                            'Çıkış Yap',
-                            style: AppTypography.body16Medium.copyWith(
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(
-                              color: AppColors.textTertiary,
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 15),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Hesabı Sil Butonu (App Store & Play Store zorunluluğu)
-                      SizedBox(
-                        width: double.infinity,
-                        child: TextButton.icon(
-                          onPressed: _handleDeleteAccount,
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            color: Colors.red,
-                          ),
-                          label: Text(
-                            'Hesabı Sil',
-                            style: AppTypography.body16Medium.copyWith(
-                              color: Colors.red,
-                            ),
-                          ),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 15),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
+                      _ActionRow(
+                        icon: CupertinoIcons.square_arrow_right,
+                        label: 'Çıkış Yap',
+                        onTap: _handleLogout,
                       ),
                     ],
                   ),
                 ),
-            ],
+                const SizedBox(height: _groupGap),
+                // Yıkıcı eylem ayrı grupta ve kırmızı: yanlışlıkla çıkışla
+                // karışmasın (App Store için Hesabı Sil zorunlu).
+                Reveal(
+                  delay: _revealStagger * 2,
+                  duration: _revealDuration,
+                  child: _ActionGroup(
+                    radius: _cardRadius,
+                    children: [
+                      _ActionRow(
+                        icon: CupertinoIcons.trash,
+                        label: 'Hesabı Sil',
+                        color: AppColors.error,
+                        showChevron: false,
+                        onTap: _handleDeleteAccount,
+                      ),
+                    ],
+                  ),
+                ),
+              ]),
+            ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+BoxDecoration _whiteCard(double radius) => BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(radius),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.04),
+      blurRadius: 16,
+      offset: const Offset(0, 4),
+    ),
+  ],
+);
+
+class _ProfileCard extends StatelessWidget {
+  final String initials;
+  final String name;
+  final String email;
+  final double radius;
+
+  const _ProfileCard({
+    required this.initials,
+    required this.name,
+    required this.email,
+    required this.radius,
+  });
+
+  static const double _avatarSize = 72;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const ValueKey('profile_card'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppColors.profileHero, AppColors.profileHeroDeep],
+        ),
+        borderRadius: BorderRadius.circular(radius),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.profileHero.withValues(alpha: 0.28),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: _avatarSize,
+            height: _avatarSize,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.onHeroDark.withValues(alpha: 0.1),
+              border: Border.all(
+                color: AppColors.accentGold.withValues(alpha: 0.5),
+              ),
+            ),
+            child: Text(
+              initials,
+              style: AppTypography.heading1.copyWith(
+                color: AppColors.accentGold,
+                fontWeight: FontWeight.w700,
+                height: 1,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            name,
+            maxLines: 2,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.heading2.copyWith(
+              color: AppColors.onHeroDark,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            email,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.body14Regular.copyWith(
+              color: AppColors.onHeroDark.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileSkeleton extends StatelessWidget {
+  final double radius;
+
+  const _ProfileSkeleton({required this.radius});
+
+  // Yüklenmiş kartın yaklaşık yüksekliği (24 + 72 + 16 + 26 + 4 + 20 + 24).
+  static const double _height = 186;
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      key: const ValueKey('profile_skeleton'),
+      baseColor: AppColors.borderSubtle,
+      highlightColor: Colors.white,
+      child: Container(
+        height: _height,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionGroup extends StatelessWidget {
+  final double radius;
+  final List<Widget> children;
+
+  const _ActionGroup({required this.radius, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: _whiteCard(radius),
+      child: Column(children: children),
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color color;
+  final bool showChevron;
+
+  const _ActionRow({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color = AppColors.textPrimary,
+    this.showChevron = true,
+  });
+
+  static const double _height = 64;
+  static const double _iconTile = 36;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      pressedScale: 0.98,
+      onTap: onTap,
+      child: Container(
+        height: _height,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Row(
+          children: [
+            Container(
+              width: _iconTile,
+              height: _iconTile,
+              decoration: const BoxDecoration(
+                color: AppColors.fillSubtle,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 18, color: color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: AppTypography.body16Medium.copyWith(color: color),
+              ),
+            ),
+            if (showChevron)
+              const Icon(
+                CupertinoIcons.chevron_right,
+                size: 16,
+                color: AppColors.textTertiary,
+              ),
+          ],
         ),
       ),
     );

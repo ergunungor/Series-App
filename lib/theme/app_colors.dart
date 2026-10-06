@@ -27,6 +27,10 @@ class AppColors {
   static const Color workoutsAccent = Color(0xFF2F5D46);
   static const Color workoutsTint = Color(0xFFE4EEE8);
 
+  // Profil ekranı (sıcak antrasit)
+  static const Color profileHero = Color(0xFF25262B);
+  static const Color profileHeroDeep = Color(0xFF17181C);
+
   // --- Eski palet (migrasyon bitince silinecek) ---
   static const Color brandPrimary = Color(0xFF960000); // ana bordo
   static const Color brandSecondary = Color(0xFFD8D8D8);
