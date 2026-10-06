@@ -12,9 +12,7 @@ class AppTopBar extends StatelessWidget {
         padding: const EdgeInsets.only(top: 8),
         child: Text(
           'SERIES',
-          style: AppTypography.heading1.copyWith(
-            color: AppColors.brandTertiary,
-          ),
+          style: AppTypography.heading1.copyWith(color: AppColors.homeHero),
         ),
       ),
     );

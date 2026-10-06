@@ -53,47 +53,95 @@ class _OtpInputState extends State<OtpInput> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: List.generate(widget.length, (index) {
         return Expanded(
-          // YENİ: Sabit width yerine Expanded kullandık. Ekranı eşit böler.
+          // Sabit width yerine Expanded: ekranı eşit böler.
           child: Padding(
-            // Kutular arası boşluğu 16'dan 8'e düşürdük
+            // Kutular arası boşluk 8
             padding: EdgeInsets.only(right: index == widget.length - 1 ? 0 : 8),
-            child: SizedBox(
-              height:
-                  52, // Dokunma alanı rahat olsun diye yüksekliği biraz artırdık
-              child: TextField(
-                controller: _controllers[index],
-                focusNode: _focusNodes[index],
-                textAlign: TextAlign.center,
-                keyboardType: TextInputType.number,
-                maxLength: 1,
-                style: AppTypography.heading3.copyWith(
-                  color: Colors.black,
-                  fontSize: 20, // Ekrana sığması için fontu çok az küçülttük
-                ),
-                decoration: InputDecoration(
-                  counterText: '',
-                  contentPadding:
-                      EdgeInsets
-                          .zero, // Yazının tam ortalanması için sıfırladık
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(
-                      color: AppColors.brandSecondary,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-                onChanged: (v) => _onChanged(index, v),
-              ),
+            child: _OtpBox(
+              controller: _controllers[index],
+              focusNode: _focusNodes[index],
+              onChanged: (v) => _onChanged(index, v),
             ),
           ),
         );
       }),
+    );
+  }
+}
+
+/// Tek haneli kutu: odakta kiremit çerçeve ve gölge, dolunca çerçeve kiremit
+/// kalır ve kutu hafifçe büyüyüp oturur.
+class _OtpBox extends StatelessWidget {
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final ValueChanged<String> onChanged;
+
+  const _OtpBox({
+    required this.controller,
+    required this.focusNode,
+    required this.onChanged,
+  });
+
+  static const double _height = 56;
+  static const double _radius = 14;
+  static const double _filledScale = 1.04;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([focusNode, controller]),
+      builder: (context, _) {
+        final focused = focusNode.hasFocus;
+        final filled = controller.text.isNotEmpty;
+        final active = focused || filled;
+        return AnimatedScale(
+          scale: filled ? _filledScale : 1,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutBack,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            height: _height,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(_radius),
+              border: Border.all(
+                color: active ? AppColors.homeHero : AppColors.borderSubtle,
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color:
+                      focused
+                          ? AppColors.homeHero.withValues(alpha: 0.14)
+                          : Colors.black.withValues(alpha: 0.03),
+                  blurRadius: focused ? 16 : 8,
+                  offset: Offset(0, focused ? 6 : 2),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              textAlign: TextAlign.center,
+              keyboardType: TextInputType.number,
+              maxLength: 1,
+              cursorColor: AppColors.homeHero,
+              style: AppTypography.heading3.copyWith(
+                color: AppColors.textPrimary,
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+              ),
+              decoration: const InputDecoration(
+                counterText: '',
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+              onChanged: onChanged,
+            ),
+          ),
+        );
+      },
     );
   }
 }
