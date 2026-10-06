@@ -8,7 +8,6 @@ import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../utils/exercise_name.dart';
 import '../utils/workout_stats.dart';
-import 'app_logo.dart';
 import 'pressable_scale.dart';
 import 'reveal.dart';
 import 'strength_line_chart.dart';
@@ -314,29 +313,7 @@ class _InsightCard extends StatelessWidget {
           ),
         ],
       ),
-      child:
-          dark
-              ? Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  // Hero'daki gibi silik logo filigranı; kart köşelerinde kırpılır.
-                  Positioned(
-                    right: -26,
-                    top: -34,
-                    child: IgnorePointer(
-                      child: Opacity(
-                        opacity: 0.05,
-                        child: const AppLogo(
-                          explicitSize: 130,
-                          type: AppLogoType.light,
-                        ),
-                      ),
-                    ),
-                  ),
-                  child,
-                ],
-              )
-              : child,
+      child: child,
     );
   }
 }
