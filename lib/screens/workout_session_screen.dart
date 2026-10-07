@@ -1780,7 +1780,7 @@ class _SetCta extends StatelessWidget {
             gradient: const LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFFEDC36C), AppColors.accentGold],
+              colors: [AppColors.goldLight, AppColors.accentGold],
             ),
             borderRadius: BorderRadius.circular(height / 2),
             boxShadow: [

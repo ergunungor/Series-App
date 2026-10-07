@@ -31,7 +31,7 @@ Future<void> showAddProgramSheet({
               center: Alignment(0.9, -1.1),
               radius: 1.5,
               colors: [
-                Color(0xFF563222),
+                AppColors.espressoLift,
                 AppColors.espresso,
                 AppColors.heroDarkEnd,
               ],
@@ -287,9 +287,9 @@ class _GlassOptionState extends State<_GlassOption> {
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: [
-                                  Color(0xFFF2CE82),
+                                  AppColors.goldHighlight,
                                   AppColors.accentGold,
-                                  Color(0xFFC99A3E),
+                                  AppColors.goldShade,
                                 ],
                                 stops: [0, 0.55, 1],
                               )

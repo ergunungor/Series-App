@@ -24,6 +24,14 @@ class AppColors {
   static const Color accentGold = Color(0xFFE3B55B);
   static const Color goldTint = Color(0xFFF3E4C4);
   static const Color goldDeep = Color(0xFFA87A22);
+  // Altın gradyanlar ve parlamalar için açık/koyu tonlar.
+  static const Color goldLight = Color(0xFFEDC36C);
+  static const Color goldHighlight = Color(0xFFF2CE82);
+  static const Color goldShade = Color(0xFFC99A3E);
+  static const Color goldTintLight = Color(0xFFFBF4E4);
+  // Espresso yüzeylerde ışık ve basılı nötr ton.
+  static const Color espressoLift = Color(0xFF563222);
+  static const Color fillSubtleDeep = Color(0xFFDDD6CC);
   static const Color onHeroDark = Color(0xFFFFF4E0);
 
   // --- Ana Sayfa, auth ve antrenman esnası: kiremit (marka rengi) ---

@@ -485,7 +485,7 @@ class _FunFactCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [AppColors.goldTint, Color(0xFFFBF4E4)],
+          colors: [AppColors.goldTint, AppColors.goldTintLight],
         ),
         borderRadius: BorderRadius.circular(_radius),
         border: Border.all(color: AppColors.accentGold.withValues(alpha: 0.4)),
@@ -526,7 +526,7 @@ class _FunFactCard extends StatelessWidget {
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [Color(0xFFEDC36C), AppColors.accentGold],
+                          colors: [AppColors.goldLight, AppColors.accentGold],
                         ),
                         shape: BoxShape.circle,
                       ),

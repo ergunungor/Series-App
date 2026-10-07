@@ -148,7 +148,7 @@ class _BarsPainter extends CustomPainter {
   // Dokunulan çubuğun yükselmesi, yana genişlemesi ve koyulaşması.
   static const double _hoverLift = 8;
   static const double _hoverGrow = 3;
-  static const Color _hoverNeutral = Color(0xFFDDD6CC);
+  static const Color _hoverNeutral = AppColors.fillSubtleDeep;
 
   @override
   void paint(Canvas canvas, Size size) {

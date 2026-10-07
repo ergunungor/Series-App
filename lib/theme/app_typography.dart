@@ -40,10 +40,4 @@ class AppTypography {
       _manrope(fontSize: 12, fontWeight: FontWeight.w500, height: 20);
   static TextStyle get body12Regular =>
       _manrope(fontSize: 12, fontWeight: FontWeight.w400, height: 20);
-  static TextStyle get wordmark => _manrope(
-    fontSize: 36,
-    fontWeight: FontWeight.bold,
-    height: 38,
-    color: AppColors.homeHeroDeep,
-  );
 }
