@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Alt bar sekmeleri arasında geçişi 250ms crossfade ile yapar.
+/// Alt bar sekmeleri arasında geçişi 250ms crossfade ile (ease in-out) yapar.
 ///
 /// `StatefulShellRoute.indexedStack` gibi tüm dalları canlı tutar (scroll ve
 /// state korunur) ama geçişi anında keser. Burada yeni sekme eskisinin üstünde
@@ -37,7 +37,7 @@ class _FadeBranchContainerState extends State<FadeBranchContainer>
       duration: _duration,
       value: 1,
     );
-    _opacity = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _opacity = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
   }
 
   @override
