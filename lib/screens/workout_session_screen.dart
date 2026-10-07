@@ -121,10 +121,35 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
       if (!_isPaused && mounted) setState(() => _elapsedSeconds++);
     });
     _fetchLastPerformance();
-    _fetchCurrentExerciseGif();
+    _fetchCurrentExerciseGif().then((_) => _prefetchOtherGifs());
     _playBell();
     // Antrenman boyunca ekran kararmasın.
     WakelockPlus.enable();
+  }
+
+  // GIF'ler uzak sunucudan (GitHub) geliyor ve orijinal boyutları büyük. Kartta
+  // en fazla ~200 mantıksal piksel gösterildiği için çözme boyutu küçültülür:
+  // daha az bellek ve daha hızlı kare çözme. Önceden yükleme ve gösterim aynı
+  // sağlayıcıyı kullanmalı ki aynı önbellek girdisini paylaşsınlar.
+  static const int _gifDecodeWidth = 560;
+
+  ImageProvider _gifProvider(String url) =>
+      ResizeImage(NetworkImage(url), width: _gifDecodeWidth);
+
+  // Antrenmandaki diğer hareketlerin GIF'lerini arka planda sırayla önceden
+  // yükler: hareket değiştirince beklemeden hazır gelir.
+  Future<void> _prefetchOtherGifs() async {
+    for (final exercise in widget.workout.exercises) {
+      if (!mounted) return;
+      if (exercise.id == _currentExercise.id) continue;
+      try {
+        final info = await _exerciseService.fetchExerciseById(exercise.id);
+        if (!mounted || info == null || info.gifUrl.isEmpty) continue;
+        await precacheImage(_gifProvider(info.gifUrl), context);
+      } catch (_) {
+        // Önceden yükleme isteğe bağlı: hata olursa gösterimde normal yüklenir.
+      }
+    }
   }
 
   Future<void> _fetchCurrentExerciseGif() async {
@@ -145,7 +170,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
       // takılma yerine hazır karede açılır. Hata olursa yine de normal gösterim.
       if (mounted && apiData != null) {
         try {
-          await precacheImage(NetworkImage(apiData.gifUrl), context);
+          await precacheImage(_gifProvider(apiData.gifUrl), context);
         } catch (_) {}
       }
 
@@ -944,8 +969,8 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                   : Padding(
                     key: ValueKey(_apiExerciseInfo!.gifUrl),
                     padding: const EdgeInsets.all(12),
-                    child: Image.network(
-                      _apiExerciseInfo!.gifUrl,
+                    child: Image(
+                      image: _gifProvider(_apiExerciseInfo!.gifUrl),
                       fit: BoxFit.contain,
                       gaplessPlayback: true,
                     ),
@@ -1381,8 +1406,8 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                     )
                     : Padding(
                       padding: const EdgeInsets.all(4),
-                      child: Image.network(
-                        _apiExerciseInfo!.gifUrl,
+                      child: Image(
+                        image: _gifProvider(_apiExerciseInfo!.gifUrl),
                         fit: BoxFit.contain,
                         gaplessPlayback: true,
                       ),
