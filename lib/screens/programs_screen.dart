@@ -12,6 +12,7 @@ import '../widgets/add_program_sheet.dart';
 import '../widgets/app_confirm_dialog.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/reveal.dart';
 
 class ProgramsScreen extends StatefulWidget {
   const ProgramsScreen({super.key});
@@ -27,10 +28,21 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   // dokunmadığımız için burada tutuluyor; nav ölçüleri değişirse güncellenmeli.
   static const double _navBarClearance = 102;
   static const double _fabGap = 16;
+  // Giriş animasyonu (Home ile aynı ritim). Grid'de sadece ilk ekrandaki
+  // kartlar animasyonlanır; geri kalanı lazy olduğu için kaydırınca tekrar oynardı.
+  static const Duration _revealDuration = Duration(milliseconds: 500);
+  static const Duration _revealStagger = Duration(milliseconds: 100);
+  static const int _revealedGridItems = 4;
+  static const int _introSteps = 1 + _revealedGridItems; // hero + kartlar
+  static const Duration _heroSwitchDuration = Duration(milliseconds: 350);
 
   List<ActiveProgram> _programs = [];
   bool _isLoading = true;
   String? _activeProgramId;
+
+  // İlk içerik gösterildikten sonra kapanır; kaydırınca Reveal tekrar oynamasın.
+  bool _isIntroActive = true;
+  bool _isIntroTimerArmed = false;
 
   bool _isSelectionMode = false;
   final Set<String> _selectedIds = {};
@@ -69,11 +81,20 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
           _activeProgramId = activeId;
           _isLoading = false;
         });
+        _armIntroTimer();
       }
     } catch (error) {
       debugPrint('Program çekme hatası: $error');
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _armIntroTimer() {
+    if (_isIntroTimerArmed) return;
+    _isIntroTimerArmed = true;
+    Future.delayed(_revealStagger * _introSteps + _revealDuration, () {
+      if (mounted) _isIntroActive = false;
+    });
   }
 
   Future<bool> _confirmDeleteProgram(ActiveProgram program) async {
@@ -374,6 +395,41 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     final otherPrograms =
         _programs.where((p) => p.id != _activeProgramId).toList();
 
+    final Widget? hero =
+        activeProgram == null
+            ? null
+            : _DismissibleWrapper(
+              key: ValueKey(activeProgram.id),
+              program: activeProgram,
+              isSelectionMode: _isSelectionMode,
+              onDeleteConfirmed: () async {
+                final originalIndex = _programs.indexOf(activeProgram);
+                setState(() => _programs.removeAt(originalIndex));
+                try {
+                  await ProgramRepository.deleteProgram(activeProgram.id);
+                } catch (e) {
+                  debugPrint(e.toString());
+                }
+              },
+              child: _FeaturedActiveCard(
+                program: activeProgram,
+                isSelected: _selectedIds.contains(activeProgram.id),
+                isSelectionMode: _isSelectionMode,
+                onTap: () {
+                  if (_isSelectionMode) {
+                    _toggleSelection(activeProgram.id);
+                  } else {
+                    context
+                        .push<bool>('/program-detail', extra: activeProgram)
+                        .then((v) {
+                          if (v == true) _fetch();
+                        });
+                  }
+                },
+                onLongPress: _enterSelectionMode,
+              ),
+            );
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
@@ -391,130 +447,103 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
               _buildHeader(),
               _buildGenerationStatus(),
 
-              if (_isLoading)
-                const SliverFillRemaining(
-                  child: Center(child: CupertinoActivityIndicator(radius: 16)),
-                )
-              else if (_programs.isEmpty &&
-                  generationStateNotifier.value == GenerationStatus.idle)
-                SliverFillRemaining(
-                  child: _PremiumEmptyState(
-                    onCreate: () => context.push<bool>('/onboarding-survey'),
-                  ),
-                )
-              else ...[
-                // Hero Active Program
-                if (activeProgram != null)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: _pagePadding,
-                        vertical: 16,
-                      ),
-                      child: _DismissibleWrapper(
-                        program: activeProgram,
-                        isSelectionMode: _isSelectionMode,
-                        onDeleteConfirmed: () async {
-                          final originalIndex = _programs.indexOf(
-                            activeProgram,
-                          );
-                          setState(() => _programs.removeAt(originalIndex));
-                          try {
-                            await ProgramRepository.deleteProgram(
-                              activeProgram.id,
-                            );
-                          } catch (e) {
-                            debugPrint(e.toString());
-                          }
-                        },
-                        child: _FeaturedActiveCard(
-                          program: activeProgram,
-                          isSelected: _selectedIds.contains(activeProgram.id),
-                          isSelectionMode: _isSelectionMode,
-                          onTap: () {
-                            if (_isSelectionMode) {
-                              _toggleSelection(activeProgram.id);
-                            } else {
-                              context
-                                  .push<bool>(
-                                    '/program-detail',
-                                    extra: activeProgram,
-                                  )
-                                  .then((v) {
-                                    if (v == true) _fetch();
-                                  });
-                            }
-                          },
-                          onLongPress: _enterSelectionMode,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                // Grid Other Programs
-                if (otherPrograms.isNotEmpty)
-                  SliverPadding(
+              // Hero alanı: Home'daki gibi iskelet ↔ içerik crossfade (aynı ölçü,
+              // layout zıplamaz).
+              if (_isLoading || hero != null)
+                SliverToBoxAdapter(
+                  child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: _pagePadding,
+                      vertical: 16,
                     ),
-                    sliver: SliverGrid(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 0.85,
-                          ),
-                      delegate: SliverChildBuilderDelegate((context, index) {
-                        final program = otherPrograms[index];
-                        return _DismissibleWrapper(
-                          program: program,
-                          isSelectionMode: _isSelectionMode,
-                          onDeleteConfirmed: () async {
-                            final originalIndex = _programs.indexOf(program);
-                            setState(() => _programs.removeAt(originalIndex));
-                            try {
-                              await ProgramRepository.deleteProgram(program.id);
-                            } catch (e) {
-                              debugPrint(e.toString());
-                            }
-                          },
-                          child: _GridProgramCard(
-                            program: program,
-                            isSelected: _selectedIds.contains(program.id),
-                            isSelectionMode: _isSelectionMode,
-                            onTap: () {
-                              if (_isSelectionMode) {
-                                _toggleSelection(program.id);
-                              } else {
-                                context
-                                    .push<bool>(
-                                      '/program-detail',
-                                      extra: program,
-                                    )
-                                    .then((v) {
-                                      if (v == true) _fetch();
-                                    });
-                              }
-                            },
-                            onLongPress: _enterSelectionMode,
-                          ),
-                        );
-                      }, childCount: otherPrograms.length),
+                    child: AnimatedSwitcher(
+                      duration: _heroSwitchDuration,
+                      child: _isLoading ? const _FeaturedSkeleton() : hero,
                     ),
-                  ),
-
-                // Bottom padding to avoid FAB overlap
-                SliverToBoxAdapter(
-                  child: SizedBox(
-                    height:
-                        MediaQuery.paddingOf(context).bottom +
-                        _navBarClearance +
-                        _LiquidGlassFab.height +
-                        _fabGap * 2,
                   ),
                 ),
-              ],
+
+              if (!_isLoading)
+                if (_programs.isEmpty &&
+                    generationStateNotifier.value == GenerationStatus.idle)
+                  SliverFillRemaining(
+                    child: _PremiumEmptyState(
+                      onCreate: () => context.push<bool>('/onboarding-survey'),
+                    ),
+                  )
+                else ...[
+                  // Grid Other Programs
+                  if (otherPrograms.isNotEmpty)
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: _pagePadding,
+                      ),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 16,
+                              crossAxisSpacing: 16,
+                              childAspectRatio: 0.85,
+                            ),
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final program = otherPrograms[index];
+                          final card = _DismissibleWrapper(
+                            program: program,
+                            isSelectionMode: _isSelectionMode,
+                            onDeleteConfirmed: () async {
+                              final originalIndex = _programs.indexOf(program);
+                              setState(() => _programs.removeAt(originalIndex));
+                              try {
+                                await ProgramRepository.deleteProgram(program.id);
+                              } catch (e) {
+                                debugPrint(e.toString());
+                              }
+                            },
+                            child: _GridProgramCard(
+                              program: program,
+                              isSelected: _selectedIds.contains(program.id),
+                              isSelectionMode: _isSelectionMode,
+                              onTap: () {
+                                if (_isSelectionMode) {
+                                  _toggleSelection(program.id);
+                                } else {
+                                  context
+                                      .push<bool>(
+                                        '/program-detail',
+                                        extra: program,
+                                      )
+                                      .then((v) {
+                                        if (v == true) _fetch();
+                                      });
+                                }
+                              },
+                              onLongPress: _enterSelectionMode,
+                            ),
+                          );
+                          if (!_isIntroActive || index >= _revealedGridItems) {
+                            return card;
+                          }
+                          return Reveal(
+                            delay: _revealStagger * (1 + index),
+                            duration: _revealDuration,
+                            child: card,
+                          );
+                        }, childCount: otherPrograms.length),
+                      ),
+                    ),
+
+                  // Bottom padding to avoid FAB overlap
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height:
+                          MediaQuery.paddingOf(context).bottom +
+                          _navBarClearance +
+                          _LiquidGlassFab.height +
+                          _fabGap * 2,
+                    ),
+                  ),
+                ],
             ],
           ),
 
@@ -545,6 +574,28 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Aktif program kartı yüklenirken gösterilen iskelet. Kartla aynı ölçüde olduğu
+/// için içerik gelince layout zıplamaz.
+class _FeaturedSkeleton extends StatelessWidget {
+  const _FeaturedSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: AppColors.borderSubtle,
+      highlightColor: Colors.white,
+      child: Container(
+        height: _FeaturedActiveCard._height,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(_FeaturedActiveCard._radius),
+        ),
       ),
     );
   }
@@ -965,6 +1016,7 @@ class _DismissibleWrapper extends StatelessWidget {
   final VoidCallback onDeleteConfirmed;
 
   const _DismissibleWrapper({
+    super.key,
     required this.program,
     required this.isSelectionMode,
     required this.child,

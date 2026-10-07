@@ -1,4 +1,8 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
+import 'package:flutter/services.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 
@@ -9,7 +13,14 @@ class AppBottomNavItem {
   const AppBottomNavItem({required this.icon, required this.label});
 }
 
-class AppBottomNav extends StatelessWidget {
+/// iOS 26 "Liquid Glass" alt bar: `liquid_glass_renderer` ile gerçek kırılmalı
+/// cam kapsül + yay fiziğiyle hareket eden, hızla hafifçe esneyen seçim lensi.
+///
+/// Paket deneysel ve sadece Impeller'da çalışır (iOS'ta varsayılan). Cam
+/// kapsül statik olduğu için ucuz; hareket eden lens bilerek düz bir pill
+/// (shader yok), böylece geçişte her karede cam yeniden hesaplanmaz.
+/// Dışarıya sadece [currentIndex] ve [onTap] açıktır.
+class AppBottomNav extends StatefulWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
 
@@ -27,109 +38,207 @@ class AppBottomNav extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(45),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      // KESİLME ÇÖZÜMÜ 1: "clipBehavior: Clip.antiAlias" satırını tamamen sildik.
-      // Artık animasyon kavisli köşeye değse bile bıçak gibi kesilmeyecek.
+  State<AppBottomNav> createState() => _AppBottomNavState();
+}
 
-      // KESİLME ÇÖZÜMÜ 2: horizontal padding'i 8'den 12'ye çıkardık.
-      // Senin dediğin gibi beyaz kısmı sağdan ve soldan büyütmüş, ikonları güvenli alana almış olduk.
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final double slotWidth = constraints.maxWidth / _items.length;
+class _AppBottomNavState extends State<AppBottomNav>
+    with SingleTickerProviderStateMixin {
+  // Kapsül
+  static const double _barRadius = 45;
+  // Performans sorunu olursa true yap: shader yerine hafif sahte cam kullanılır.
+  static const bool _useFakeGlass = false;
+  static const LiquidGlassSettings _glassSettings = LiquidGlassSettings(
+    thickness: 24,
+    blur: 8,
+    refractiveIndex: 1.21,
+    saturation: 1.5,
+    lightIntensity: 1,
+    ambientStrength: 0.5,
+    lightAngle: 0.25 * math.pi,
+    glassColor: Color(0x73FFFFFF),
+  );
+  static const EdgeInsets _barMargin = EdgeInsets.fromLTRB(16, 0, 16, 16);
+  static const EdgeInsets _barPadding = EdgeInsets.symmetric(
+    horizontal: 12,
+    vertical: 8,
+  );
 
-            return Stack(
-              clipBehavior:
-                  Clip.none, // KRİTİK ÇÖZÜM: Stack'in dışına taşan esneme animasyonunu kesmesini engeller
-              children: [
-                // Kayan "damla" arka plan
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 700),
-                  curve: const ElasticOutCurve(0.85),
-                  left: slotWidth * currentIndex + 3,
-                  width: slotWidth - 6,
-                  top: 0,
-                  bottom: 0,
-                  child: Center(
-                    child: TweenAnimationBuilder<double>(
-                      key: ValueKey(currentIndex),
-                      duration: const Duration(milliseconds: 700),
-                      curve: const ElasticOutCurve(0.85),
-                      tween: Tween(begin: 0.94, end: 1.0),
-                      builder:
-                          (context, scale, child) =>
-                              Transform.scale(scale: scale, child: child),
-                      child: Container(
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: AppColors.navSelectedBg,
-                          borderRadius: BorderRadius.circular(45),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                // Item'lar (icon + label, tıklanabilir)
-                Row(
-                  children: List.generate(_items.length, (index) {
-                    final isSelected = index == currentIndex;
-                    final item = _items[index];
-                    return Expanded(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => onTap(index),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              AnimatedScale(
-                                duration: const Duration(milliseconds: 450),
-                                curve: Curves.easeOutCubic,
-                                scale: isSelected ? 1.08 : 1.0,
-                                child: Icon(
-                                  item.icon,
-                                  color: AppColors.brandTertiary,
-                                  size: 26,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              AnimatedDefaultTextStyle(
-                                duration: const Duration(milliseconds: 250),
-                                style: AppTypography.body12Medium.copyWith(
-                                  color: AppColors.brandTertiary,
-                                  fontWeight:
-                                      isSelected
-                                          ? FontWeight
-                                              .w700 // Hata vermemesi için w700'de bırakıldı
-                                          : FontWeight.w500,
-                                ),
-                                child: Text(item.label),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
+  // Seçim lensi
+  static const double _lensHeight = 56;
+  static const double _lensInset = 3;
+  static const double _lensAlpha = 0.5;
+  static const double _stretchPerVelocity = 0.035;
+  static const double _maxStretch = 1.22;
+  static const double _squashFactor = 0.5;
+
+  // Hafif sönümlü yay: hedefi hafifçe aşıp oturur (jöle hissi).
+  static const SpringDescription _spring = SpringDescription(
+    mass: 1,
+    stiffness: 220,
+    damping: 21,
+  );
+
+  // Değer = (kesirli) sekme indeksi; sınırsız, çünkü yay hedefi aşabilir.
+  late final AnimationController _position;
+
+  @override
+  void initState() {
+    super.initState();
+    _position = AnimationController.unbounded(
+      vsync: this,
+      value: widget.currentIndex.toDouble(),
+    );
+  }
+
+  @override
+  void didUpdateWidget(AppBottomNav oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentIndex != widget.currentIndex) {
+      _position.animateWith(
+        SpringSimulation(
+          _spring,
+          _position.value,
+          widget.currentIndex.toDouble(),
+          _position.velocity,
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _position.dispose();
+    super.dispose();
+  }
+
+  void _handleTap(int index) {
+    if (index != widget.currentIndex) HapticFeedback.selectionClick();
+    widget.onTap(index);
+  }
+
+  Widget _buildLens(double slotWidth) {
+    final velocity = _position.velocity.abs();
+    final stretch =
+        (1 + velocity * _stretchPerVelocity).clamp(1.0, _maxStretch).toDouble();
+    // Yatayda uzarken dikeyde biraz basıklaşır (hacim korunuyormuş gibi).
+    final squash = 1 - (stretch - 1) * _squashFactor;
+
+    return Positioned(
+      left: slotWidth * _position.value + _lensInset,
+      width: slotWidth - _lensInset * 2,
+      top: 0,
+      bottom: 0,
+      child: Center(
+        child: Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.diagonal3Values(stretch, squash, 1),
+          child: Container(
+            height: _lensHeight,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: _lensAlpha),
+              borderRadius: BorderRadius.circular(_barRadius),
+              border: Border.all(color: Colors.white, width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
               ],
-            );
-          },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildItem(int index) {
+    final isSelected = index == widget.currentIndex;
+    final item = AppBottomNav._items[index];
+
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: isSelected,
+        label: item.label,
+        excludeSemantics: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _handleTap(index),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedScale(
+                  duration: const Duration(milliseconds: 450),
+                  curve: Curves.easeOutCubic,
+                  scale: isSelected ? 1.08 : 1.0,
+                  child: Icon(
+                    item.icon,
+                    color: AppColors.brandTertiary,
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 250),
+                  style: AppTypography.body12Medium.copyWith(
+                    color: AppColors.brandTertiary,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                  child: Text(item.label),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: _barMargin,
+      child: LiquidGlassLayer(
+        settings: _glassSettings,
+        fake: _useFakeGlass,
+        child: LiquidGlass(
+          shape: const LiquidRoundedSuperellipse(borderRadius: _barRadius),
+          child: Padding(
+            padding: _barPadding,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final slotWidth =
+                    constraints.maxWidth / AppBottomNav._items.length;
+
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // Lens arkada; Positioned.fill sayesinde iç Stack sınırlı
+                    // ölçü alır (Row yüksekliği belirler).
+                    Positioned.fill(
+                      child: AnimatedBuilder(
+                        animation: _position,
+                        builder:
+                            (context, _) => Stack(
+                              clipBehavior: Clip.none,
+                              children: [_buildLens(slotWidth)],
+                            ),
+                      ),
+                    ),
+                    Row(
+                      children: List.generate(
+                        AppBottomNav._items.length,
+                        _buildItem,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
