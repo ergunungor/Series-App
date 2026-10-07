@@ -141,6 +141,14 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
         _currentExercise.id,
       );
 
+      // GIF'i göstermeden önce indirip ilk karesini çözüyoruz: ekranda görününce
+      // takılma yerine hazır karede açılır. Hata olursa yine de normal gösterim.
+      if (mounted && apiData != null) {
+        try {
+          await precacheImage(NetworkImage(apiData.gifUrl), context);
+        } catch (_) {}
+      }
+
       // İstek sonuçlandığında widget hala ekrandaysa (mounted) güncelle
       if (mounted) {
         setState(() {
@@ -868,22 +876,26 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
       heightFactor: (_gifHeight - _gifOverlap) / _gifHeight,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: _pagePadding),
-        child: Container(
-          height: _gifHeight,
-          width: double.infinity,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.homeHeroDeep.withValues(alpha: 0.18),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
+        // GIF her karede yeniden çizildiği için kendi katmanında: hero'nun
+        // gradyan ve gölgeleri her kare yeniden boyanmasın.
+        child: RepaintBoundary(
+          child: Container(
+            height: _gifHeight,
+            width: double.infinity,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.homeHeroDeep.withValues(alpha: 0.18),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: _buildGifContent(),
           ),
-          child: _buildGifContent(),
         ),
       ),
     );

@@ -3,8 +3,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart'; // YENİ: rootBundle (lokal dosya okuma) için gerekli
 import '../models/exercise.dart';
 
+// Büyük egzersiz JSON'unu ayrı bir isolate'te çözer: ana (UI) thread'i bloklayıp
+// ekranın takılmasına yol açmasın.
+List<Exercise> _parseExercises(String jsonString) {
+  final List<dynamic> data = json.decode(jsonString);
+  return data.map((json) => Exercise.fromJson(json)).toList();
+}
+
 class ExerciseService {
-  List<Exercise>? _cachedAllExercises;
+  // Statik: her antrenman oturumunda yeni bir servis örneği oluşsa bile
+  // egzersiz listesi uygulama boyunca bir kez çözülür.
+  static List<Exercise>? _cachedAllExercises;
 
   // Artık isme, çeviriye veya yapay zekanın uydurmalarına ihtiyacımız yok.
   // Supabase'den gelen programdaki "id" değerini buraya veriyoruz.
@@ -15,9 +24,7 @@ class ExerciseService {
         final String jsonString = await rootBundle.loadString(
           'assets/exercises.json',
         );
-        final List<dynamic> data = json.decode(jsonString);
-        _cachedAllExercises =
-            data.map((json) => Exercise.fromJson(json)).toList();
+        _cachedAllExercises = await compute(_parseExercises, jsonString);
       }
 
       // ID'ler benzersiz olduğu için milisaniyede tam isabet bulur (%0 hata payı)
