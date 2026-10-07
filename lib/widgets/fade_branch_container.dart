@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 /// Alt bar sekmeleri arasında geçişi yatay kayma ile yapar (fade yok).
@@ -94,13 +95,20 @@ class _FadeBranchContainerState extends State<FadeBranchContainer>
                   offset: Offset(_direction * (1 - t) * width, 0),
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.14 * (1 - t)),
-                          blurRadius: 32,
-                          offset: Offset(-_direction * 6.0, 0),
-                        ),
-                      ],
+                      // Tam ekran katmanda büyük bulanık gölge web'de pahalı;
+                      // orada atlanır (yalnızca mobilde derinlik gölgesi).
+                      boxShadow:
+                          kIsWeb
+                              ? const []
+                              : [
+                                BoxShadow(
+                                  color: Colors.black.withValues(
+                                    alpha: 0.14 * (1 - t),
+                                  ),
+                                  blurRadius: 32,
+                                  offset: Offset(-_direction * 6.0, 0),
+                                ),
+                              ],
                     ),
                     child: child,
                   ),
