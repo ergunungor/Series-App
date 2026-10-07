@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../models/program.dart';
 import 'app_bottom_nav.dart';
-import 'app_logo.dart';
-import 'pressable_scale.dart';
-import 'reveal.dart';
 
+/// Aktif program seçme sheet'i: krem zeminde tek beyaz kart içinde ince çizgili
+/// satırlar (iOS ayarlar listesi gibi). Seçili satır kiremit radyo ve kiremit
+/// yazı; bir satıra dokunmak sheet'i kapatıp o programı döndürür.
 Future<ActiveProgram?> showSelectActiveProgramSheet({
   required BuildContext context,
   required List<ActiveProgram> programs,
@@ -23,7 +24,7 @@ Future<ActiveProgram?> showSelectActiveProgramSheet({
           MediaQuery.of(context).padding.bottom + AppBottomNav.clearance;
 
       return DraggableScrollableSheet(
-        initialChildSize: 0.55,
+        initialChildSize: 0.6,
         minChildSize: 0.3,
         maxChildSize: 0.85,
         expand: false,
@@ -46,7 +47,7 @@ Future<ActiveProgram?> showSelectActiveProgramSheet({
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
@@ -59,32 +60,66 @@ Future<ActiveProgram?> showSelectActiveProgramSheet({
                     ),
                   ),
                 ),
-                // Sabit ConstrainedBox yerine DraggableScrollableSheet kullanan
-                // esnek liste: uzun olsa da akıcı kayar.
+                // Liste başlığın altında sert kesilmesin diye üstte yumuşak geçiş.
                 Expanded(
-                  child: ListView.separated(
-                    controller: scrollController,
-                    physics: const BouncingScrollPhysics(
-                      parent: AlwaysScrollableScrollPhysics(),
+                  child: ShaderMask(
+                    blendMode: BlendMode.dstIn,
+                    shaderCallback:
+                        (rect) => const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Colors.black],
+                          stops: [0, 0.04],
+                        ).createShader(rect),
+                    child: ListView(
+                      controller: scrollController,
+                      physics: const BouncingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
+                      ),
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        6,
+                        16,
+                        bottomPadding + 24,
+                      ),
+                      children: [
+                        Container(
+                          clipBehavior: Clip.antiAlias,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(22),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 16,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              for (var i = 0; i < programs.length; i++) ...[
+                                if (i > 0)
+                                  const Divider(
+                                    height: 1,
+                                    thickness: 0.5,
+                                    indent: 52,
+                                    color: AppColors.borderSubtle,
+                                  ),
+                                _ProgramRow(
+                                  program: programs[i],
+                                  isActive: programs[i].id == currentActiveId,
+                                  onTap:
+                                      () => Navigator.of(
+                                        context,
+                                      ).pop(programs[i]),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding + 24),
-                    itemCount: programs.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final program = programs[index];
-                      final card = _ProgramOptionCard(
-                        program: program,
-                        isActive: program.id == currentActiveId,
-                        onTap: () => Navigator.of(context).pop(program),
-                      );
-                      if (index >= _revealedItems) return card;
-                      return Reveal(
-                        delay: _revealStagger * index,
-                        duration: _revealDuration,
-                        offsetY: 10,
-                        child: card,
-                      );
-                    },
                   ),
                 ),
               ],
@@ -96,135 +131,117 @@ Future<ActiveProgram?> showSelectActiveProgramSheet({
   );
 }
 
-// Sheet açılışında ilk kartlar sırayla belirir; lazy listede gerisi animasyonsuz.
-const int _revealedItems = 5;
-const Duration _revealStagger = Duration(milliseconds: 60);
-const Duration _revealDuration = Duration(milliseconds: 400);
-
-class _ProgramOptionCard extends StatelessWidget {
+class _ProgramRow extends StatefulWidget {
   final ActiveProgram program;
   final bool isActive;
   final VoidCallback onTap;
 
-  const _ProgramOptionCard({
+  const _ProgramRow({
     required this.program,
     required this.isActive,
     required this.onTap,
   });
 
-  static const double _radius = 22;
-  static const double _tileSize = 46;
-  static const double _indicatorSize = 26;
-  static const double _activeBorderWidth = 1.5;
+  @override
+  State<_ProgramRow> createState() => _ProgramRowState();
+}
 
-  String get _summary {
+class _ProgramRowState extends State<_ProgramRow> {
+  static const double _radio = 22;
+
+  bool _isPressed = false;
+
+  void _setPressed(bool value) {
+    if (_isPressed != value) setState(() => _isPressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final program = widget.program;
     final days = program.workouts.length;
     final exercises = program.workouts.fold<int>(
       0,
       (sum, w) => sum + w.exercises.length,
     );
-    return '$days gün · $exercises hareket';
-  }
+    final active = widget.isActive;
 
-  @override
-  Widget build(BuildContext context) {
-    return PressableScale(
-      pressedScale: 0.98,
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(_radius),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        // Seçim çerçevesi layout'u kaydırmasın diye hep var, aktif değilken şeffaf.
-        foregroundDecoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(_radius),
-          border: Border.all(
-            color: isActive ? AppColors.homeHero : Colors.transparent,
-            width: _activeBorderWidth,
-          ),
-        ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _setPressed(true),
+      onTapUp: (_) => _setPressed(false),
+      onTapCancel: () => _setPressed(false),
+      onTap: () {
+        HapticFeedback.selectionClick();
+        widget.onTap();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        color: _isPressed ? AppColors.fillSubtle : Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Container(
-              width: _tileSize,
-              height: _tileSize,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                gradient:
-                    isActive
-                        ? const LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [AppColors.homeHero, AppColors.homeHeroDeep],
-                        )
-                        : null,
-                color: isActive ? null : AppColors.fillSubtle,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: AppLogo(
-                explicitSize: 28,
-                type: isActive ? AppLogoType.light : AppLogoType.dark,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    program.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.body16Medium.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _summary,
-                    style: AppTypography.body12Regular.copyWith(
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: _indicatorSize,
-              height: _indicatorSize,
+              curve: Curves.easeOut,
+              width: _radio,
+              height: _radio,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isActive ? AppColors.homeHero : Colors.transparent,
+                color: active ? AppColors.homeHero : Colors.transparent,
                 border: Border.all(
                   color:
-                      isActive
+                      active
                           ? AppColors.homeHero
                           : AppColors.textTertiary.withValues(alpha: 0.4),
                   width: 1.5,
                 ),
               ),
-              child:
-                  isActive
-                      ? const Icon(
-                        Icons.check_rounded,
-                        size: 16,
-                        color: Colors.white,
-                      )
-                      : null,
+              child: AnimatedScale(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutBack,
+                scale: active ? 1 : 0,
+                child: const Icon(
+                  Icons.check_rounded,
+                  size: 14,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                program.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.body16Medium.copyWith(
+                  color: active ? AppColors.homeHero : AppColors.textPrimary,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                  height: 1.25,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$days gün',
+                  style: AppTypography.body12Medium.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
+                  ),
+                ),
+                Text(
+                  '$exercises hareket',
+                  style: AppTypography.body12Regular.copyWith(
+                    color: AppColors.textTertiary,
+                    height: 1.3,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
