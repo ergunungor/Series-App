@@ -3,8 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
-import '../widgets/app_logo.dart';
 import '../widgets/app_button.dart';
+import '../widgets/auth_scaffold.dart';
 import '../widgets/otp_input.dart';
 
 class VerificationScreen extends StatefulWidget {
@@ -24,9 +24,12 @@ class VerificationScreen extends StatefulWidget {
 class _VerificationScreenState extends State<VerificationScreen> {
   bool _isLoading = false;
   String _otpCode = '';
+  // Hata olunca alanları sallamak için artan sayaç (yalnızca görsel).
+  int _shakeCount = 0;
 
   Future<void> _verifyCode() async {
     if (_otpCode.length < 6) {
+      setState(() => _shakeCount++);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Lütfen 6 haneli kodu eksiksiz girin.')),
       );
@@ -60,12 +63,14 @@ class _VerificationScreenState extends State<VerificationScreen> {
       }
     } on AuthException catch (error) {
       if (mounted) {
+        setState(() => _shakeCount++);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(error.message)));
       }
     } catch (error) {
       if (mounted) {
+        setState(() => _shakeCount++);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Doğrulama sırasında bir hata oluştu.')),
         );
@@ -79,51 +84,50 @@ class _VerificationScreenState extends State<VerificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
+    return AuthScaffold(
+      title: 'E-mail Doğrulama',
+      onBack: () => context.pop(),
+      children: [
+        Text.rich(
+          TextSpan(
             children: [
-              const SizedBox(height: 52),
-              const AppLogo(size: AppLogoSize.medium, type: AppLogoType.dark),
-              const SizedBox(height: 32),
-              Text(
-                'E-mail Doğrulama',
-                textAlign: TextAlign.center,
-                style: AppTypography.heading1.copyWith(
+              TextSpan(
+                text: widget.email,
+                style: const TextStyle(
                   color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                '${widget.email} adresinize gelen\ndoğrulama kodunu giriniz.',
-                textAlign: TextAlign.center,
-                style: AppTypography.body16Regular.copyWith(
-                  color: Colors.black,
-                ),
+              const TextSpan(
+                text: ' adresinize gelen\ndoğrulama kodunu giriniz.',
               ),
-              const SizedBox(height: 24),
-              // YENİ: length parametresini 6 yaptık
-              OtpInput(
-                length: 6,
-                onCompleted: (code) {
-                  setState(() => _otpCode = code);
-                  _verifyCode(); // Kullanıcı 6. rakamı girince otomatik doğrula
-                },
-              ),
-              const Spacer(),
-              AppButton(
-                text: _isLoading ? 'DOĞRULANIYOR...' : 'DEVAM ET',
-                showIcon: false,
-                onPressed: _isLoading ? null : _verifyCode,
-              ),
-              const SizedBox(height: 24),
             ],
           ),
+          style: AppTypography.body16Regular.copyWith(
+            color: AppColors.textTertiary,
+            height: 1.45,
+          ),
         ),
-      ),
+        const SizedBox(height: 24),
+        AuthShake(
+          trigger: _shakeCount,
+          // YENİ: length parametresini 6 yaptık
+          child: OtpInput(
+            length: 6,
+            onCompleted: (code) {
+              setState(() => _otpCode = code);
+              _verifyCode(); // Kullanıcı 6. rakamı girince otomatik doğrula
+            },
+          ),
+        ),
+        const SizedBox(height: 28),
+        AppButton(
+          text: _isLoading ? 'DOĞRULANIYOR...' : 'DEVAM ET',
+          showIcon: false,
+          isLoading: _isLoading,
+          onPressed: _isLoading ? null : _verifyCode,
+        ),
+      ],
     );
   }
 }

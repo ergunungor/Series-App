@@ -28,11 +28,15 @@ class WorkoutHistorySession {
   final DateTime completedAt;
   final List<LoggedSet> sets;
 
+  /// Antrenman sayacı süresi (sn). Süre kaydı eklenmeden önceki seanslarda null.
+  final int? durationSeconds;
+
   WorkoutHistorySession({
     required this.workoutId,
     required this.workoutName,
     required this.completedAt,
     required this.sets,
+    this.durationSeconds,
   });
 
   int get exerciseCount => sets.map((s) => s.exerciseName).toSet().length;

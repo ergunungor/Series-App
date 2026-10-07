@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -12,7 +13,12 @@ import '../widgets/add_program_sheet.dart';
 import '../widgets/app_confirm_dialog.dart';
 import '../widgets/app_logo.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/detail_hero.dart' show HeroStatusBarScope;
+import '../widgets/hero_stats_row.dart';
+import '../widgets/kiremit_hero_surface.dart';
 import '../widgets/reveal.dart';
+import '../widgets/screen_title_block.dart';
+import '../widgets/app_bottom_nav.dart';
 
 class ProgramsScreen extends StatefulWidget {
   const ProgramsScreen({super.key});
@@ -24,9 +30,8 @@ class ProgramsScreen extends StatefulWidget {
 class _ProgramsScreenState extends State<ProgramsScreen> {
   // Home ile aynı yatay sayfa boşluğu; sekmeler arası geçişte içerik kaymasın.
   static const double _pagePadding = 16;
-  // AppBottomNav'ın kapladığı alan: 86 yükseklik + 16 alt marj. Nav dosyasına
-  // dokunmadığımız için burada tutuluyor; nav ölçüleri değişirse güncellenmeli.
-  static const double _navBarClearance = 102;
+  // AppBottomNav'ın büyük hâldeki kapladığı alan (yükseklik + alt marj).
+  static const double _navBarClearance = AppBottomNav.clearance;
   static const double _fabGap = 16;
   // Giriş animasyonu (Home ile aynı ritim). Grid'de sadece ilk ekrandaki
   // kartlar animasyonlanır; geri kalanı lazy olduğu için kaydırınca tekrar oynardı.
@@ -97,17 +102,6 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     });
   }
 
-  Future<bool> _confirmDeleteProgram(ActiveProgram program) async {
-    return showAppConfirmDialog(
-      context: context,
-      title: 'Programı Sil',
-      message:
-          '"${program.name}" programını silmek istediğine emin misin? Bu işlem geri alınamaz.',
-      confirmLabel: 'Sil',
-      isDestructive: true,
-    );
-  }
-
   void _enterSelectionMode() {
     setState(() => _isSelectionMode = true);
   }
@@ -161,76 +155,107 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     }
   }
 
-  Widget _buildHeader() {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(_pagePadding, 16, _pagePadding, 16),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child:
-              _isSelectionMode
-                  ? Row(
-                    key: const ValueKey('selection_header'),
-                    children: [
-                      _GlassIconButton(
-                        icon: CupertinoIcons.xmark,
-                        onTap: _exitSelectionMode,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(
-                          '${_selectedIds.length} Seçili',
-                          style: AppTypography.heading2.copyWith(
-                            color: AppColors.textPrimary,
-                          ),
+  // Hero içindeki başlık satırı: normal başlık ya da seçim modu başlığı.
+  Widget _buildHeaderRow() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      child:
+          _isSelectionMode
+              ? SizedBox(
+                key: const ValueKey('selection_header'),
+                height: ScreenTitleBlock.height,
+                child: Row(
+                  children: [
+                    _GlassIconButton(
+                      icon: CupertinoIcons.xmark,
+                      onTap: _exitSelectionMode,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        '${_selectedIds.length} Seçili',
+                        style: AppTypography.heading2.copyWith(
+                          color: Colors.white,
                         ),
                       ),
-                      _GlassIconButton(
-                        icon: CupertinoIcons.check_mark_circled,
-                        onTap: _selectAll,
-                      ),
-                      const SizedBox(width: 12),
-                      _GlassIconButton(
-                        icon: CupertinoIcons.trash,
-                        color: CupertinoColors.destructiveRed,
-                        onTap: _selectedIds.isEmpty ? () {} : _deleteSelected,
-                      ),
-                    ],
-                  )
-                  : Row(
-                    key: const ValueKey('normal_header'),
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Kütüphane',
-                              style: AppTypography.body18Medium.copyWith(
-                                color: AppColors.textTertiary,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Programlar',
-                              style: AppTypography.heading1.copyWith(
-                                color: AppColors.espresso,
-                                fontSize: 34,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.6,
-                              ),
+                    ),
+                    _GlassIconButton(
+                      icon: CupertinoIcons.check_mark_circled,
+                      onTap: _selectAll,
+                    ),
+                    const SizedBox(width: 12),
+                    _GlassIconButton(
+                      icon: CupertinoIcons.trash,
+                      destructive: true,
+                      onTap: _selectedIds.isEmpty ? () {} : _deleteSelected,
+                    ),
+                  ],
+                ),
+              )
+              : ScreenTitleBlock(
+                key: const ValueKey('normal_header'),
+                eyebrow: 'Kütüphane',
+                title: 'Programlar',
+                titleColor: Colors.white,
+                eyebrowColor: Colors.white.withValues(alpha: 0.65),
+                trailing:
+                    _programs.isNotEmpty
+                        ? _GlassIconButton(
+                          icon: CupertinoIcons.check_mark_circled,
+                          onTap: _enterSelectionMode,
+                        )
+                        : null,
+              ),
+    );
+  }
+
+  // Tam ekran espresso hero: wordmark, başlık satırı ve üç rakam (program sayısı,
+  // aktif programın gün ve hareket sayısı).
+  Widget _buildScreenHero(GlobalKey heroKey) {
+    final active = _programs.where((p) => p.id == _activeProgramId).firstOrNull;
+    final exercises =
+        active?.workouts.fold<int>(0, (sum, w) => sum + w.exercises.length) ??
+        0;
+
+    return KiremitHeroSurface(
+      heroKey: heroKey,
+      topColor: AppColors.espresso,
+      bottomColor: AppColors.heroDarkEnd,
+      glowColor: AppColors.espressoGlow,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          _pagePadding,
+          MediaQuery.paddingOf(context).top + 12,
+          _pagePadding,
+          28,
+        ),
+        child: Column(
+          children: [
+            SeriesWordmark(color: Colors.white.withValues(alpha: 0.9)),
+            // Diğer sekmelerle aynı başlık konumu (wordmark + 16 boşluk).
+            const SizedBox(height: 16),
+            _buildHeaderRow(),
+            if (_isLoading || _programs.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              AnimatedSwitcher(
+                duration: _heroSwitchDuration,
+                child:
+                    _isLoading
+                        ? const HeroStatsSkeleton()
+                        : HeroStatsRow(
+                          stats: [
+                            HeroStat(_programs.length, 'Program'),
+                            HeroStat(active?.workouts.length ?? 0, 'Gün'),
+                            HeroStat(
+                              exercises,
+                              'Hareket',
+                              valueColor: AppColors.accentGold,
                             ),
                           ],
                         ),
-                      ),
-                      if (_programs.isNotEmpty)
-                        _GlassIconButton(
-                          icon: CupertinoIcons.check_mark_circled,
-                          onTap: _enterSelectionMode,
-                        ),
-                    ],
-                  ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -338,7 +363,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
             ),
             child: const Icon(
               CupertinoIcons.exclamationmark_triangle_fill,
-              color: CupertinoColors.destructiveRed,
+              color: AppColors.error,
               size: 20,
             ),
           ),
@@ -432,148 +457,162 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
-            slivers: [
-              const SliverSafeArea(
-                sliver: SliverToBoxAdapter(child: SizedBox(height: 12)),
-                bottom: false,
-              ),
-              const SliverToBoxAdapter(child: SeriesWordmark()),
-              _buildHeader(),
-              _buildGenerationStatus(),
-
-              // Hero alanı: Home'daki gibi iskelet ↔ içerik crossfade (aynı ölçü,
-              // layout zıplamaz).
-              if (_isLoading || hero != null)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: _pagePadding,
-                      vertical: 16,
-                    ),
-                    child: AnimatedSwitcher(
-                      duration: _heroSwitchDuration,
-                      child: _isLoading ? const _FeaturedSkeleton() : hero,
-                    ),
+      body: HeroStatusBarScope(
+        builder:
+            (context, heroKey) => Stack(
+              children: [
+                CustomScrollView(
+                  physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
                   ),
-                ),
+                  slivers: [
+                    SliverToBoxAdapter(child: _buildScreenHero(heroKey)),
+                    const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                    _buildGenerationStatus(),
 
-              if (!_isLoading)
-                if (_programs.isEmpty &&
-                    generationStateNotifier.value == GenerationStatus.idle)
-                  SliverFillRemaining(
-                    child: _PremiumEmptyState(
-                      onCreate: () => context.push<bool>('/onboarding-survey'),
-                    ),
-                  )
-                else ...[
-                  // Grid Other Programs
-                  if (otherPrograms.isNotEmpty)
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: _pagePadding,
+                    // Hero alanı: Home'daki gibi iskelet ↔ içerik crossfade (aynı ölçü,
+                    // layout zıplamaz).
+                    if (_isLoading || hero != null)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: _pagePadding,
+                            vertical: 16,
+                          ),
+                          child: AnimatedSwitcher(
+                            duration: _heroSwitchDuration,
+                            child:
+                                _isLoading ? const _FeaturedSkeleton() : hero,
+                          ),
+                        ),
                       ),
-                      sliver: SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 16,
-                              crossAxisSpacing: 16,
-                              childAspectRatio: 0.85,
+
+                    if (!_isLoading)
+                      if (_programs.isEmpty &&
+                          generationStateNotifier.value ==
+                              GenerationStatus.idle)
+                        SliverFillRemaining(
+                          child: _PremiumEmptyState(
+                            onCreate:
+                                () => context.push<bool>('/onboarding-survey'),
+                          ),
+                        )
+                      else ...[
+                        // Grid Other Programs
+                        if (otherPrograms.isNotEmpty)
+                          SliverPadding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: _pagePadding,
                             ),
-                        delegate: SliverChildBuilderDelegate((context, index) {
-                          final program = otherPrograms[index];
-                          final card = _DismissibleWrapper(
-                            program: program,
-                            isSelectionMode: _isSelectionMode,
-                            onDeleteConfirmed: () async {
-                              final originalIndex = _programs.indexOf(program);
-                              setState(() => _programs.removeAt(originalIndex));
-                              try {
-                                await ProgramRepository.deleteProgram(program.id);
-                              } catch (e) {
-                                debugPrint(e.toString());
-                              }
-                            },
-                            child: _GridProgramCard(
-                              program: program,
-                              isSelected: _selectedIds.contains(program.id),
-                              isSelectionMode: _isSelectionMode,
-                              onTap: () {
-                                if (_isSelectionMode) {
-                                  _toggleSelection(program.id);
-                                } else {
-                                  context
-                                      .push<bool>(
-                                        '/program-detail',
-                                        extra: program,
-                                      )
-                                      .then((v) {
-                                        if (v == true) _fetch();
-                                      });
+                            sliver: SliverGrid(
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    mainAxisSpacing: 16,
+                                    crossAxisSpacing: 16,
+                                    childAspectRatio: 0.85,
+                                  ),
+                              delegate: SliverChildBuilderDelegate((
+                                context,
+                                index,
+                              ) {
+                                final program = otherPrograms[index];
+                                final card = _DismissibleWrapper(
+                                  program: program,
+                                  isSelectionMode: _isSelectionMode,
+                                  onDeleteConfirmed: () async {
+                                    final originalIndex = _programs.indexOf(
+                                      program,
+                                    );
+                                    setState(
+                                      () => _programs.removeAt(originalIndex),
+                                    );
+                                    try {
+                                      await ProgramRepository.deleteProgram(
+                                        program.id,
+                                      );
+                                    } catch (e) {
+                                      debugPrint(e.toString());
+                                    }
+                                  },
+                                  child: _GridProgramCard(
+                                    program: program,
+                                    isSelected: _selectedIds.contains(
+                                      program.id,
+                                    ),
+                                    isSelectionMode: _isSelectionMode,
+                                    onTap: () {
+                                      if (_isSelectionMode) {
+                                        _toggleSelection(program.id);
+                                      } else {
+                                        context
+                                            .push<bool>(
+                                              '/program-detail',
+                                              extra: program,
+                                            )
+                                            .then((v) {
+                                              if (v == true) _fetch();
+                                            });
+                                      }
+                                    },
+                                    onLongPress: _enterSelectionMode,
+                                  ),
+                                );
+                                if (!_isIntroActive ||
+                                    index >= _revealedGridItems) {
+                                  return card;
                                 }
-                              },
-                              onLongPress: _enterSelectionMode,
+                                return Reveal(
+                                  delay: _revealStagger * (1 + index),
+                                  duration: _revealDuration,
+                                  child: card,
+                                );
+                              }, childCount: otherPrograms.length),
                             ),
-                          );
-                          if (!_isIntroActive || index >= _revealedGridItems) {
-                            return card;
-                          }
-                          return Reveal(
-                            delay: _revealStagger * (1 + index),
-                            duration: _revealDuration,
-                            child: card,
-                          );
-                        }, childCount: otherPrograms.length),
-                      ),
-                    ),
+                          ),
 
-                  // Bottom padding to avoid FAB overlap
-                  SliverToBoxAdapter(
-                    child: SizedBox(
-                      height:
-                          MediaQuery.paddingOf(context).bottom +
-                          _navBarClearance +
-                          _LiquidGlassFab.height +
-                          _fabGap * 2,
+                        // Bottom padding to avoid FAB overlap
+                        SliverToBoxAdapter(
+                          child: SizedBox(
+                            height:
+                                MediaQuery.paddingOf(context).bottom +
+                                _navBarClearance +
+                                _LiquidGlassFab.height +
+                                _fabGap * 2,
+                          ),
+                        ),
+                      ],
+                  ],
+                ),
+
+                if (!_isSelectionMode)
+                  Positioned(
+                    bottom:
+                        MediaQuery.paddingOf(context).bottom +
+                        _navBarClearance +
+                        _fabGap,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: _LiquidGlassFab(
+                        onTap:
+                            () => showAddProgramSheet(
+                              context: context,
+                              onCreateWithAi: () async {
+                                await context.push<bool>('/onboarding-survey');
+                              },
+                              onImportProgram: () async {
+                                final created = await context.push<bool>(
+                                  '/import-program',
+                                );
+                                if (created == true) _fetch();
+                              },
+                            ),
+                      ),
                     ),
                   ),
-                ],
-            ],
-          ),
-
-          if (!_isSelectionMode)
-            Positioned(
-              bottom:
-                  MediaQuery.paddingOf(context).bottom +
-                  _navBarClearance +
-                  _fabGap,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: _LiquidGlassFab(
-                  onTap:
-                      () => showAddProgramSheet(
-                        context: context,
-                        onCreateWithAi: () async {
-                          await context.push<bool>('/onboarding-survey');
-                        },
-                        onImportProgram: () async {
-                          final created = await context.push<bool>(
-                            '/import-program',
-                          );
-                          if (created == true) _fetch();
-                        },
-                      ),
-                ),
-              ),
+              ],
             ),
-        ],
       ),
     );
   }
@@ -966,43 +1005,119 @@ class _PremiumEmptyState extends StatelessWidget {
   }
 }
 
-class _LiquidGlassFab extends StatelessWidget {
+/// "Program Ekle" butonu: Programlar sekmesi her göründüğünde yazılı hâliyle
+/// çıkar, [_collapseDelay] sonra yalnızca "+" dairesine daralır.
+class _LiquidGlassFab extends StatefulWidget {
   final VoidCallback onTap;
   const _LiquidGlassFab({required this.onTap});
 
   static const double height = 52;
 
   @override
+  State<_LiquidGlassFab> createState() => _LiquidGlassFabState();
+}
+
+class _LiquidGlassFabState extends State<_LiquidGlassFab> {
+  static const Duration _collapseDelay = Duration(milliseconds: 800);
+  static const Duration _morphDuration = Duration(milliseconds: 380);
+  static const double _compactPadding = 16; // 16 + 20 ikon + 16 = 52 daire
+  static const double _expandedPadding = 22;
+
+  bool _isCompact = false;
+  bool _wasTabActive = false;
+  Timer? _collapseTimer;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Sekme kabuğu görünmeyen sekmelerin ticker'larını kapatır; sekme tekrar
+    // görününce (true'ya dönünce) buton yeniden yazılı açılıp daralır.
+    final isActive = TickerMode.valuesOf(context).enabled;
+    if (isActive && !_wasTabActive) {
+      _collapseTimer?.cancel();
+      if (_isCompact) setState(() => _isCompact = false);
+      _collapseTimer = Timer(_collapseDelay, () {
+        if (mounted) setState(() => _isCompact = true);
+      });
+    }
+    _wasTabActive = isActive;
+  }
+
+  @override
+  void dispose() {
+    _collapseTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return PressableScale(
-      onTap: onTap,
-      child: Container(
-        height: height,
-        padding: const EdgeInsets.symmetric(horizontal: 22),
-        decoration: BoxDecoration(
-          color: AppColors.accentGold,
-          borderRadius: BorderRadius.circular(height / 2),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.goldDeep.withValues(alpha: 0.35),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(CupertinoIcons.add, color: AppColors.espresso, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              'Program Ekle',
-              style: AppTypography.body16Medium.copyWith(
-                color: AppColors.espresso,
-                fontWeight: FontWeight.w700,
+    return Semantics(
+      label: 'Program Ekle',
+      button: true,
+      excludeSemantics: true,
+      child: PressableScale(
+        onTap: widget.onTap,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween<double>(end: _isCompact ? 0 : 1),
+          duration: _morphDuration,
+          curve: Curves.easeInOutCubic,
+          builder:
+              (context, t, _) => Container(
+                height: _LiquidGlassFab.height,
+                padding: EdgeInsets.symmetric(
+                  horizontal:
+                      _compactPadding +
+                      (_expandedPadding - _compactPadding) * t,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.accentGold,
+                  borderRadius: BorderRadius.circular(
+                    _LiquidGlassFab.height / 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.goldDeep.withValues(alpha: 0.35),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      CupertinoIcons.add,
+                      color: AppColors.espresso,
+                      size: 20,
+                    ),
+                    // Yazı: genişliği ve opaklığı t ile birlikte kapanır.
+                    ClipRect(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: t,
+                        child: Opacity(
+                          opacity: t,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(width: 8),
+                              Text(
+                                'Program Ekle',
+                                maxLines: 1,
+                                softWrap: false,
+                                style: AppTypography.body16Medium.copyWith(
+                                  color: AppColors.espresso,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
         ),
       ),
     );
@@ -1046,7 +1161,7 @@ class _DismissibleWrapper extends StatelessWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 32),
         decoration: BoxDecoration(
-          color: CupertinoColors.destructiveRed,
+          color: AppColors.error,
           borderRadius: BorderRadius.circular(24), // Hero ve Grid'e uyan radius
         ),
         child: const Icon(CupertinoIcons.trash, color: Colors.white, size: 28),
@@ -1056,12 +1171,18 @@ class _DismissibleWrapper extends StatelessWidget {
   }
 }
 
+/// Koyu hero üzerinde 44px yarı saydam beyaz daire buton; [destructive] ise
+/// kırmızı dolgu (silme).
 class _GlassIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
-  final Color? color;
+  final bool destructive;
 
-  const _GlassIconButton({required this.icon, required this.onTap, this.color});
+  const _GlassIconButton({
+    required this.icon,
+    required this.onTap,
+    this.destructive = false,
+  });
 
   static const double _size = 44;
   static const double _pressedScale = 0.92;
@@ -1075,11 +1196,14 @@ class _GlassIconButton extends StatelessWidget {
         width: _size,
         height: _size,
         alignment: Alignment.center,
-        decoration: const BoxDecoration(
-          color: AppColors.fillSubtle,
+        decoration: BoxDecoration(
+          color:
+              destructive
+                  ? AppColors.error
+                  : Colors.white.withValues(alpha: 0.14),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, size: 20, color: color ?? AppColors.brandTertiary),
+        child: Icon(icon, size: 20, color: Colors.white),
       ),
     );
   }

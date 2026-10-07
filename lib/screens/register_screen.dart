@@ -3,8 +3,10 @@ import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/app_input.dart';
 import '../widgets/app_button.dart';
+import '../widgets/auth_scaffold.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -22,6 +24,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _isLoading = false; // Butona basılınca yükleniyor animasyonu/engeli için
   bool _rememberMe = false;
+  // Hata olunca alanları sallamak için artan sayaç (yalnızca görsel).
+  int _shakeCount = 0;
 
   @override
   void dispose() {
@@ -36,6 +40,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _signUp() async {
     // 1. Şifrelerin eşleşip eşleşmediğini kontrol et
     if (_passwordController.text != _passwordConfirmController.text) {
+      setState(() => _shakeCount++);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Şifreler birbiriyle eşleşmiyor!')),
       );
@@ -52,6 +57,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         password: _passwordController.text,
       );
 
+      // "Beni hatırla" seçimini Giriş ekranındaki gibi kaydet; yönlendirici
+      // açılışta bu tercihe bakıp oturumu koruyor ya da kapatıyor.
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('remember_me', _rememberMe);
+
       // 3. İşlem başarılıysa, profili OLUŞTURMADAN doğrudan doğrulama ekranına git.
       if (mounted) {
         context.push(
@@ -64,6 +74,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     } on AuthException catch (error) {
       if (mounted) {
+        setState(() => _shakeCount++);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(error.message)));
@@ -86,112 +97,116 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Kayıt Ol',
-                  textAlign: TextAlign.center,
-                  style: AppTypography.heading1.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                AppInput(
-                  controller: _nameController,
-                  hintText: 'Ad Soyad',
-                  prefixIcon: Icons.person_outline,
-                ),
-                const SizedBox(height: 16),
-                AppInput(
-                  controller: _emailController,
-                  hintText: 'E-mail Adresiniz',
-                  prefixIcon: Icons.mail_outline,
-                ),
-                const SizedBox(height: 16),
-                AppInput(
-                  controller: _passwordController,
-                  hintText: 'Şifre',
-                  prefixIcon: Icons.lock_outline,
-                  isPassword: true,
-                ),
-                const SizedBox(height: 16),
-                AppInput(
-                  controller: _passwordConfirmController,
-                  hintText: 'Şifreyi Tekrar Giriniz',
-                  prefixIcon: Icons.lock_outline,
-                  isPassword: true,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: Checkbox(
-                            value: _rememberMe,
-                            onChanged:
-                                (v) => setState(() => _rememberMe = v ?? false),
-                            side: BorderSide(color: AppColors.brandSecondary),
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        Text(
-                          'Beni hatırla',
-                          style: AppTypography.body12Medium.copyWith(
-                            color: AppColors.brandSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      'Şifremi unuttum',
-                      style: AppTypography.body12Medium.copyWith(
-                        color: AppColors.brandSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                AppButton(
-                  text: _isLoading ? 'KAYDEDİLİYOR...' : 'KAYIT OL',
-                  showIcon: false,
-                  // Yükleniyorsa butona tekrar basılmasını engelle, değilse fonksiyonu çağır
-                  onPressed: _isLoading ? null : _signUp,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Zaten hesabınız var mı?',
-                  textAlign: TextAlign.center,
-                  style: AppTypography.body12Medium.copyWith(
-                    color: AppColors.brandSecondary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                AppButton(
-                  text: 'GİRİŞ YAP',
-                  variant: AppButtonVariant.outlined,
-                  showIcon: false,
-                  onPressed: () {
-                    context.go('/login');
-                  }, // Giriş ekranına geçiş
-                ),
-              ],
-            ),
+    return AuthScaffold(
+      title: 'Kayıt Ol',
+      onBack: () => context.pop(),
+      children: [
+        AuthShake(
+          trigger: _shakeCount,
+          child: Column(
+            children: [
+              AppInput(
+                controller: _nameController,
+                hintText: 'Ad Soyad',
+                prefixIcon: Icons.person_outline,
+              ),
+              const SizedBox(height: 12),
+              AppInput(
+                controller: _emailController,
+                hintText: 'E-mail Adresiniz',
+                keyboardType: TextInputType.emailAddress,
+                prefixIcon: Icons.mail_outline,
+              ),
+              const SizedBox(height: 12),
+              AppInput(
+                controller: _passwordController,
+                hintText: 'Şifre',
+                prefixIcon: Icons.lock_outline,
+                isPassword: true,
+              ),
+              const SizedBox(height: 12),
+              AppInput(
+                controller: _passwordConfirmController,
+                hintText: 'Şifreyi Tekrar Giriniz',
+                prefixIcon: Icons.lock_outline,
+                isPassword: true,
+              ),
+            ],
           ),
         ),
-      ),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _rememberMe = !_rememberMe),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: Checkbox(
+                      value: _rememberMe,
+                      onChanged:
+                          (v) => setState(() => _rememberMe = v ?? false),
+                      activeColor: AppColors.homeHero,
+                      side: const BorderSide(
+                        color: AppColors.textTertiary,
+                        width: 1.5,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Beni hatırla',
+                    style: AppTypography.body12Medium.copyWith(
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => context.push('/forgot-password'),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'Şifremi unuttum',
+                  style: AppTypography.body12Medium.copyWith(
+                    color: AppColors.homeHero,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        AppButton(
+          text: _isLoading ? 'KAYDEDİLİYOR...' : 'KAYIT OL',
+          showIcon: false,
+          isLoading: _isLoading,
+          // Yükleniyorsa butona tekrar basılmasını engelle, değilse fonksiyonu çağır
+          onPressed: _isLoading ? null : _signUp,
+        ),
+        const SizedBox(height: 16),
+        const AuthDivider(label: 'Zaten hesabınız var mı?'),
+        const SizedBox(height: 16),
+        AppButton(
+          text: 'GİRİŞ YAP',
+          variant: AppButtonVariant.outlined,
+          showIcon: false,
+          onPressed: () {
+            context.go('/login');
+          }, // Giriş ekranına geçiş
+        ),
+      ],
     );
   }
 }

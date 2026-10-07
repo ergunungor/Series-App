@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
+import 'pressable_scale.dart';
 
 class ExerciseTimerWidget extends StatefulWidget {
   final int durationSeconds;
@@ -77,61 +78,107 @@ class _ExerciseTimerWidgetState extends State<ExerciseTimerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.brandSecondary.withValues(alpha: 0.5),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            _formattedTime,
-            style: AppTypography.heading1.copyWith(
-              fontSize: 48,
-              color:
-                  _remainingSeconds == 0
-                      ? Colors.green
-                      : AppColors.brandPrimary,
-            ),
+    final total = widget.durationSeconds == 0 ? 1 : widget.durationSeconds;
+    final progress = 1 - _remainingSeconds / total;
+    final isDone = _remainingSeconds == 0;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          _formattedTime,
+          style: AppTypography.heading1.copyWith(
+            fontSize: 56,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -2,
+            height: 1,
+            fontFeatures: const [FontFeature.tabularFigures()],
+            color: isDone ? AppColors.success : AppColors.textPrimary,
           ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                onPressed: _resetTimer,
-                icon: Icon(Icons.replay, color: AppColors.textTertiary),
-                iconSize: 28,
-              ),
-              const SizedBox(width: 16),
-              InkWell(
-                onTap: _isRunning ? _stopTimer : _startTimer,
-                borderRadius: BorderRadius.circular(30),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color:
-                        _isRunning
-                            ? Colors.orange.withValues(alpha: 0.2)
-                            : AppColors.brandPrimary.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    _isRunning ? Icons.pause : Icons.play_arrow,
-                    color: _isRunning ? Colors.orange : AppColors.brandPrimary,
-                    size: 36,
+        ),
+        const SizedBox(height: 14),
+        // İlerleme: süre ilerledikçe kiremit dolgu akıcı uzar.
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween<double>(end: progress.clamp(0.0, 1.0)),
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.linear,
+            builder:
+                (context, value, _) => Container(
+                  height: 6,
+                  color: AppColors.borderSubtle,
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: value,
+                    heightFactor: 1,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.homeHeroGlow,
+                            isDone ? AppColors.success : AppColors.homeHero,
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ],
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 18),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            PressableScale(
+              pressedScale: 0.92,
+              onTap: _resetTimer,
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: const BoxDecoration(
+                  color: AppColors.fillSubtle,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.replay_rounded,
+                  size: 24,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 18),
+            PressableScale(
+              pressedScale: 0.94,
+              onTap: _isRunning ? _stopTimer : _startTimer,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _isRunning ? AppColors.accentGold : AppColors.homeHero,
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_isRunning
+                              ? AppColors.accentGold
+                              : AppColors.homeHero)
+                          .withValues(alpha: 0.4),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  _isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  size: 38,
+                  color: _isRunning ? AppColors.espresso : Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

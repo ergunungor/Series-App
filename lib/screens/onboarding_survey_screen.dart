@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -7,6 +6,7 @@ import '../theme/app_typography.dart';
 import '../widgets/app_input.dart';
 import '../widgets/survey_step_scaffold.dart';
 import '../widgets/selectable_chip.dart';
+import '../widgets/selectable_option_card.dart';
 import '../models/onboarding_data.dart';
 import '../services/program_service.dart';
 import '../widgets/app_confirm_dialog.dart';
@@ -326,6 +326,55 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     );
   }
 
+  // Kaydırıcı değeri: büyük kiremit rakam ve soluk birim.
+  Widget _sliderValue(String value, String unit) => Text.rich(
+    TextSpan(
+      children: [
+        TextSpan(text: value),
+        TextSpan(
+          text: ' $unit',
+          style: AppTypography.body18Medium.copyWith(
+            color: AppColors.textTertiary,
+            letterSpacing: 0,
+          ),
+        ),
+      ],
+    ),
+    style: AppTypography.heading1.copyWith(
+      color: AppColors.espresso,
+      fontSize: 56,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -2,
+      height: 1.1,
+    ),
+  );
+
+  Widget _sliderTheme(Slider slider) => SliderTheme(
+    data: SliderTheme.of(context).copyWith(
+      trackHeight: 8,
+      activeTrackColor: AppColors.espresso,
+      inactiveTrackColor: AppColors.borderSubtle,
+      thumbColor: AppColors.accentGold,
+      overlayColor: AppColors.espresso.withValues(alpha: 0.12),
+      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 13),
+      trackShape: const RoundedRectSliderTrackShape(),
+      activeTickMarkColor: Colors.transparent,
+      inactiveTickMarkColor: Colors.transparent,
+    ),
+    child: slider,
+  );
+
+  // Tek seçimli adımlar: tam genişlik kartlar, aralarında 12px.
+  Widget _optionCards(List<Widget> cards) => Column(
+    children: [
+      for (var i = 0; i < cards.length; i++)
+        Padding(
+          padding: EdgeInsets.only(top: i == 0 ? 0 : 12),
+          child: cards[i],
+        ),
+    ],
+  );
+
   Widget _ageStep() => SurveyStepScaffold(
     currentStep: _currentStep,
     totalSteps: totalSteps,
@@ -335,6 +384,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
       hintText: 'Yaşın',
       controller: _ageController,
       keyboardType: TextInputType.number,
+      focusColor: AppColors.espresso,
     ),
     onNext: () {
       if (int.tryParse(_ageController.text) == null) {
@@ -351,19 +401,16 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     question: 'Cinsiyetin nedir?',
     onExit: _handleCloseSurvey,
     onBack: _goBack,
-    content: Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children:
-          _genderOptions
-              .map(
-                (o) => SelectableChip(
-                  label: o,
-                  isSelected: _selectedGender == o,
-                  onTap: () => setState(() => _selectedGender = o),
-                ),
-              )
-              .toList(),
+    content: _optionCards(
+      _genderOptions
+          .map(
+            (o) => SelectableOptionCard(
+              label: o,
+              isSelected: _selectedGender == o,
+              onTap: () => setState(() => _selectedGender = o),
+            ),
+          )
+          .toList(),
     ),
     onNext: () {
       if (_selectedGender == null) {
@@ -380,19 +427,16 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     question: 'Antrenman tecrüben ne seviyede?',
     onExit: _handleCloseSurvey,
     onBack: _goBack,
-    content: Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children:
-          _experienceOptions
-              .map(
-                (o) => SelectableChip(
-                  label: o,
-                  isSelected: _data.experience == o,
-                  onTap: () => setState(() => _data.experience = o),
-                ),
-              )
-              .toList(),
+    content: _optionCards(
+      _experienceOptions
+          .map(
+            (o) => SelectableOptionCard(
+              label: o,
+              isSelected: _data.experience == o,
+              onTap: () => setState(() => _data.experience = o),
+            ),
+          )
+          .toList(),
     ),
     onNext: () {
       if (_data.experience == null) {
@@ -613,18 +657,17 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     onBack: _goBack,
     content: Column(
       children: [
-        Text(
-          '${_data.logistics.daysPerWeek} gün',
-          style: AppTypography.heading1.copyWith(color: AppColors.brandPrimary),
-        ),
-        Slider(
-          value: _data.logistics.daysPerWeek.toDouble(),
-          min: 1,
-          max: 7,
-          divisions: 6,
-          activeColor: AppColors.brandPrimary,
-          onChanged:
-              (v) => setState(() => _data.logistics.daysPerWeek = v.round()),
+        _sliderValue('${_data.logistics.daysPerWeek}', 'gün'),
+        const SizedBox(height: 8),
+        _sliderTheme(
+          Slider(
+            value: _data.logistics.daysPerWeek.toDouble(),
+            min: 1,
+            max: 7,
+            divisions: 6,
+            onChanged:
+                (v) => setState(() => _data.logistics.daysPerWeek = v.round()),
+          ),
         ),
       ],
     ),
@@ -639,18 +682,18 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
     onBack: _goBack,
     content: Column(
       children: [
-        Text(
-          '${_data.logistics.maxDurationMin} dk',
-          style: AppTypography.heading1.copyWith(color: AppColors.brandPrimary),
-        ),
-        Slider(
-          value: _data.logistics.maxDurationMin.toDouble(),
-          min: 15,
-          max: 90,
-          divisions: 15,
-          activeColor: AppColors.brandPrimary,
-          onChanged:
-              (v) => setState(() => _data.logistics.maxDurationMin = v.round()),
+        _sliderValue('${_data.logistics.maxDurationMin}', 'dk'),
+        const SizedBox(height: 8),
+        _sliderTheme(
+          Slider(
+            value: _data.logistics.maxDurationMin.toDouble(),
+            min: 15,
+            max: 90,
+            divisions: 15,
+            onChanged:
+                (v) =>
+                    setState(() => _data.logistics.maxDurationMin = v.round()),
+          ),
         ),
       ],
     ),
@@ -670,6 +713,7 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
       maxLines: 4,
       minLines: 2,
       keyboardType: TextInputType.multiline,
+      cursorColor: AppColors.espresso,
       style: AppTypography.body16Regular.copyWith(color: AppColors.textPrimary),
       decoration: InputDecoration(
         hintText: 'Örn: motivasyon eksikliği, zaman yönetimi...',
@@ -679,16 +723,22 @@ class _OnboardingSurveyScreenState extends State<OnboardingSurveyScreen> {
         filled: true,
         fillColor: Colors.white,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: AppColors.brandSecondary),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(
+            color: AppColors.borderSubtle,
+            width: 1.5,
+          ),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: AppColors.brandSecondary),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(
+            color: AppColors.borderSubtle,
+            width: 1.5,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: AppColors.brandPrimary, width: 1.5),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: AppColors.espresso, width: 1.5),
         ),
         contentPadding: const EdgeInsets.all(16),
       ),

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart'; // EKLENDİ
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_typography.dart';
 import '../widgets/app_input.dart';
 import '../widgets/app_button.dart';
+import '../widgets/auth_scaffold.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -16,10 +15,15 @@ class ForgotPasswordScreen extends StatefulWidget {
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
   bool _isLoading = false;
+  // Hata olunca alanları sallamak için artan sayaç (yalnızca görsel).
+  int _shakeCount = 0;
 
   Future<void> _sendResetCode() async {
     final email = _emailController.text.trim();
-    if (email.isEmpty) return;
+    if (email.isEmpty) {
+      setState(() => _shakeCount++);
+      return;
+    }
 
     setState(() => _isLoading = true);
     try {
@@ -39,6 +43,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       }
     } catch (error) {
       if (mounted) {
+        setState(() => _shakeCount++);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Bir hata oluştu, tekrar dene.')),
         );
@@ -50,43 +55,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
-      ),
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Şifremi Unuttum',
-                  style: AppTypography.heading1.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                AppInput(
-                  controller: _emailController,
-                  hintText: 'E-mail Adresiniz',
-                  prefixIcon: Icons.mail_outline,
-                ),
-                const SizedBox(height: 16),
-                AppButton(
-                  text: _isLoading ? 'KOD GÖNDERİLİYOR...' : 'KOD GÖNDER',
-                  showIcon: false,
-                  onPressed: _isLoading ? null : _sendResetCode,
-                ),
-              ],
-            ),
+    return AuthScaffold(
+      title: 'Şifremi Unuttum',
+      onBack: () => context.pop(),
+      children: [
+        AuthShake(
+          trigger: _shakeCount,
+          child: AppInput(
+            controller: _emailController,
+            hintText: 'E-mail Adresiniz',
+            keyboardType: TextInputType.emailAddress,
+            prefixIcon: Icons.mail_outline,
           ),
         ),
-      ),
+        const SizedBox(height: 18),
+        AppButton(
+          text: _isLoading ? 'KOD GÖNDERİLİYOR...' : 'KOD GÖNDER',
+          showIcon: false,
+          isLoading: _isLoading,
+          onPressed: _isLoading ? null : _sendResetCode,
+        ),
+      ],
     );
   }
 }
