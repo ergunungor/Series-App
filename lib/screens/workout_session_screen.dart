@@ -611,80 +611,89 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     final bottomSafe = MediaQuery.paddingOf(context).bottom;
     final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: HeroStatusBarScope(
-        // Yapı klavye açılıp kapanınca değişmez (Expanded + isteğe bağlı son
-        // çocuk); aksi halde tekrar/ağırlık kutuları yeniden kurulup odağı
-        // kaybeder ve klavye kapanırdı.
-        builder:
-            (context, heroKey) => Column(
-              children: [
-                Expanded(
-                  child: CustomScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: Column(
-                          children: [
-                            _buildExerciseHero(heroKey, keyboardOpen),
-                            // Klavye açıkken GIF kartı küçülüp kaybolur: tekrar/ağırlık
-                            // kutuları ve altın buton klavyenin üstünde sığsın.
-                            AnimatedSize(
-                              duration: const Duration(milliseconds: 250),
-                              curve: Curves.easeOutCubic,
-                              clipBehavior: Clip.none,
-                              child:
-                                  keyboardOpen
-                                      ? const SizedBox(width: double.infinity)
-                                      : _buildGifCard(),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                _pagePadding,
-                                _sectionGap,
-                                _pagePadding,
-                                0,
+    // Klavye açıkken boş bir yere dokunmak klavyeyi kapatır; butonlar kendi
+    // dokunuşunu yakaladığı için onlara basmak etkilenmez.
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: HeroStatusBarScope(
+          // Yapı klavye açılıp kapanınca değişmez (Expanded + isteğe bağlı son
+          // çocuk); aksi halde tekrar/ağırlık kutuları yeniden kurulup odağı
+          // kaybeder ve klavye kapanırdı.
+          builder:
+              (context, heroKey) => Column(
+                children: [
+                  Expanded(
+                    child: CustomScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      // Listeyi sürükleyince de klavye kapanır.
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: Column(
+                            children: [
+                              _buildExerciseHero(heroKey, keyboardOpen),
+                              // Klavye açıkken GIF kartı küçülüp kaybolur: tekrar/ağırlık
+                              // kutuları ve altın buton klavyenin üstünde sığsın.
+                              AnimatedSize(
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeOutCubic,
+                                clipBehavior: Clip.none,
+                                child:
+                                    keyboardOpen
+                                        ? const SizedBox(width: double.infinity)
+                                        : _buildGifCard(),
                               ),
-                              child: _buildSetArea(),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Kalan alanı doldurur: "Sıradaki" + butonlar grubu, içerik
-                      // ile ekran altı arasında dikey olarak ortalanır. İçerik
-                      // uzunsa (küçük ekran) aşağıda kaydırılır. Klavye açıkken
-                      // grup aşağıdaki sabit alana geçer.
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child:
-                            keyboardOpen
-                                ? const SizedBox.shrink()
-                                : Padding(
-                                  padding: EdgeInsets.fromLTRB(
-                                    _pagePadding,
-                                    _sectionGap,
-                                    _pagePadding,
-                                    bottomSafe,
-                                  ),
-                                  child: Center(child: _buildBottomGroup()),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  _pagePadding,
+                                  _sectionGap,
+                                  _pagePadding,
+                                  0,
                                 ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (keyboardOpen)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      _pagePadding,
-                      12,
-                      _pagePadding,
-                      _dockBottomGap,
+                                child: _buildSetArea(),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Kalan alanı doldurur: "Sıradaki" + butonlar grubu, içerik
+                        // ile ekran altı arasında dikey olarak ortalanır. İçerik
+                        // uzunsa (küçük ekran) aşağıda kaydırılır. Klavye açıkken
+                        // grup aşağıdaki sabit alana geçer.
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child:
+                              keyboardOpen
+                                  ? const SizedBox.shrink()
+                                  : Padding(
+                                    padding: EdgeInsets.fromLTRB(
+                                      _pagePadding,
+                                      _sectionGap,
+                                      _pagePadding,
+                                      bottomSafe,
+                                    ),
+                                    child: Center(child: _buildBottomGroup()),
+                                  ),
+                        ),
+                      ],
                     ),
-                    child: _buildBottomGroup(),
                   ),
-              ],
-            ),
+                  if (keyboardOpen)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        _pagePadding,
+                        12,
+                        _pagePadding,
+                        _dockBottomGap,
+                      ),
+                      child: _buildBottomGroup(),
+                    ),
+                ],
+              ),
+        ),
       ),
     );
   }
