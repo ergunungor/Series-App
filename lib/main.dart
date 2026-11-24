@@ -5,15 +5,28 @@ import 'package:supabase_flutter/supabase_flutter.dart'; // Supabase için gerek
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/services.dart';
+import 'config/api_config.dart';
+import 'services/supabase_endpoint.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('tr_TR', null);
 
+  // Doğrudan erişilemiyorsa (supabase.co engelli ağ) vekil adres kullanılır.
+  final supabaseUrl = await SupabaseEndpoint.resolve();
+
   await Supabase.initialize(
-    url: 'https://scycflgsxpkgoouunptr.supabase.co', // Kopyaladığın URL
+    url: supabaseUrl,
     publishableKey:
         'sb_publishable_6DIZ_1cdyXAFe1EXCKy3AA_ClBEe2ah', // Kopyaladığın Anon Key
+    authOptions: FlutterAuthClientOptions(
+      // Oturum anahtarı adresten türetilir; vekil/doğrudan geçişte kullanıcı
+      // çıkış yapmış olmasın diye proje adresine göre sabitlenir.
+      localStorage: SharedPreferencesLocalStorage(
+        persistSessionKey:
+            'sb-${Uri.parse(ApiConfig.supabaseUrl).host.split('.').first}-auth-token',
+      ),
+    ),
   );
 
   final appLinks = AppLinks();
