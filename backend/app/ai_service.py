@@ -1,125 +1,167 @@
-import os
 import json
 import re
-import google.generativeai as genai
-from dotenv import load_dotenv
+from typing import Optional
+
+from .llm import generate_json
 from .schemas import UserOnboardingData
+from . import exercise_catalog as catalog
 
-load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# Eşleştirme eşikleri (exercise_catalog._score ölçeği, 0-1)
+AUTO_MATCH_SCORE = 0.99      # birebir aynı ad: yapay zekaya sormadan eşleştir
+CANDIDATE_MIN_SCORE = 0.5    # bunun altı aday sayılmaz
 
-def get_generative_models(model_type: str):
-    """
-    İsteğe göre ana ve yedek modelleri döndürür.
-    Pro: 3.7-flash (Ana) -> 3.5-flash-lite (Yedek)
-    Flash: 3.6-flash (Ana) -> 3.1-flash-lite (Yedek)
-    """
-    if model_type == "pro":
-        primary = genai.GenerativeModel('gemini-3.7-flash')
-        fallback = genai.GenerativeModel('gemini-3.5-flash-lite')
-    else:
-        primary = genai.GenerativeModel('gemini-3.6-flash')
-        fallback = genai.GenerativeModel('gemini-3.1-flash-lite')
-        
-    return primary, fallback
 
-def generate_with_fallback(content, generation_config, model_type="flash"):
-    """Seçilen model tipine göre önce ana modeli dener, kota hatası alırsa yedeğe geçer."""
-    primary_model, fallback_model = get_generative_models(model_type)
-    
-    # Sunucu tarafında zombi thread oluşmasını engellemek için 35 saniyelik timeout
-    custom_request_options = {"timeout": 35.0}
-    
-    try:
-        return primary_model.generate_content(
-            content, 
-            generation_config=generation_config,
-            request_options=custom_request_options
-        )
-    except Exception as e:
-        error_msg = str(e)
-        if "429" in error_msg or "Quota" in error_msg:
-            print(f"⚠️ Ana model limiti doldu! Yedek model devreye giriyor... (Model Tipi: {model_type})")
-            return fallback_model.generate_content(
-                content, 
-                generation_config=generation_config,
-                request_options=custom_request_options
-            )
-        
-        raise e
+# ------------------------------------------------------------------ üretim
 
-def get_ai_exercise_catalog():
-    file_path = os.path.join(os.path.dirname(__file__), 'exercises.json')
-    with open(file_path, 'r', encoding='utf-8') as f:
-        all_exercises = json.load(f)
-    
-    ai_catalog = [{"id": ex.get("id"), "name": ex.get("name"), "target": ex.get("target"), "equipment": ex.get("equipment")} for ex in all_exercises]
-    return json.dumps(ai_catalog)
+_PROGRAM_SCHEMA = (
+    '{"program_name":"","description":"2 cümle","workouts":[{"day_number":1,"name":"",'
+    '"estimated_duration_min":0,"exercises":[{"id":"","sets":3,"reps":"8-12",'
+    '"duration_seconds":null,"rest_seconds":60,"notes":""}]}]}'
+)
+
+_DURATION_RULE = (
+    'Süreli hareketlerde (plank, tutuş, kardiyo aralığı vb.) "reps": null ve '
+    '"duration_seconds": saniye yaz.'
+)
+
 
 def generate_workout_program(data: UserOnboardingData):
-    interests_str = ", ".join(data.specific_interests) if data.specific_interests else "Genel Vücut"
-    restrictions_str = ", ".join(data.health_restrictions) if data.health_restrictions else "Yok"
-    ai_catalog_str = get_ai_exercise_catalog()
+    interests = data.specific_interests or []
+    restrictions = ", ".join(data.health_restrictions) if data.health_restrictions else "Yok"
+    equipment = ", ".join(data.logistics.equipment) if data.logistics.equipment else "Yok"
 
-    prompt = f"""
-    Sen dünya çapında uzman bir fitness ve kalistenik koçusun. 
-    Kullanıcı Profili:
-    - Yaş: {data.age}
-    - Cinsiyet: {data.gender}
-    - Tecrübe: {data.experience}
-    - Ana Hedef: {data.primary_goal}
-    - Odaklanmak İstediği Alanlar: {interests_str}
-    - Sağlık Kısıtlamaları/Sakatlıklar: {restrictions_str}
-    - Antrenman Yeri: {", ".join(data.logistics.location)}
-    - Evdeki Ekipmanlar: {", ".join(data.logistics.equipment) if data.logistics.equipment else "Yok"}
-    - Haftalık Gün Sayısı: {data.logistics.days_per_week} gün
-    - Maksimum Süre: {data.logistics.max_duration_min} dakika
-    - Zihinsel Engel: {data.mental_blocker or 'Yok'}
-
-    Kullanıcının sağlık kısıtlamalarına KESİNLİKLE dikkat et. Bu profile uygun {data.logistics.days_per_week} günlük bir antrenman programı oluştur.
-    
-    ÇOK ÖNEMLİ KURAL (KATI KISITLAMA):
-    Kullanacağın tüm egzersizleri SADECE aşağıdaki JSON listesinden (Katalogdan) seçeceksin. 
-    Kendi kafandan, başka bir kaynaktan veya listede olmayan hiçbir egzersizi KESİNLİKLE uydurma. Kullanıcının alet durumuna dikkat ederek seçim yap.
-    
-    ZORUNLU KURAL (SANIYELİ SETLER & CORE):
-    Eğer programda Plank, Wall Sit, statik tutuşlar, kardiyo interval süreleri veya saniyeye dayalı herhangi bir hareket varsa, "reps" alanını KESİNLİKLE `null` yap ve "duration_seconds" alanına saniye cinsinden değeri mutlaka yaz.
-    
-    KULLANABİLECEĞİN EGZERSİZLER LİSTESİ (KATALOG):
-    {ai_catalog_str}
-
-    Yanıtını SADECE aşağıdaki JSON formatında ver, başına veya sonuna markdown (```json) veya ekstra metin EKLEME:
-    {{
-      "program_name": "Programın havalı ve amaca uygun ismi",
-      "description": "Kullanıcıyı motive edecek 2 cümlelik açıklama",
-      "workouts": [
-        {{
-          "day_number": 1,
-          "name": "Push Day veya Üst Vücut vb.",
-          "estimated_duration_min": {data.logistics.max_duration_min},
-          "exercises": [
-            {{
-              "id": "0025", 
-              "name": "Barbell Bench Press",
-              "sets": 3,
-              "reps": "8-12",
-              "duration_seconds": null,
-              "rest_seconds": 60,
-              "notes": "Formuna dikkat et"
-            }}
-          ]
-        }}
-      ]
-    }}
-    """
-
-    response = generate_with_fallback(
-        prompt,
-        generation_config={"response_mime_type": "application/json"},
-        model_type=data.model_type 
+    catalog_text = catalog.build_catalog_text(
+        locations=data.logistics.location,
+        equipment=data.logistics.equipment or [],
+        interests=interests,
     )
-    
-    return sanitize_program_data(json.loads(response.text.strip()))
+
+    prompt = f"""{data.age} yaşında, {data.gender}, deneyim: {data.experience}, hedef: {data.primary_goal}.
+Odak bölgeler: {", ".join(interests) or "Tüm vücut"}. Sağlık kısıtları: {restrictions}.
+Yer: {", ".join(data.logistics.location)}. Ekipman: {equipment}.
+Haftada {data.logistics.days_per_week} gün, en fazla {data.logistics.max_duration_min} dk. Zihinsel engel: {data.mental_blocker or "Yok"}.
+
+{data.logistics.days_per_week} günlük antrenman programı hazırla; sağlık kısıtlarına aykırı hareket seçme.
+Hareketleri yalnızca aşağıdaki listeden seç ve "id" alanına listedeki id'yi yaz (satır: id|ad|ekipman; kas grubuna göre gruplu).
+{_DURATION_RULE}
+Sadece şu şemada JSON döndür:
+{_PROGRAM_SCHEMA}
+
+LİSTE:
+{catalog_text}"""
+
+    result = generate_json(prompt, model_type=data.model_type)
+    allowed = catalog.allowed_equipment(data.logistics.location, data.logistics.equipment or [])
+    return sanitize_program_data(_finalize_exercises(result, allow_custom=False, allowed_equipment=allowed))
+
+
+def revise_workout_program(data):
+    current = data.current_program or {}
+    include_ids = [
+        ex.get("id")
+        for w in current.get("workouts", [])
+        for ex in w.get("exercises", [])
+        if ex.get("id")
+    ]
+
+    catalog_text = catalog.build_catalog_text(
+        locations=["Spor Salonu"],  # revizyonda kullanıcı ekipman bilgisi yok: tüm havuz
+        equipment=[],
+        include_ids=include_ids,
+        prompt_text=data.prompt,
+    )
+
+    prompt = f"""Mevcut program:
+{json.dumps(_compact_program(current), ensure_ascii=False, separators=(",", ":"))}
+
+İstenen değişiklik: "{data.prompt}"
+
+Programı bu isteğe göre güncelle; istenmeyen kısımları koru.
+Yeni hareketleri yalnızca aşağıdaki listeden seç ve "id" alanına listedeki id'yi yaz (satır: id|ad|ekipman).
+Mevcut programda id'si boş olan bir hareketi koruyorsan "id": "" bırak ve "name" alanını aynen yaz.
+{_DURATION_RULE}
+Sadece şu şemada JSON döndür:
+{_PROGRAM_SCHEMA}
+
+LİSTE:
+{catalog_text}"""
+
+    result = generate_json(prompt, model_type=data.model_type)
+    _restore_instructions(result, current)
+    return sanitize_program_data(_finalize_exercises(result, allow_custom=True))
+
+
+def _compact_program(program: dict) -> dict:
+    """Yapay zekaya gereksiz alanları (talimat metni vb.) göndermeyiz."""
+    workouts = []
+    for w in program.get("workouts", []):
+        exs = []
+        for ex in w.get("exercises", []):
+            item = {
+                "id": ex.get("id") or "",
+                "name": ex.get("name"),
+                "sets": ex.get("sets"),
+                "reps": ex.get("reps"),
+                "duration_seconds": ex.get("duration_seconds"),
+                "rest_seconds": ex.get("rest_seconds"),
+            }
+            exs.append({k: v for k, v in item.items() if v not in (None, "")} | {"id": item["id"]})
+        workouts.append(
+            {
+                "day_number": w.get("day_number"),
+                "name": w.get("name"),
+                "estimated_duration_min": w.get("estimated_duration_min"),
+                "exercises": exs,
+            }
+        )
+    return {
+        "program_name": program.get("program_name") or program.get("name"),
+        "description": program.get("description"),
+        "workouts": workouts,
+    }
+
+
+def _restore_instructions(result: dict, original: dict):
+    """Yapay zeka çıktısında düşen 'instructions' alanını eski programdan geri koy."""
+    by_name = {}
+    for w in original.get("workouts", []):
+        for ex in w.get("exercises", []):
+            if ex.get("name") and ex.get("instructions"):
+                by_name[ex["name"].strip().lower()] = ex["instructions"]
+    for w in result.get("workouts", []):
+        for ex in w.get("exercises", []):
+            name = (ex.get("name") or "").strip().lower()
+            if name in by_name and not ex.get("instructions"):
+                ex["instructions"] = by_name[name]
+
+
+def _finalize_exercises(program: dict, allow_custom: bool, allowed_equipment=None) -> dict:
+    """id'leri havuza göre doğrular, adı havuzdaki adla doldurur.
+
+    Havuzda olmayan (uydurulmuş) hareketler atılır; allow_custom=True ise
+    kullanıcının kendi (id'siz) hareketleri korunur.
+    """
+    for w in program.get("workouts", []):
+        kept = []
+        for ex in w.get("exercises", []):
+            found = catalog.get_by_id(ex.get("id"))
+            if not found and ex.get("name"):
+                found = catalog.match_exact(ex["name"])
+            if found and allowed_equipment is not None and found["equipment"] not in allowed_equipment:
+                print(f"⚠️ Ekipmana uymayan hareket atıldı: {found['name']} ({found['equipment']})")
+                continue
+            if found:
+                ex["id"] = found["id"]
+                ex["name"] = found["name"]
+                kept.append(ex)
+            elif allow_custom and ex.get("name"):
+                ex["id"] = ""
+                kept.append(ex)
+            else:
+                print(f"⚠️ Havuzda olmayan hareket atıldı: {ex.get('id')} / {ex.get('name')}")
+        w["exercises"] = kept
+    return program
+
 
 def save_generated_program(supabase_client, user_id: str, generated_program: dict):
     program_insert = supabase_client.table('programs').insert({
@@ -143,74 +185,100 @@ def save_generated_program(supabase_client, user_id: str, generated_program: dic
 
     return program_id
 
+
+# ------------------------------------------------------------ program yükleme
+
+_PARSE_PROMPT = """Verilen antrenman programını (metin, görsel veya PDF) JSON'a çevir.
+
+Kurallar:
+- Programda yazanı kullan, hareket uydurma.
+- "name": programda yazdığı ad. "english_name": aynı hareketin yaygın İngilizce spor salonu adı (örn. Şınav -> push-up, Barfiks -> pull-up).
+- "instructions": hareketin nasıl yapıldığını anlatan 1-2 cümle.
+- Hareketin yanında sn/saniye/sec/dk/dakika gibi süre varsa "reps": null ve süreyi saniyeye çevirip "duration_seconds" alanına yaz (30 sn -> 30). Süre yoksa "reps" kullan.
+- İçerik bir antrenman programı değilse sadece {"error": "not_a_program"} döndür.
+
+Sadece şu şemada JSON döndür:
+{"program_name":"","description":"2 cümle","workouts":[{"day_number":1,"name":"","estimated_duration_min":45,"exercises":[{"name":"","english_name":"","sets":3,"reps":"8-12","duration_seconds":null,"rest_seconds":60,"instructions":"","notes":null}]}]}"""
+
+
 def parse_program_from_input(text: str = None, file_bytes: bytes = None, mime_type: str = None):
-    prompt = """
-    Sen bir fitness programı analiz uzmanısın. Sana verilen antrenman
-    programını (metin, görsel veya PDF olabilir) analiz et ve aşağıdaki
-    JSON formatına dönüştür.
-
-    KURALLAR:
-    - Programda ne yazıyorsa onu kullan, egzersiz uydurma.
-    - Her egzersiz için "instructions" alanına, o hareketin nasıl yapılacağını
-      anlatan kısa (1-2 cümle) bir talimat yaz.
-    - ÇOK ÖNEMLİ (SÜRE BAZLI HAREKETLER): Eğer hareketin yanında "sn", "saniye", "sec", "dk", "dakika" gibi süre belirten bir ifade varsa, "reps" alanını KESİNLİKLE `null` yap ve süreyi saniyeye çevirerek "duration_seconds" alanına yaz (Örn: 30 sn -> duration_seconds: 30, reps: null). Süre yoksa normal hareketlerde "reps" kullan.
-    - Eğer verilen içerik bir antrenman/egzersiz programı DEĞİLSE, SADECE
-      şu JSON'u dön: {"error": "not_a_program"}
-
-    Yanıtını SADECE aşağıdaki JSON formatında ver, markdown veya ekstra
-    metin EKLEME:
-    {
-      "program_name": "Programın ismi (yoksa uygun bir isim öner)",
-      "description": "2 cümlelik açıklama",
-      "workouts": [
-        {
-          "day_number": 1,
-          "name": "Gün adı",
-          "estimated_duration_min": 45,
-          "exercises": [
-            {
-              "name": "Egzersiz adı",
-              "sets": 3,
-              "reps": "8-12",
-              "duration_seconds": null,
-              "rest_seconds": 60,
-              "instructions": "Kısa yapılış talimatı",
-              "notes": null
-            }
-          ]
-        }
-      ]
-    }
-    """
-
+    prompt = _PARSE_PROMPT
     if text:
-        prompt += f"\n\nKULLANICININ YAZDIĞI PROGRAM:\n{text}"
-        content = [prompt]
-    elif file_bytes and mime_type:
-        content = [prompt, {"mime_type": mime_type, "data": file_bytes}]
-    else:
+        prompt += f"\n\nPROGRAM:\n{text}"
+        file_bytes, mime_type = None, None
+    elif not (file_bytes and mime_type):
         raise ValueError("Ne metin ne dosya verildi.")
 
-    response = generate_with_fallback(
-        content,
-        generation_config={"response_mime_type": "application/json"},
-        model_type="flash" 
-    )
-
-    clean_text = response.text.strip()
-    result = json.loads(clean_text)
+    result = generate_json(prompt, model_type="flash", file_bytes=file_bytes, mime_type=mime_type)
 
     if result.get("error") == "not_a_program":
         raise ValueError("Yüklenen içerik bir antrenman programına benzemiyor.")
 
+    try:
+        _match_to_pool(result)
+    except Exception as e:  # eşleştirme isteğe bağlı: hata olursa tarifler olduğu gibi kalır
+        print(f"⚠️ GIF eşleştirme atlandı: {e}")
+
+    for w in result.get("workouts", []):
+        for ex in w.get("exercises", []):
+            ex.pop("english_name", None)
+
     return sanitize_program_data(result)
+
+
+def _match_to_pool(program: dict):
+    """Programdaki hareketleri havuzla eşleştirir; eşleşirse "id" alanı dolar.
+
+    1) Normalize edilmiş ad birebir aynıysa yapay zekaya sormadan eşleşir.
+    2) Yakın ama kesin olmayan adaylar tek bir toplu yapay zeka çağrısına gider.
+    3) Eşleşme yoksa "id" eklenmez; mevcut tarif metni aynen kalır.
+    """
+    uncertain = []  # (egzersiz, [aday kayıtlar])
+    for w in program.get("workouts", []):
+        for ex in w.get("exercises", []):
+            if ex.get("id"):
+                continue
+            queries = [q for q in (ex.get("english_name"), ex.get("name")) if q]
+            best = []
+            for q in queries:
+                cands = catalog.find_candidates(q, limit=5, min_score=CANDIDATE_MIN_SCORE)
+                if cands and cands[0][1] >= AUTO_MATCH_SCORE:
+                    ex["id"] = cands[0][0]["id"]
+                    best = []
+                    break
+                if cands and (not best or cands[0][1] > best[0][1]):
+                    best = cands
+            if not ex.get("id") and best:
+                uncertain.append((ex, [c for c, _ in best]))
+
+    if not uncertain:
+        return
+
+    items = [
+        {"i": i, "ad": ex.get("english_name") or ex.get("name"), "adaylar": [c["name"] for c in cands]}
+        for i, (ex, cands) in enumerate(uncertain)
+    ]
+    prompt = (
+        "Her öğe için adaylardan AYNI hareket olanın sıra numarasını (0'dan başlar) yaz; "
+        "yoksa null yaz. Ağırlıklı, eğimli, farklı ekipmanlı ya da farklı tutuşlu varyasyonlar "
+        "aynı hareket sayılmaz.\n"
+        f"{json.dumps(items, ensure_ascii=False, separators=(',', ':'))}\n"
+        'Sadece JSON döndür: {"0": 2, "1": null, ...}'
+    )
+    answers = generate_json(prompt, model_type="flash")
+
+    for i, (ex, cands) in enumerate(uncertain):
+        choice = answers.get(str(i))
+        if isinstance(choice, int) and 0 <= choice < len(cands):
+            ex["id"] = cands[choice]["id"]
+
 
 def sanitize_program_data(data: dict):
     for workout in data.get("workouts", []):
         for exercise in workout.get("exercises", []):
             reps = exercise.get("reps")
             dur = exercise.get("duration_seconds")
-            
+
             if not dur and reps and isinstance(reps, str):
                 reps_lower = reps.lower()
                 if any(kw in reps_lower for kw in ["sn", "saniye", "sec"]):
@@ -218,59 +286,9 @@ def sanitize_program_data(data: dict):
                     if match:
                         exercise["duration_seconds"] = int(match.group())
                         exercise["reps"] = None
-                        
-            name_lower = exercise.get("name", "").lower()
+
+            name_lower = (exercise.get("name") or "").lower()
             if ("plank" in name_lower or "hold" in name_lower) and not exercise.get("duration_seconds") and not exercise.get("reps"):
                 exercise["duration_seconds"] = 30
-                
+
     return data
-
-def revise_workout_program(data):
-    ai_catalog_str = get_ai_exercise_catalog()
-
-    prompt = f"""
-    Sen dünya çapında uzman bir fitness koçusun.
-    Kullanıcının mevcut antrenman programı (JSON formatında) aşağıdadır:
-    {json.dumps(data.current_program, ensure_ascii=False)}
-
-    Kullanıcının bu program üzerinde yapılmasını istediği değişiklik (Prompt):
-    "{data.prompt}"
-
-    Lütfen kullanıcının isteğini yerine getirerek programı güncelle. 
-    ÇOK ÖNEMLİ KURAL: Yeni egzersiz eklerken veya değiştirirken SADECE aşağıdaki katalogdan seçim yap:
-    {ai_catalog_str}
-
-    ZORUNLU KURAL: Süreli egzersizlerde (Plank vs.) "reps" alanını null yap ve süreyi saniye olarak "duration_seconds" alanına yaz.
-    
-    Yanıtını SADECE aşağıdaki JSON şemasında ver, başına sonuna ekstra metin ekleme:
-    {{
-      "program_name": "Güncellenmiş Program İsmi",
-      "description": "Değişiklikleri yansıtan yeni açıklama",
-      "workouts": [
-        {{
-          "day_number": 1,
-          "name": "Gün adı",
-          "estimated_duration_min": 45,
-          "exercises": [
-            {{
-              "id": "0025", 
-              "name": "Egzersiz Adı",
-              "sets": 3,
-              "reps": "8-12",
-              "duration_seconds": null,
-              "rest_seconds": 60,
-              "notes": "Not"
-            }}
-          ]
-        }}
-      ]
-    }}
-    """
-
-    response = generate_with_fallback(
-        prompt,
-        generation_config={"response_mime_type": "application/json"},
-        model_type=data.model_type 
-    )
-    
-    return sanitize_program_data(json.loads(response.text.strip()))
