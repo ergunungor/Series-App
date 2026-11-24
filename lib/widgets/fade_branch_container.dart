@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show ValueNotifier, kIsWeb;
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -44,6 +43,7 @@ class _FadeBranchContainerState extends State<FadeBranchContainer>
   // Eski sekmenin paralaks kayması (ekran genişliğinin oranı) ve kararması.
   static const double _parallax = 0.28;
   static const double _scrimAlpha = 0.1;
+  static const double _edgeShadowWidth = 28;
 
   // Kaydırma ile geçiş: bu orandan fazla sürüklenirse ya da bu hızı aşan bir
   // fırlatma olursa tamamlanır.
@@ -232,54 +232,67 @@ class _FadeBranchContainerState extends State<FadeBranchContainer>
                 current,
               ];
 
+              // Her sekmenin widget zinciri geçiş sırasında ve dışında AYNI kalır:
+              // yapı değişirse sekme alt ağacı sökülüp yeniden kurulur ve
+              // kaydırma başında takılma olur. Sekme içeriği ayrıca kendi
+              // RepaintBoundary'sinde: kayarken içerik yeniden boyanmaz, yalnızca
+              // katman taşınır (gölge/karartma içeriğin dışında, küçük katmanlar).
               Widget decorate(int i) {
-                final child = widget.children[i];
-                if (!isAnimating) return child;
-                if (i == current) {
-                  // Yeni sekme: gittiği yönün tersinden kayarak girer.
-                  return Transform.translate(
-                    offset: Offset(_direction * (1 - t) * width, 0),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        // Tam ekran katmanda büyük bulanık gölge web'de pahalı;
-                        // orada atlanır (yalnızca mobilde derinlik gölgesi).
-                        boxShadow:
-                            kIsWeb
-                                ? const []
-                                : [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(
-                                      alpha: 0.14 * (1 - t),
-                                    ),
-                                    blurRadius: 32,
-                                    offset: Offset(-_direction * 6.0, 0),
-                                  ),
-                                ],
-                      ),
-                      child: child,
-                    ),
-                  );
-                }
-                if (i == under) {
-                  // Eski sekme: daha yavaş ters yöne kayar ve hafifçe kararır.
-                  return Transform.translate(
-                    offset: Offset(-_direction * t * width * _parallax, 0),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        child,
-                        IgnorePointer(
-                          child: ColoredBox(
-                            color: Colors.black.withValues(
-                              alpha: _scrimAlpha * t,
+                Offset offset = Offset.zero;
+                Widget overlay = const SizedBox.shrink();
+                if (isAnimating && i == current) {
+                  // Yeni sekme: gittiği yönün tersinden kayarak girer; kenarında
+                  // karşı sekmeye düşen ince bir derinlik gölgesi.
+                  offset = Offset(_direction * (1 - t) * width, 0);
+                  overlay = Positioned(
+                    top: 0,
+                    bottom: 0,
+                    left: _direction > 0 ? -_edgeShadowWidth : null,
+                    right: _direction < 0 ? -_edgeShadowWidth : null,
+                    width: _edgeShadowWidth,
+                    child: IgnorePointer(
+                      child: RepaintBoundary(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                Colors.black.withValues(
+                                  alpha: _direction > 0 ? 0 : 0.14 * (1 - t),
+                                ),
+                                Colors.black.withValues(
+                                  alpha: _direction > 0 ? 0.14 * (1 - t) : 0,
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      ],
+                      ),
+                    ),
+                  );
+                } else if (isAnimating && i == under) {
+                  // Eski sekme: daha yavaş ters yöne kayar ve hafifçe kararır.
+                  offset = Offset(-_direction * t * width * _parallax, 0);
+                  overlay = Positioned.fill(
+                    child: IgnorePointer(
+                      child: ColoredBox(
+                        color: Colors.black.withValues(alpha: _scrimAlpha * t),
+                      ),
                     ),
                   );
                 }
-                return child;
+                return Transform.translate(
+                  offset: offset,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    clipBehavior: Clip.none,
+                    children: [
+                      RepaintBoundary(child: widget.children[i]),
+                      overlay,
+                    ],
+                  ),
+                );
               }
 
               return Stack(
