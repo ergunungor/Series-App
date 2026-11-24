@@ -12,6 +12,7 @@ import json
 import os
 import re
 import base64
+import time
 from typing import Optional
 
 import httpx
@@ -70,15 +71,57 @@ def _call_gemini(prompt: str, model_type: str, file_bytes, mime_type) -> str:
 
 # ------------------------------------------------------- OpenAI uyumlu uç
 
-def _call_openai_compatible(prompt: str, model_type: str, file_bytes, mime_type) -> str:
+class _RetryableLLMError(RuntimeError):
+    """Kota/yoğunluk/ağ hatası: yedek modele geçmeye değer."""
+
+
+def _retry_after_seconds(message: str) -> Optional[float]:
+    m = re.search(r"try again in ([0-9.]+)s", message)
+    return float(m.group(1)) if m else None
+
+
+def _openai_models(model_type: str):
+    if model_type == "pro":
+        return (
+            os.getenv("LLM_MODEL_PRO", "openai/gpt-oss-120b"),
+            os.getenv("LLM_MODEL_PRO_FALLBACK", "qwen/qwen3.8-27b"),
+        )
+    return (
+        os.getenv("LLM_MODEL_FLASH", "openai/gpt-oss-20b"),
+        os.getenv("LLM_MODEL_FLASH_FALLBACK", "openai/gpt-oss-120b"),
+    )
+
+
+def _openai_request(model: str, user_content) -> str:
     base = os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1").rstrip("/")
     key = os.getenv("LLM_API_KEY")
     if not key:
         raise RuntimeError("LLM_API_KEY tanımlı değil.")
-    if model_type == "pro":
-        model = os.getenv("LLM_MODEL_PRO", "llama-3.3-70b-versatile")
-    else:
-        model = os.getenv("LLM_MODEL_FLASH", "llama-3.1-8b-instant")
+    try:
+        resp = httpx.post(
+            f"{base}/chat/completions",
+            headers={"Authorization": f"Bearer {key}"},
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": user_content}],
+                "response_format": {"type": "json_object"},
+                "temperature": 0.4,
+            },
+            timeout=60.0,
+        )
+    except httpx.TransportError as e:  # zaman aşımı, bağlantı kopması
+        raise _RetryableLLMError(f"LLM bağlantı hatası ({model}): {e}") from e
+    if resp.status_code != 200:
+        # main.py "429" içeren hata metnini kullanıcıya "yoğunluk" olarak gösteriyor
+        msg = f"LLM hatası {resp.status_code} ({model}): {resp.text[:300]}"
+        if resp.status_code == 429 or resp.status_code >= 500 or "json_validate_failed" in resp.text:
+            raise _RetryableLLMError(msg)
+        raise RuntimeError(msg)
+    return resp.json()["choices"][0]["message"]["content"]
+
+
+def _call_openai_compatible(prompt: str, model_type: str, file_bytes, mime_type) -> str:
+    primary, fallback = _openai_models(model_type)
 
     if file_bytes and mime_type:
         if not mime_type.startswith("image/"):
@@ -88,25 +131,24 @@ def _call_openai_compatible(prompt: str, model_type: str, file_bytes, mime_type)
             {"type": "text", "text": prompt},
             {"type": "image_url", "image_url": {"url": data_uri}},
         ]
-        model = os.getenv("LLM_MODEL_VISION", model)
-    else:
-        user_content = prompt
+        # Görselde yedek yok: görsel destekleyen model ayrıca seçilmeli
+        return _openai_request(os.getenv("LLM_MODEL_VISION", primary), user_content)
 
-    resp = httpx.post(
-        f"{base}/chat/completions",
-        headers={"Authorization": f"Bearer {key}"},
-        json={
-            "model": model,
-            "messages": [{"role": "user", "content": user_content}],
-            "response_format": {"type": "json_object"},
-            "temperature": 0.4,
-        },
-        timeout=60.0,
-    )
-    if resp.status_code != 200:
-        # main.py "429" içeren hata metnini kullanıcıya "yoğunluk" olarak gösteriyor
-        raise RuntimeError(f"LLM hatası {resp.status_code}: {resp.text[:300]}")
-    return resp.json()["choices"][0]["message"]["content"]
+    try:
+        return _openai_request(primary, prompt)
+    except _RetryableLLMError as e:
+        if not fallback or fallback == primary:
+            raise
+        print(f"⚠️ {primary} yanıt vermedi ({e}); yedek modele geçiliyor: {fallback}")
+        try:
+            return _openai_request(fallback, prompt)
+        except _RetryableLLMError as e2:
+            # İkisi de dakikalık limitte: bekleme süresi kısaysa bir kez bekleyip asıl modeli tekrar dene
+            wait = _retry_after_seconds(str(e)) or _retry_after_seconds(str(e2))
+            if wait is None or wait > 15:
+                raise
+            time.sleep(wait + 0.5)
+            return _openai_request(primary, prompt)
 
 
 # ------------------------------------------------------------------ genel

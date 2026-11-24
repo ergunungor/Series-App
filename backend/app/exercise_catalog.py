@@ -23,6 +23,12 @@ def _load() -> Tuple[List[dict], Dict[str, dict]]:
     with open(path, "r", encoding="utf-8") as f:
         raw = json.load(f)
 
+    # Sözcük sıklığı: nadir/garip sözcük içeren adlar (yazım hatası, çok özel varyasyon) geriye itilir
+    freq: Dict[str, int] = {}
+    for ex in raw:
+        for w in _tokens((ex.get("name") or "")):
+            freq[w] = freq.get(w, 0) + 1
+
     items: List[dict] = []
     for ex in raw:
         name = (ex.get("name") or "").strip()
@@ -37,7 +43,7 @@ def _load() -> Tuple[List[dict], Dict[str, dict]]:
                 "body_part": ex.get("body_part") or "",
                 "tokens": _tokens(name),
                 "norm": _normalize(name),
-                "rank": _rank(name, ex.get("equipment") or ""),
+                "rank": _rank(name, ex.get("equipment") or "", freq),
             }
         )
     return items, {it["id"]: it for it in items}
@@ -108,7 +114,7 @@ _COMMON = {
 }
 
 
-def _rank(name: str, equipment: str) -> float:
+def _rank(name: str, equipment: str, freq: Dict[str, int]) -> float:
     """Düşük = temel/yaygın hareket. Uzun adlı varyasyonlar sona gider."""
     n = name.lower()
     score = float(len(n.split()))
@@ -120,6 +126,7 @@ def _rank(name: str, equipment: str) -> float:
         score += 2
     if equipment in _EXOTIC:
         score += 2
+    score += 2 * sum(1 for w in _tokens(name) if freq.get(w, 0) < 3)
     return score
 
 
@@ -202,13 +209,21 @@ def keyword_targets(text: str) -> List[str]:
 
 # ------------------------------------------------------------ katalog üretimi
 
-def _pick_diverse(candidates: List[dict], quota: int) -> List[dict]:
+# Spor salonu kullanıcısı için ekipman öncelik sırası (vücut ağırlığı en sonda)
+_GYM_ORDER = ["barbell", "dumbbell", "cable", "leverage machine", "smith machine",
+              "ez barbell", "kettlebell", "body weight"]
+
+
+def _pick_diverse(candidates: List[dict], quota: int, gym: bool = False) -> List[dict]:
     """Önce temel hareketler, ekipmanlar arasında dönüşümlü: çeşitlilik sağlar."""
     groups: Dict[str, List[dict]] = {}
     for c in sorted(candidates, key=lambda x: (x["rank"], x["name"])):
         groups.setdefault(c["equipment"], []).append(c)
     # en yaygın (en iyi sıralı) ekipman önce gelsin
-    order = sorted(groups, key=lambda k: groups[k][0]["rank"])
+    if gym:
+        order = sorted(groups, key=lambda k: (_GYM_ORDER.index(k) if k in _GYM_ORDER else len(_GYM_ORDER), groups[k][0]["rank"]))
+    else:
+        order = sorted(groups, key=lambda k: groups[k][0]["rank"])
     picked: List[dict] = []
     i = 0
     while len(picked) < quota and any(i < len(groups[k]) for k in order):
@@ -231,6 +246,13 @@ def _dedupe_gender(items: List[dict]) -> List[dict]:
     return out
 
 
+# Antrenman programında yeri olmayan, çok özel ekipmanlar (assisted/weighted hariç tutulmaz)
+_SKIP_EQUIPMENT = {
+    "tire", "hammer", "skierg machine", "upper body ergometer", "wheel roller",
+    "sled machine", "bosu ball", "roller", "medicine ball", "stability ball",
+}
+
+
 def select_exercises(
     *,
     equipment: Optional[Set[str]],
@@ -240,8 +262,14 @@ def select_exercises(
     base_quota: int = 8,
     focus_quota: int = 18,
     cardio_quota: int = 4,
+    include_stretches: bool = False,
 ) -> List[dict]:
-    pool = [e for e in all_exercises() if equipment is None or e["equipment"] in equipment]
+    pool = [
+        e for e in all_exercises()
+        if (equipment is None or e["equipment"] in equipment)
+        and e["equipment"] not in _SKIP_EQUIPMENT
+        and (include_stretches or "stretch" not in e["name"])
+    ]
     pool = _dedupe_gender(pool)
 
     focus = list(focus_targets)
@@ -255,7 +283,7 @@ def select_exercises(
             quota = max(cardio_quota, focus_quota if target in focus else 0)
         else:
             quota = focus_quota if target in focus else base_quota
-        for it in _pick_diverse(items, quota):
+        for it in _pick_diverse(items, quota, gym=equipment is None):
             chosen[it["id"]] = it
 
     # Mevcut programdaki hareketler her zaman listede olsun
@@ -300,6 +328,7 @@ def build_catalog_text(
     interests: Iterable[str] = (),
     include_ids: Iterable[str] = (),
     prompt_text: str = "",
+    include_stretches: bool = False,
 ) -> str:
     focus = interest_targets(interests) + [
         t for t in keyword_targets(prompt_text) if t not in interest_targets(interests)
@@ -309,6 +338,7 @@ def build_catalog_text(
         focus_targets=focus,
         include_ids=include_ids,
         prompt_text=prompt_text,
+        include_stretches=include_stretches,
     )
     return format_catalog(items)
 

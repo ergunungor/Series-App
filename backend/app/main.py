@@ -60,8 +60,11 @@ async def parse_program(
     text: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
 ):
-    if not text and not file:
-        raise HTTPException(status_code=400, detail="Metin veya dosya göndermelisin.")
+    if file:
+        # Geçici: görsel/PDF ile program yükleme şimdilik kapalı, yalnızca metin destekleniyor.
+        raise HTTPException(status_code=503, detail="Dosya ile program yükleme geçici olarak kullanılamıyor. Programı metin olarak yapıştırabilirsin.")
+    if not text:
+        raise HTTPException(status_code=400, detail="Program metnini girmelisin.")
 
     try:
         file_bytes = await file.read() if file else None

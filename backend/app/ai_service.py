@@ -34,14 +34,19 @@ def generate_workout_program(data: UserOnboardingData):
         locations=data.logistics.location,
         equipment=data.logistics.equipment or [],
         interests=interests,
+        include_stretches=any(k in (data.primary_goal or "").lower() for k in ("esneklik", "rehabilitasyon")),
     )
+
+    per_day = max(4, min(8, round(data.logistics.max_duration_min / 8)))
 
     prompt = f"""{data.age} yaşında, {data.gender}, deneyim: {data.experience}, hedef: {data.primary_goal}.
 Odak bölgeler: {", ".join(interests) or "Tüm vücut"}. Sağlık kısıtları: {restrictions}.
 Yer: {", ".join(data.logistics.location)}. Ekipman: {equipment}.
 Haftada {data.logistics.days_per_week} gün, en fazla {data.logistics.max_duration_min} dk. Zihinsel engel: {data.mental_blocker or "Yok"}.
 
-{data.logistics.days_per_week} günlük antrenman programı hazırla; sağlık kısıtlarına aykırı hareket seçme.
+{data.logistics.days_per_week} günlük antrenman programı hazırla. Her güne {per_day} hareket koy (bir günde aynı hareketi tekrarlama).
+Odak bölgelere ağırlık ver ama programı dengeli tut: her gün farklı kas grupları çalışsın, aynı bölge ardışık günlerde tekrar etmesin.
+Sağlık kısıtlarına aykırı hareket seçme.
 Hareketleri yalnızca aşağıdaki listeden seç ve "id" alanına listedeki id'yi yaz (satır: id|ad|ekipman; kas grubuna göre gruplu).
 {_DURATION_RULE}
 Sadece şu şemada JSON döndür:
@@ -50,9 +55,30 @@ Sadece şu şemada JSON döndür:
 LİSTE:
 {catalog_text}"""
 
-    result = generate_json(prompt, model_type=data.model_type)
     allowed = catalog.allowed_equipment(data.logistics.location, data.logistics.equipment or [])
-    return sanitize_program_data(_finalize_exercises(result, allow_custom=False, allowed_equipment=allowed))
+    min_per_day = max(3, per_day - 2)
+
+    def attempt(model_type: str) -> dict:
+        raw = generate_json(prompt, model_type=model_type)
+        return _finalize_exercises(raw, allow_custom=False, allowed_equipment=allowed)
+
+    def is_complete(program: dict) -> bool:
+        workouts = program.get("workouts", [])
+        return len(workouts) == data.logistics.days_per_week and all(
+            len(w.get("exercises", [])) >= min_per_day for w in workouts
+        )
+
+    result = attempt(data.model_type)
+    if not is_complete(result) and data.model_type != "pro":
+        # Küçük model eksik gün/hareket üretti: bir kez büyük modelle dene
+        print("⚠️ Program eksik üretildi, büyük modelle yeniden deneniyor.")
+        try:
+            better = attempt("pro")
+            if is_complete(better):
+                result = better
+        except Exception as e:
+            print(f"⚠️ Yeniden deneme başarısız: {e}")
+    return sanitize_program_data(result)
 
 
 def revise_workout_program(data):
@@ -69,6 +95,7 @@ def revise_workout_program(data):
         equipment=[],
         include_ids=include_ids,
         prompt_text=data.prompt,
+        include_stretches=any(k in data.prompt.lower() for k in ("esne", "stretch", "mobilite", "hareketlilik")),
     )
 
     prompt = f"""Mevcut program:
@@ -80,8 +107,8 @@ Programı bu isteğe göre güncelle; istenmeyen kısımları koru.
 Yeni hareketleri yalnızca aşağıdaki listeden seç ve "id" alanına listedeki id'yi yaz (satır: id|ad|ekipman).
 Mevcut programda id'si boş olan bir hareketi koruyorsan "id": "" bırak ve "name" alanını aynen yaz.
 {_DURATION_RULE}
-Sadece şu şemada JSON döndür:
-{_PROGRAM_SCHEMA}
+Sadece şu şemada JSON döndür ("name" yalnızca id'si boş olan hareketlerde yazılır):
+{_PROGRAM_SCHEMA.replace('"exercises":[{"id":"",', '"exercises":[{"id":"","name":"",')}
 
 LİSTE:
 {catalog_text}"""
