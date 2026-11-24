@@ -5,6 +5,7 @@ from typing import Optional
 from .llm import generate_json
 from .schemas import UserOnboardingData
 from . import exercise_catalog as catalog
+from . import workout_planner as planner
 
 # Eşleştirme eşikleri (exercise_catalog._score ölçeği, 0-1)
 AUTO_MATCH_SCORE = 0.99      # birebir aynı ad: yapay zekaya sormadan eşleştir
@@ -26,66 +27,83 @@ _DURATION_RULE = (
 
 
 def generate_workout_program(data: UserOnboardingData):
+    """Gün bölünmesi, kas dağılımı ve set/tekrar kuralla belirlenir (workout_planner);
+    yapay zeka her kas grubunun aday listesinden hareket seçer ve ipucu yazar."""
     interests = data.specific_interests or []
+    focus = catalog.interest_targets(interests)
     restrictions = ", ".join(data.health_restrictions) if data.health_restrictions else "Yok"
     equipment = ", ".join(data.logistics.equipment) if data.logistics.equipment else "Yok"
 
-    catalog_text = catalog.build_catalog_text(
-        locations=data.logistics.location,
-        equipment=data.logistics.equipment or [],
-        interests=interests,
-        include_stretches=any(k in (data.primary_goal or "").lower() for k in ("esneklik", "rehabilitasyon")),
-    )
-
     allowed = catalog.allowed_equipment(data.logistics.location, data.logistics.equipment or [])
     per_day = max(4, min(8, round(data.logistics.max_duration_min / 8)))
+    plan = planner.build_plan(data.logistics.days_per_week, data.experience, focus, per_day)
+
+    excluded = catalog.restriction_words(data.health_restrictions)
+    if allowed is not None and "barfiks demiri" not in [e.strip().lower() for e in data.logistics.equipment or []]:
+        excluded += catalog.PULL_UP_BAR_WORDS  # barfiks demiri yoksa asılma hareketleri çıkmasın
+
+    pools = catalog.candidates_by_slot(
+        planner.plan_targets(plan) + planner.sibling_slots(plan),
+        equipment=allowed,
+        focus_slots=planner.interest_slots(focus),
+        include_stretches=any(k in (data.primary_goal or "").lower() for k in ("esneklik", "rehabilitasyon")),
+        excluded_words=excluded,
+    )
+    plan = planner.repair_plan(plan, pools)
+    used_slots = planner.plan_targets(plan)
+    pools = {slot: pools[slot] for slot in used_slots if slot in pools}
+    catalog_text = catalog.format_catalog([e for items in pools.values() for e in items], gym=allowed is None)
 
     gym_rule = ""
     if allowed is None:
-        gym_rule = (
-            "\nKullanıcı spor salonunda: barbell, dambıl, kablo ve makine hareketlerini öncelikle seç; "
-            "vücut ağırlığı hareketleri günde en fazla 1-2 tane olsun."
-        )
+        gym_rule = "\n- Kullanıcı spor salonunda: barbell, dambıl, kablo ve makine hareketlerini tercih et."
 
-    prompt = f"""{data.age} yaşında, {data.gender}, deneyim: {data.experience}, hedef: {data.primary_goal}.
+    prompt = f"""Kullanıcı: {data.age} yaş, {data.gender}, deneyim: {data.experience}, hedef: {data.primary_goal}.
 Odak bölgeler: {", ".join(interests) or "Tüm vücut"}. Sağlık kısıtları: {restrictions}.
-Yer: {", ".join(data.logistics.location)}. Ekipman: {equipment}.
-Haftada {data.logistics.days_per_week} gün, en fazla {data.logistics.max_duration_min} dk. Zihinsel engel: {data.mental_blocker or "Yok"}.
+Yer: {", ".join(data.logistics.location)}. Ekipman: {equipment}. Zihinsel engel: {data.mental_blocker or "Yok"}.
 
-{data.logistics.days_per_week} günlük antrenman programı hazırla. Her güne {per_day} hareket koy (bir günde aynı hareketi tekrarlama).
-Odak bölgelere ağırlık ver ama programı dengeli tut: her gün farklı kas grupları çalışsın, aynı bölge ardışık günlerde tekrar etmesin.
-Sağlık kısıtlarına aykırı hareket seçme.{gym_rule}
-Hareketleri yalnızca aşağıdaki listeden seç ve "id" alanına listedeki id'yi yaz (satır: id|ad|ekipman; kas grubuna göre gruplu).
-{_DURATION_RULE}
-Sadece şu şemada JSON döndür:
-{_PROGRAM_SCHEMA}
+Aşağıdaki gün planına göre, her gün için belirtilen kas grubundan belirtilen sayıda hareketi ADAY LİSTESİNDEN seç.
+Kurallar:
+- Yalnızca listedeki id'leri kullan; her hareketi kendi yuvasının satırlarından seç.
+- Aynı hareketi birden fazla güne koyma. Ağır bileşik hareketler önce, izolasyon sonra gelsin.
+- Sağlık kısıtlarına aykırı hareket seçme.{gym_rule}
+- "program_name": kısa ve motive edici Türkçe isim. "description": Türkçe 2 cümle.
+- Her hareket için "note" alanını MUTLAKA doldur: Türkçe, en fazla 10 kelimelik form ipucu.
+- Her günün "exercises" listesi, o günün plandaki toplam hareket sayısı kadar olsun.
 
-LİSTE:
-{catalog_text}"""
+GÜN PLANI (yuva ×hareket sayısı). Yuvalar: {planner.SLOT_LEGEND}.
+{planner.plan_text(plan)}
 
-    min_per_day = max(3, per_day - 2)
+ADAY LİSTESİ (yuva başlıkları altında id|ad|ekipman):
+{catalog_text}
 
-    def attempt(model_type: str) -> dict:
-        raw = generate_json(prompt, model_type=model_type)
-        return _finalize_exercises(raw, allow_custom=False, allowed_equipment=allowed)
+Sadece JSON döndür; "days" listesi gün planıyla aynı sırada olsun:
+{{"program_name":"","description":"","days":[{{"exercises":[{{"id":"","note":""}}]}}]}}"""
 
-    def is_complete(program: dict) -> bool:
-        workouts = program.get("workouts", [])
-        return len(workouts) == data.logistics.days_per_week and all(
-            len(w.get("exercises", [])) >= min_per_day for w in workouts
-        )
+    # Üretimde her zaman güçlü model: küçük model eksik/yanlış çıktı veriyordu.
+    try:
+        result = generate_json(prompt, model_type="pro")
+    except Exception as e:
+        # Yapay zeka yanıt vermese de iskelet + havuzdan program üretilir (not ve özel isim olmadan).
+        print(f"⚠️ Yapay zeka yanıtı alınamadı, kural tabanlı program üretiliyor: {e}")
+        result = {}
 
-    result = attempt(data.model_type)
-    if not is_complete(result) and data.model_type != "pro":
-        # Küçük model eksik gün/hareket üretti: bir kez büyük modelle dene
-        print("⚠️ Program eksik üretildi, büyük modelle yeniden deneniyor.")
-        try:
-            better = attempt("pro")
-            if is_complete(better):
-                result = better
-        except Exception as e:
-            print(f"⚠️ Yeniden deneme başarısız: {e}")
-    return sanitize_program_data(result)
+    workouts = planner.assemble(
+        plan,
+        result.get("days") if isinstance(result.get("days"), list) else [],
+        pools,
+        allowed_equipment=allowed,
+        goal=data.primary_goal,
+        experience=data.experience,
+        duration_min=data.logistics.max_duration_min,
+    )
+    program = {
+        "program_name": result.get("program_name") or f"{data.primary_goal} Programı",
+        "description": result.get("description")
+        or f"{data.logistics.days_per_week} günlük, {data.primary_goal.lower()} odaklı program.",
+        "workouts": workouts,
+    }
+    return sanitize_program_data(program)
 
 
 def revise_workout_program(data):

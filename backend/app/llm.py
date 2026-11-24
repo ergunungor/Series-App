@@ -97,16 +97,20 @@ def _openai_request(model: str, user_content) -> str:
     key = os.getenv("LLM_API_KEY")
     if not key:
         raise RuntimeError("LLM_API_KEY tanımlı değil.")
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": user_content}],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.4,
+    }
+    if "gpt-oss" in model:
+        # Akıl yürütme jetonları yanıtı tüketip boş JSON'a yol açabiliyor; düşük düzey daha hızlı ve ucuz
+        payload["reasoning_effort"] = "low"
     try:
         resp = httpx.post(
             f"{base}/chat/completions",
             headers={"Authorization": f"Bearer {key}"},
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": user_content}],
-                "response_format": {"type": "json_object"},
-                "temperature": 0.4,
-            },
+            json=payload,
             timeout=60.0,
         )
     except httpx.TransportError as e:  # zaman aşımı, bağlantı kopması
