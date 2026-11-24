@@ -31,57 +31,59 @@ class KiremitHeroSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hero = Container(
-      key: heroKey,
-      width: double.infinity,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [topColor, bottomColor],
-        ),
-        borderRadius: BorderRadius.vertical(
-          bottom: Radius.circular(bottomRadius),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: bottomColor.withValues(alpha: 0.5),
-            blurRadius: 40,
-            spreadRadius: -18,
-            offset: const Offset(0, 24),
+    final hero = RepaintBoundary(
+      child: Container(
+        key: heroKey,
+        width: double.infinity,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [topColor, bottomColor],
           ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Sağ üstten gelen yumuşak ışık. Üst kenarda şeffafa solar: aşağı
-          // çekince hero'nun üstündeki düz renkli bloğa kesiksiz bağlanır.
-          Positioned.fill(
-            child: IgnorePointer(
-              child: ShaderMask(
-                blendMode: BlendMode.dstIn,
-                shaderCallback:
-                    (rect) => const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Colors.black],
-                      stops: [0, _glowFadeStop],
-                    ).createShader(rect),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: const Alignment(0.95, -0.6),
-                      radius: 1.35,
-                      colors: [glowColor, glowColor.withValues(alpha: 0)],
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(bottomRadius),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: bottomColor.withValues(alpha: 0.5),
+              blurRadius: 40,
+              spreadRadius: -18,
+              offset: const Offset(0, 24),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            // Sağ üstten gelen yumuşak ışık. Üst kenarda şeffafa solar: aşağı
+            // çekince hero'nun üstündeki düz renkli bloğa kesiksiz bağlanır.
+            Positioned.fill(
+              child: IgnorePointer(
+                child: ShaderMask(
+                  blendMode: BlendMode.dstIn,
+                  shaderCallback:
+                      (rect) => const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black],
+                        stops: [0, _glowFadeStop],
+                      ).createShader(rect),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: const Alignment(0.95, -0.6),
+                        radius: 1.35,
+                        colors: [glowColor, glowColor.withValues(alpha: 0)],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-          child,
-        ],
+            child,
+          ],
+        ),
       ),
     );
 

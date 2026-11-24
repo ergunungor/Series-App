@@ -23,7 +23,23 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
   final TextEditingController _controller = TextEditingController();
   bool _isLoading = false;
 
+  // Geçici: görsel/PDF ile yükleme kapalı, yalnızca metin destekleniyor.
+  // Yeniden açmak için true yapmak yeterli.
+  static const bool _fileImportAvailable = false;
+
   Future<void> _showPickerOptions() async {
+    if (!_fileImportAvailable) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Görsel ve dosya yükleme geçici olarak kullanılamıyor. Programını metin olarak yapıştırabilirsin.',
+            ),
+          ),
+        );
+      return;
+    }
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -295,7 +311,7 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              'Programını yapıştır veya ekran görüntüsü yükle, yapay zeka ile hemen dijital forma dönüştürelim.',
+              'Programını yapıştır, yapay zeka ile hemen dijital forma dönüştürelim.',
               style: AppTypography.body14Regular.copyWith(
                 color: Colors.white.withValues(alpha: 0.72),
                 height: 1.5,
@@ -483,7 +499,7 @@ class _ImportProgramScreenState extends State<ImportProgramScreen> {
           const SizedBox(height: 12),
           Text(
             '• Notes uygulamasındaki programını direkt üstteki alana yapıştırabilirsin.\n'
-            '• Telefonundaki program ekran görüntüsünü veya PDF dosyasını alt butondan yükleyebilirsin.\n'
+            '• Görsel ve PDF yükleme geçici olarak kullanılamıyor.\n'
             '• Hareket isimleri, set ve tekrar sayıları yapay zeka tarafından otomatik ayarlanır.',
             style: AppTypography.body14Regular.copyWith(
               fontSize: 13,

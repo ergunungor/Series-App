@@ -1,5 +1,6 @@
 import 'dart:async' show Timer;
 import 'dart:ui' show ImageFilter;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
@@ -81,6 +82,7 @@ class _AppBottomNavState extends State<AppBottomNav>
   static const double _barRadius = 45;
   static const double _blurSigma = 24;
   static const double _glassAlpha = 0.58;
+  static const double _webGlassAlpha = 0.88;
   static const double _borderAlpha = 0.75;
 
   // Büyük (yazılı) ve küçük (yalnızca ikon) hâl ölçüleri; animasyon bunlar
@@ -343,6 +345,14 @@ class _AppBottomNavState extends State<AppBottomNav>
     );
   }
 
+  Widget _maybeBlur(Widget child) {
+    if (kIsWeb) return child;
+    return BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma),
+      child: child,
+    );
+  }
+
   Widget _buildBar(Color color, double t) {
     final radius = BorderRadius.circular(_barRadius);
     final slot = _lerp(_collapsedSlot, _expandedSlot, t);
@@ -366,12 +376,15 @@ class _AppBottomNavState extends State<AppBottomNav>
       ),
       child: ClipRRect(
         borderRadius: radius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma),
-          child: Container(
+        // Web'de BackdropFilter (arka plan bulanıklığı) her karede pahalı olduğu
+        // için kullanılmaz; yerine daha opak beyaz dolgu ile cam görünümü korunur.
+        child: _maybeBlur(
+          Container(
             padding: EdgeInsets.all(pad),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: _glassAlpha),
+              color: Colors.white.withValues(
+                alpha: kIsWeb ? _webGlassAlpha : _glassAlpha,
+              ),
               borderRadius: radius,
               border: Border.all(
                 color: Colors.white.withValues(alpha: _borderAlpha),
@@ -421,23 +434,25 @@ class _AppBottomNavState extends State<AppBottomNav>
   Widget build(BuildContext context) {
     final target = AppBottomNav._items[widget.currentIndex].color;
 
-    return Center(
-      child: Listener(
-        onPointerDown: (_) => _handlePointerDown(),
-        onPointerUp: (_) => _handlePointerUp(),
-        onPointerCancel: (_) => _handlePointerUp(),
-        // Sekme değişince ikon ve yazı rengi yumuşakça yeni sayfanın rengine
-        // geçer; ilk build'de animasyon yok.
-        child: TweenAnimationBuilder<Color?>(
-          tween: ColorTween(end: target),
-          duration: _colorDuration,
-          curve: Curves.easeOut,
-          builder:
-              (context, color, _) => AnimatedBuilder(
-                animation: _expand,
-                builder:
-                    (context, _) => _buildBar(color ?? target, _expand.value),
-              ),
+    return RepaintBoundary(
+      child: Center(
+        child: Listener(
+          onPointerDown: (_) => _handlePointerDown(),
+          onPointerUp: (_) => _handlePointerUp(),
+          onPointerCancel: (_) => _handlePointerUp(),
+          // Sekme değişince ikon ve yazı rengi yumuşakça yeni sayfanın rengine
+          // geçer; ilk build'de animasyon yok.
+          child: TweenAnimationBuilder<Color?>(
+            tween: ColorTween(end: target),
+            duration: _colorDuration,
+            curve: Curves.easeOut,
+            builder:
+                (context, color, _) => AnimatedBuilder(
+                  animation: _expand,
+                  builder:
+                      (context, _) => _buildBar(color ?? target, _expand.value),
+                ),
+          ),
         ),
       ),
     );
