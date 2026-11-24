@@ -37,7 +37,15 @@ def generate_workout_program(data: UserOnboardingData):
         include_stretches=any(k in (data.primary_goal or "").lower() for k in ("esneklik", "rehabilitasyon")),
     )
 
+    allowed = catalog.allowed_equipment(data.logistics.location, data.logistics.equipment or [])
     per_day = max(4, min(8, round(data.logistics.max_duration_min / 8)))
+
+    gym_rule = ""
+    if allowed is None:
+        gym_rule = (
+            "\nKullanıcı spor salonunda: barbell, dambıl, kablo ve makine hareketlerini öncelikle seç; "
+            "vücut ağırlığı hareketleri günde en fazla 1-2 tane olsun."
+        )
 
     prompt = f"""{data.age} yaşında, {data.gender}, deneyim: {data.experience}, hedef: {data.primary_goal}.
 Odak bölgeler: {", ".join(interests) or "Tüm vücut"}. Sağlık kısıtları: {restrictions}.
@@ -46,7 +54,7 @@ Haftada {data.logistics.days_per_week} gün, en fazla {data.logistics.max_durati
 
 {data.logistics.days_per_week} günlük antrenman programı hazırla. Her güne {per_day} hareket koy (bir günde aynı hareketi tekrarlama).
 Odak bölgelere ağırlık ver ama programı dengeli tut: her gün farklı kas grupları çalışsın, aynı bölge ardışık günlerde tekrar etmesin.
-Sağlık kısıtlarına aykırı hareket seçme.
+Sağlık kısıtlarına aykırı hareket seçme.{gym_rule}
 Hareketleri yalnızca aşağıdaki listeden seç ve "id" alanına listedeki id'yi yaz (satır: id|ad|ekipman; kas grubuna göre gruplu).
 {_DURATION_RULE}
 Sadece şu şemada JSON döndür:
@@ -55,7 +63,6 @@ Sadece şu şemada JSON döndür:
 LİSTE:
 {catalog_text}"""
 
-    allowed = catalog.allowed_equipment(data.logistics.location, data.logistics.equipment or [])
     min_per_day = max(3, per_day - 2)
 
     def attempt(model_type: str) -> dict:
