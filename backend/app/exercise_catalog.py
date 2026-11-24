@@ -224,6 +224,8 @@ def _pick_diverse(candidates: List[dict], quota: int, gym: bool = False) -> List
         order = sorted(groups, key=lambda k: (_GYM_ORDER.index(k) if k in _GYM_ORDER else len(_GYM_ORDER), groups[k][0]["rank"]))
     else:
         order = sorted(groups, key=lambda k: groups[k][0]["rank"])
+    if gym and "body weight" in groups:
+        groups["body weight"] = groups["body weight"][:2]  # ağırlıksız hareketler listeyi doldurmasın
     picked: List[dict] = []
     i = 0
     while len(picked) < quota and any(i < len(groups[k]) for k in order):
@@ -308,7 +310,12 @@ def select_exercises(
     return list(chosen.values())
 
 
-def format_catalog(items: List[dict]) -> str:
+def _gym_sort_key(it: dict):
+    eq = it["equipment"]
+    return (_GYM_ORDER.index(eq) if eq in _GYM_ORDER else len(_GYM_ORDER) - 1, it["rank"], it["name"])
+
+
+def format_catalog(items: List[dict], gym: bool = False) -> str:
     """Kas grubuna göre gruplu, sıkıştırılmış metin: 'id|ad|ekipman'."""
     groups: Dict[str, List[dict]] = {}
     for it in items:
@@ -316,7 +323,8 @@ def format_catalog(items: List[dict]) -> str:
     lines = []
     for target in sorted(groups):
         lines.append(f"[{target}]")
-        for it in sorted(groups[target], key=lambda x: (x["rank"], x["name"])):
+        order = _gym_sort_key if gym else (lambda x: (x["rank"], x["name"]))
+        for it in sorted(groups[target], key=order):
             lines.append(f"{it['id']}|{it['name']}|{it['equipment']}")
     return "\n".join(lines)
 
@@ -340,7 +348,7 @@ def build_catalog_text(
         prompt_text=prompt_text,
         include_stretches=include_stretches,
     )
-    return format_catalog(items)
+    return format_catalog(items, gym=allowed_equipment(locations, equipment) is None)
 
 
 # ------------------------------------------------------------ eşleştirme
