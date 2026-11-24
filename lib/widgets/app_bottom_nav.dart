@@ -1,6 +1,7 @@
 import 'dart:async' show Timer;
+import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show ValueListenable, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
@@ -37,6 +38,10 @@ class AppBottomNav extends StatefulWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
 
+  /// Doluysa lens bu (kesirli) sekme konumunda durur: ekranlar arası
+  /// kaydırmada lens içerikle birlikte akar. `null` iken normal çalışır.
+  final ValueListenable<double?>? externalPosition;
+
   /// Büyük hâldeki kapsül yüksekliği ve alt marj. Ekranlar alt boşluklarını
   /// buna bağlar ([clearance]); bar küçülüp büyüyünce içerik kaymaz.
   static const double expandedHeight = 72;
@@ -70,6 +75,7 @@ class AppBottomNav extends StatefulWidget {
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.externalPosition,
   });
 
   @override
@@ -115,6 +121,8 @@ class _AppBottomNavState extends State<AppBottomNav>
   static const double _lensVerticalInset = 2;
   static const double _lensInset = 3;
   static const double _lensAlpha = 0.7;
+  static const double _lensDragAlpha = 0.5;
+  static const double _lensDragScale = 1.12;
   static const double _stretchPerVelocity = 0.035;
   static const double _maxStretch = 1.22;
   static const double _squashFactor = 0.5;
@@ -139,6 +147,14 @@ class _AppBottomNavState extends State<AppBottomNav>
   Timer? _idleTimer;
   bool _isExpanded = true;
   bool _isPressed = false;
+  // Lens parmakla sürükleniyor (basılı tutup kaydırma).
+  bool _isLensDragging = false;
+  // Sürükleme sırasında parmakla lens merkezi arasındaki sabit fark (sıçrama olmasın).
+  double _dragGrabOffset = 0;
+  int _lastHapticSlot = 0;
+  // Parmağın anlık hızı (slot/sn): lensin esnemesi için.
+  double _dragVelocity = 0;
+  Timer? _dragVelocityReset;
   // VoiceOver ya da "hareketi azalt" açıkken bar hep büyük kalır.
   bool _isLocked = false;
 
@@ -151,6 +167,27 @@ class _AppBottomNavState extends State<AppBottomNav>
     );
     _expand = AnimationController.unbounded(vsync: this, value: 1);
     _restartIdleTimer();
+    widget.externalPosition?.addListener(_onExternalPosition);
+  }
+
+  // Ekranlar arası kaydırma: lens içerikle birlikte akar, bar açık kalır.
+  void _onExternalPosition() {
+    final value = widget.externalPosition?.value;
+    if (value != null) {
+      _position.stop();
+      _position.value = value;
+      _idleTimer?.cancel();
+      _setExpanded(true);
+    } else if (!_isLensDragging) {
+      _springTo(widget.currentIndex.toDouble());
+      _restartIdleTimer();
+    }
+  }
+
+  void _springTo(double target) {
+    _position.animateWith(
+      SpringSimulation(_spring, _position.value, target, _position.velocity),
+    );
   }
 
   @override
@@ -172,15 +209,15 @@ class _AppBottomNavState extends State<AppBottomNav>
   @override
   void didUpdateWidget(AppBottomNav oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.externalPosition != widget.externalPosition) {
+      oldWidget.externalPosition?.removeListener(_onExternalPosition);
+      widget.externalPosition?.addListener(_onExternalPosition);
+    }
     if (oldWidget.currentIndex != widget.currentIndex) {
-      _position.animateWith(
-        SpringSimulation(
-          _spring,
-          _position.value,
-          widget.currentIndex.toDouble(),
-          _position.velocity,
-        ),
-      );
+      // Kaydırma/sürükleme lensi zaten yönetiyor; yay yalnızca dokunmada.
+      if (widget.externalPosition?.value == null && !_isLensDragging) {
+        _springTo(widget.currentIndex.toDouble());
+      }
       _setExpanded(true);
       _restartIdleTimer();
     }
@@ -188,6 +225,8 @@ class _AppBottomNavState extends State<AppBottomNav>
 
   @override
   void dispose() {
+    widget.externalPosition?.removeListener(_onExternalPosition);
+    _dragVelocityReset?.cancel();
     _idleTimer?.cancel();
     _position.dispose();
     _expand.dispose();
@@ -231,6 +270,67 @@ class _AppBottomNavState extends State<AppBottomNav>
     _restartIdleTimer();
   }
 
+  // Basılı tutup kaydırma (iOS 26 sekme çubuğu gibi): lens parmağı izler,
+  // bırakınca en yakın sekmeye oturur ve o sekmeye geçilir.
+  double _slotWidth() =>
+      _lerp(_collapsedSlot, _expandedSlot, _expand.value.clamp(0.0, 1.0));
+  double _barPad() =>
+      _lerp(_collapsedPad, _expandedPad, _expand.value.clamp(0.0, 1.0));
+
+  // Bar içindeki x konumunu kesirli sekme indeksine (lens merkezi) çevirir.
+  double _fractionAt(double dx) => (dx - _barPad()) / _slotWidth() - 0.5;
+
+  void _onLensDragStart(DragStartDetails details) {
+    _idleTimer?.cancel();
+    _position.stop();
+    _dragGrabOffset = _fractionAt(details.localPosition.dx) - _position.value;
+    _lastHapticSlot = _position.value.round();
+    setState(() => _isLensDragging = true);
+    _setExpanded(true);
+  }
+
+  void _onLensDragUpdate(DragUpdateDetails details) {
+    final maxIndex = (AppBottomNav._items.length - 1).toDouble();
+    // Uçlarda hafifçe taşabilir (yay gibi), sonra geri oturur.
+    final value =
+        (_fractionAt(details.localPosition.dx) - _dragGrabOffset)
+            .clamp(-0.18, maxIndex + 0.18)
+            .toDouble();
+    final slot = _lastHapticSlot;
+    final nearest = value.round().clamp(0, maxIndex.toInt());
+    if (nearest != slot) {
+      _lastHapticSlot = nearest;
+      HapticFeedback.selectionClick();
+    }
+    // Hız (slot/sn), ~60 olay/sn varsayımıyla; durunca kısa sürede sıfırlanır.
+    _dragVelocity = (details.delta.dx / _slotWidth()) * 60;
+    _dragVelocityReset?.cancel();
+    _dragVelocityReset = Timer(const Duration(milliseconds: 90), () {
+      if (mounted) setState(() => _dragVelocity = 0);
+    });
+    _position.value = value;
+  }
+
+  void _onLensDragEnd(DragEndDetails details) {
+    final maxIndex = AppBottomNav._items.length - 1;
+    final velocity = (details.primaryVelocity ?? 0) / _slotWidth();
+    // Fırlatma, hedef sekmeyi biraz ileri taşır.
+    final projected = _position.value + velocity * 0.1;
+    final target = projected.round().clamp(0, maxIndex);
+
+    _dragVelocityReset?.cancel();
+    setState(() {
+      _isLensDragging = false;
+      _dragVelocity = 0;
+    });
+    if (target != widget.currentIndex) {
+      _handleTap(target);
+    }
+    // Lens, bıraktığı yerden hedefe yay ile oturur.
+    _springTo(target.toDouble());
+    _restartIdleTimer();
+  }
+
   void _handleTap(int index) {
     if (index != widget.currentIndex) HapticFeedback.selectionClick();
     widget.onTap(index);
@@ -239,7 +339,7 @@ class _AppBottomNavState extends State<AppBottomNav>
   static double _lerp(double a, double b, double t) => a + (b - a) * t;
 
   Widget _buildLens(double slotWidth, double itemHeight) {
-    final velocity = _position.velocity.abs();
+    final velocity = math.max(_position.velocity.abs(), _dragVelocity.abs());
     final stretch =
         (1 + velocity * _stretchPerVelocity).clamp(1.0, _maxStretch).toDouble();
     // Yatayda uzarken dikeyde biraz basıklaşır (hacim korunuyormuş gibi).
@@ -254,19 +354,29 @@ class _AppBottomNavState extends State<AppBottomNav>
         child: Transform(
           alignment: Alignment.center,
           transform: Matrix4.diagonal3Values(stretch, squash, 1),
-          child: Container(
-            height: itemHeight - _lensVerticalInset * 2,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: _lensAlpha),
-              borderRadius: BorderRadius.circular(_barRadius),
-              border: Border.all(color: Colors.white, width: 1),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+          // Parmakla tutulurken lens hafifçe büyür, daha saydam ve parlak olur.
+          child: AnimatedScale(
+            scale: _isLensDragging ? _lensDragScale : 1,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            child: Container(
+              height: itemHeight - _lensVerticalInset * 2,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(
+                  alpha: _isLensDragging ? _lensDragAlpha : _lensAlpha,
                 ),
-              ],
+                borderRadius: BorderRadius.circular(_barRadius),
+                border: Border.all(color: Colors.white, width: 1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(
+                      alpha: _isLensDragging ? 0.12 : 0.06,
+                    ),
+                    blurRadius: _isLensDragging ? 14 : 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -425,7 +535,14 @@ class _AppBottomNavState extends State<AppBottomNav>
         scale: _isPressed ? _pressedScale : 1,
         duration: _isPressed ? _pressInDuration : _pressOutDuration,
         curve: _isPressed ? Curves.easeOut : Curves.easeInOutCubic,
-        child: bar,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragStart: _onLensDragStart,
+          onHorizontalDragUpdate: _onLensDragUpdate,
+          onHorizontalDragEnd: _onLensDragEnd,
+          onHorizontalDragCancel: () => _onLensDragEnd(DragEndDetails()),
+          child: bar,
+        ),
       ),
     );
   }
