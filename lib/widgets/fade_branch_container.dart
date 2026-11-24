@@ -1,5 +1,12 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show ValueNotifier, kIsWeb;
+import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+/// Ekranlar arasında parmakla kaydırırken ya da kayma animasyonu bitene kadar,
+/// alt barın seçim lensinin konumunu (kesirli sekme indeksi) taşır. Kaydırma
+/// yokken `null`. Alt bar bunu dinleyip lensi içerikle birlikte akıtır.
+final ValueNotifier<double?> tabSwipeProgress = ValueNotifier<double?>(null);
 
 /// Alt bar sekmeleri arasında geçişi yatay kayma ile yapar (fade yok).
 ///
@@ -8,14 +15,23 @@ import 'package:flutter/material.dart';
 /// tersinden kayarak girer, eski sekme daha yavaş (paralaks) ters yöne çekilir
 /// ve hafifçe kararır; yeni sekmenin kenarında ince bir gölge derinlik verir.
 /// Eski sekme kayma bitene kadar altta kalır.
+///
+/// Ekranda yatay sürükleyerek de komşu sekmeye geçilir: geçiş animasyonu
+/// parmakla birlikte ilerler, bırakınca hız ya da mesafeye göre tamamlanır ya
+/// da geri döner. İçeride yatay kaydırılan bir öğe (ör. silinebilir kart)
+/// hareketi önce kapar; sekme geçişi yalnızca boş alanda başlar.
 class FadeBranchContainer extends StatefulWidget {
   final int currentIndex;
   final List<Widget> children;
+
+  /// Kaydırma ile başka sekmeye geçilince çağrılır.
+  final ValueChanged<int>? onIndexChanged;
 
   const FadeBranchContainer({
     super.key,
     required this.currentIndex,
     required this.children,
+    this.onIndexChanged,
   });
 
   @override
@@ -29,11 +45,21 @@ class _FadeBranchContainerState extends State<FadeBranchContainer>
   static const double _parallax = 0.28;
   static const double _scrimAlpha = 0.1;
 
+  // Kaydırma ile geçiş: bu orandan fazla sürüklenirse ya da bu hızı aşan bir
+  // fırlatma olursa tamamlanır.
+  static const double _commitFraction = 0.33;
+  static const double _flingVelocity = 700;
+
   late final AnimationController _controller;
   late final Animation<double> _progress;
   int? _previousIndex;
   // +1: yeni sekme sağdan girer (sağdaki sekmeye geçiş), -1: soldan.
   int _direction = 1;
+
+  // Parmakla sürükleme: gösterilen (girmekte olan) komşu sekme. null = yok.
+  int? _dragTarget;
+  double _dragDx = 0;
+  bool _isDragging = false;
 
   @override
   void initState() {
@@ -48,22 +74,129 @@ class _FadeBranchContainerState extends State<FadeBranchContainer>
       parent: _controller,
       curve: Curves.easeInOutCubic,
     );
+    _controller.addListener(_publishProgress);
   }
 
   @override
   void didUpdateWidget(FadeBranchContainer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.currentIndex != widget.currentIndex) {
-      _previousIndex = oldWidget.currentIndex;
-      _direction = widget.currentIndex > oldWidget.currentIndex ? 1 : -1;
-      _controller.forward(from: 0);
+    if (oldWidget.currentIndex == widget.currentIndex) return;
+
+    if (_dragTarget != null && _dragTarget == widget.currentIndex) {
+      // Kaydırma ile tamamlanan geçiş: animasyon zaten sürüyor, yeniden başlatma.
+      return;
     }
+    // Alt bardan dokunma (ya da kaydırma sırasında başka yönlendirme).
+    _dragTarget = null;
+    _isDragging = false;
+    tabSwipeProgress.value = null;
+    _previousIndex = oldWidget.currentIndex;
+    _direction = widget.currentIndex > oldWidget.currentIndex ? 1 : -1;
+    _controller.forward(from: 0);
   }
 
   @override
   void dispose() {
+    tabSwipeProgress.value = null;
+    _controller.removeListener(_publishProgress);
     _controller.dispose();
     super.dispose();
+  }
+
+  // Alt barın lensini içerikle birlikte akıtır (yalnızca sürükleme/yerleşme
+  // sırasında).
+  void _publishProgress() {
+    if (_dragTarget == null || _previousIndex == null) return;
+    tabSwipeProgress.value = _previousIndex! + _direction * _controller.value;
+  }
+
+  void _clearDrag() {
+    _dragTarget = null;
+    _isDragging = false;
+    tabSwipeProgress.value = null;
+    if (mounted) setState(() {});
+  }
+
+  int? _neighbor(int direction) {
+    final target = widget.currentIndex + direction;
+    if (target < 0 || target >= widget.children.length) return null;
+    return target;
+  }
+
+  void _onDragStart(DragStartDetails details) {
+    if (widget.onIndexChanged == null) return;
+    // Bir geçiş sürerken yeni sürükleme başlatma.
+    if (_controller.value < 1 || _dragTarget != null) return;
+    _isDragging = true;
+    _dragDx = 0;
+  }
+
+  void _onDragUpdate(DragUpdateDetails details, double width) {
+    if (!_isDragging || width <= 0) return;
+    _dragDx += details.delta.dx;
+
+    // Sola sürükleme (negatif) → sağdaki sekme girer.
+    final direction = _dragDx < 0 ? 1 : -1;
+    final target = _neighbor(direction);
+    if (target == null) {
+      // Uçtaki sekme: komşu yok, hareket yok sayılır.
+      if (_dragTarget != null) {
+        _dragTarget = null;
+        tabSwipeProgress.value = null;
+        setState(() {});
+      }
+      return;
+    }
+
+    setState(() {
+      if (_dragTarget != target) {
+        _dragTarget = target;
+        _previousIndex = widget.currentIndex;
+        _direction = direction;
+        // Yön değişirken başlangıç noktası sıfırdan hesaplanır.
+      }
+      _controller.value = (_dragDx.abs() / width).clamp(0.0, 1.0).toDouble();
+    });
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    if (!_isDragging) return;
+    _isDragging = false;
+    final target = _dragTarget;
+    if (target == null) return;
+
+    // Gittiği yöne doğru hız (+: geçişi ilerleten, -: geri çeken).
+    final velocity = -_direction * (details.primaryVelocity ?? 0);
+    final progress = _controller.value;
+    final cancelled = velocity < -_flingVelocity;
+    final commit =
+        !cancelled && (velocity > _flingVelocity || progress > _commitFraction);
+
+    if (commit) {
+      HapticFeedback.selectionClick();
+      // Önce yönlendirmeyi yap: didUpdateWidget bu geçişi yeniden başlatmaz.
+      widget.onIndexChanged?.call(target);
+      final remaining = 1 - progress;
+      _controller
+          .animateTo(
+            1,
+            duration: Duration(milliseconds: (140 + 240 * remaining).round()),
+            curve: Curves.easeOutCubic,
+          )
+          .whenComplete(_clearDrag);
+    } else {
+      _controller
+          .animateTo(
+            0,
+            duration: Duration(milliseconds: (120 + 220 * progress).round()),
+            curve: Curves.easeOutCubic,
+          )
+          .whenComplete(() {
+            // Vazgeçildi: eski sekme yerinde kalır.
+            _controller.value = 1;
+            _clearDrag();
+          });
+    }
   }
 
   @override
@@ -71,92 +204,105 @@ class _FadeBranchContainerState extends State<FadeBranchContainer>
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        return AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            final current = widget.currentIndex;
-            final isAnimating = _controller.value < 1;
-            final t = _progress.value;
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          dragStartBehavior: DragStartBehavior.down,
+          onHorizontalDragStart: _onDragStart,
+          onHorizontalDragUpdate: (d) => _onDragUpdate(d, width),
+          onHorizontalDragEnd: _onDragEnd,
+          onHorizontalDragCancel: () => _onDragEnd(DragEndDetails()),
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              final dragging = _dragTarget != null;
+              // Gösterilen sekme: sürüklerken komşu, aksi halde aktif sekme.
+              final current = _dragTarget ?? widget.currentIndex;
+              final isAnimating = dragging || _controller.value < 1;
+              // Sürüklerken parmağı birebir izlemek için doğrusal ilerleme.
+              final t = dragging ? _controller.value : _progress.value;
+              // Altta kalan (çıkan) sekme: geçişi başlatan sekme. Sürüklemede de,
+              // tamamlanan kaydırmada da, dokunma geçişinde de aynı alan.
+              final under = _previousIndex;
 
-            // Aktif sekme en son (en üstte) çizilir; anahtarlar sayesinde
-            // sıra değişse de dalların state'i korunur.
-            final order = [
-              for (var i = 0; i < widget.children.length; i++)
-                if (i != current) i,
-              current,
-            ];
+              // Aktif sekme en son (en üstte) çizilir; anahtarlar sayesinde
+              // sıra değişse de dalların state'i korunur.
+              final order = [
+                for (var i = 0; i < widget.children.length; i++)
+                  if (i != current) i,
+                current,
+              ];
 
-            Widget decorate(int i) {
-              final child = widget.children[i];
-              if (!isAnimating) return child;
-              if (i == current) {
-                // Yeni sekme: gittiği yönün tersinden kayarak girer.
-                return Transform.translate(
-                  offset: Offset(_direction * (1 - t) * width, 0),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      // Tam ekran katmanda büyük bulanık gölge web'de pahalı;
-                      // orada atlanır (yalnızca mobilde derinlik gölgesi).
-                      boxShadow:
-                          kIsWeb
-                              ? const []
-                              : [
-                                BoxShadow(
-                                  color: Colors.black.withValues(
-                                    alpha: 0.14 * (1 - t),
+              Widget decorate(int i) {
+                final child = widget.children[i];
+                if (!isAnimating) return child;
+                if (i == current) {
+                  // Yeni sekme: gittiği yönün tersinden kayarak girer.
+                  return Transform.translate(
+                    offset: Offset(_direction * (1 - t) * width, 0),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        // Tam ekran katmanda büyük bulanık gölge web'de pahalı;
+                        // orada atlanır (yalnızca mobilde derinlik gölgesi).
+                        boxShadow:
+                            kIsWeb
+                                ? const []
+                                : [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(
+                                      alpha: 0.14 * (1 - t),
+                                    ),
+                                    blurRadius: 32,
+                                    offset: Offset(-_direction * 6.0, 0),
                                   ),
-                                  blurRadius: 32,
-                                  offset: Offset(-_direction * 6.0, 0),
-                                ),
-                              ],
+                                ],
+                      ),
+                      child: child,
                     ),
-                    child: child,
-                  ),
-                );
+                  );
+                }
+                if (i == under) {
+                  // Eski sekme: daha yavaş ters yöne kayar ve hafifçe kararır.
+                  return Transform.translate(
+                    offset: Offset(-_direction * t * width * _parallax, 0),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        child,
+                        IgnorePointer(
+                          child: ColoredBox(
+                            color: Colors.black.withValues(
+                              alpha: _scrimAlpha * t,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return child;
               }
-              if (i == _previousIndex) {
-                // Eski sekme: daha yavaş ters yöne kayar ve hafifçe kararır.
-                return Transform.translate(
-                  offset: Offset(-_direction * t * width * _parallax, 0),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      child,
-                      IgnorePointer(
-                        child: ColoredBox(
-                          color: Colors.black.withValues(
-                            alpha: _scrimAlpha * t,
+
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  for (final i in order)
+                    KeyedSubtree(
+                      key: ValueKey(i),
+                      child: Offstage(
+                        offstage: i != current && !(isAnimating && i == under),
+                        child: IgnorePointer(
+                          ignoring: i != current,
+                          child: TickerMode(
+                            enabled: i == current,
+                            child: decorate(i),
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                );
-              }
-              return child;
-            }
-
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                for (final i in order)
-                  KeyedSubtree(
-                    key: ValueKey(i),
-                    child: Offstage(
-                      offstage:
-                          i != current && !(isAnimating && i == _previousIndex),
-                      child: IgnorePointer(
-                        ignoring: i != current,
-                        child: TickerMode(
-                          enabled: i == current,
-                          child: decorate(i),
-                        ),
-                      ),
                     ),
-                  ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         );
       },
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import 'app_bottom_nav.dart';
+import 'fade_branch_container.dart' show tabSwipeProgress;
 
 class MainShell extends StatelessWidget {
   final Widget child;
@@ -43,7 +44,11 @@ class MainShell extends StatelessWidget {
               bottom: 0,
               child: SafeArea(
                 top: false,
-                child: AppBottomNav(currentIndex: currentIndex, onTap: onTap),
+                child: AppBottomNav(
+                  currentIndex: currentIndex,
+                  onTap: onTap,
+                  externalPosition: tabSwipeProgress,
+                ),
               ),
             ),
           ],
