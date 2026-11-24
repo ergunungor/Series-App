@@ -181,6 +181,8 @@ class AppRouter {
             (context, navigationShell, children) => FadeBranchContainer(
               currentIndex: navigationShell.currentIndex,
               children: children,
+              // Ekranda yatay kaydırarak komşu sekmeye geçiş.
+              onIndexChanged: (index) => navigationShell.goBranch(index),
             ),
         pageBuilder: (context, state, navigationShell) {
           return CustomTransitionPage(
