@@ -8,5 +8,6 @@ class ApiConfig {
   /// `supabase.co` engellenen ağlar için Cloudflare Worker vekili
   /// (bkz. cloudflare/supabase-proxy/README.md). Boşsa vekil kullanılmaz.
   /// Sonunda `/` olmamalı.
-  static const String supabaseProxyUrl = '';
+  static const String supabaseProxyUrl =
+      'https://series-supabase-proxy.ergun6e.workers.dev';
 }
