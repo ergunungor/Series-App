@@ -24,6 +24,7 @@ import '../widgets/reveal.dart';
 import '../widgets/series_wordmark.dart';
 import '../utils/exercise_name.dart';
 import 'package:audioplayers/audioplayers.dart';
+import '../services/app_settings.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 class WorkoutSessionScreen extends StatefulWidget {
@@ -59,20 +60,23 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   // Ses oynatıcıları
   final AudioPlayer _audioPlayer = AudioPlayer();
 
-  void _playBell() async {
-    // Aynı anda birden fazla tetiklenirse sesi baştan başlatır
-    await _audioPlayer.play(
-      AssetSource('sounds/bell.mp3'),
-      mode: PlayerMode.lowLatency,
-    );
+  // Sesi çalar. Ayarlardan kapatılmışsa çalmaz; müzikle karışma/kısma/duraklatma
+  // davranışı Ayarlar'daki seçime göre (ses oturumu) belirlenir.
+  Future<void> _playSound(String asset) async {
+    final settings = AppSettings.instance;
+    if (!settings.soundEnabled) return;
+    try {
+      await _audioPlayer.setAudioContext(settings.audioContext);
+      // Aynı anda birden fazla tetiklenirse sesi baştan başlatır
+      await _audioPlayer.play(AssetSource(asset), mode: PlayerMode.lowLatency);
+    } catch (e) {
+      debugPrint('Ses çalınamadı: $e');
+    }
   }
 
-  void _playFinish() async {
-    await _audioPlayer.play(
-      AssetSource('sounds/finish.mp3'),
-      mode: PlayerMode.lowLatency,
-    );
-  }
+  void _playBell() => _playSound('sounds/bell.mp3');
+
+  void _playFinish() => _playSound('sounds/finish.mp3');
 
   WorkoutExercise get _currentExercise =>
       widget.workout.exercises[_exerciseIndex];
@@ -230,6 +234,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     WakelockPlus.disable();
     _restTimer?.cancel();
     _elapsedTimer?.cancel();
+    _audioPlayer.dispose();
     _repsController.dispose();
     _weightController.dispose();
     super.dispose();

@@ -63,7 +63,9 @@ void main() {
     expect(index.value, 1);
   });
 
-  testWidgets('alt barda basılı tutup kaydırınca seçim değişir', (tester) async {
+  testWidgets('alt barda basılı tutup kaydırınca seçim değişir', (
+    tester,
+  ) async {
     int? tapped;
     await tester.pumpWidget(
       MaterialApp(

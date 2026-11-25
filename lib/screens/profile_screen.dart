@@ -1,8 +1,9 @@
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
+import 'package:flutter/cupertino.dart' show CupertinoIcons, CupertinoSwitch;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/app_settings.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../widgets/app_confirm_dialog.dart';
@@ -12,6 +13,7 @@ import '../widgets/pressable_scale.dart';
 import '../widgets/reveal.dart';
 import '../widgets/screen_title_block.dart';
 import '../widgets/series_wordmark.dart';
+import '../widgets/sound_mode_sheet.dart';
 import '../widgets/app_bottom_nav.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -150,8 +152,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
+                      // Ayarlar: set arası sesler ve müzikle davranışı.
                       Reveal(
                         delay: _revealStagger,
+                        duration: _revealDuration,
+                        child: ListenableBuilder(
+                          listenable: AppSettings.instance,
+                          builder: (context, _) {
+                            final settings = AppSettings.instance;
+                            return _ActionGroup(
+                              radius: _cardRadius,
+                              children: [
+                                _SwitchRow(
+                                  icon: CupertinoIcons.speaker_2,
+                                  label: 'Set arası sesler',
+                                  value: settings.soundEnabled,
+                                  onChanged: settings.setSoundEnabled,
+                                ),
+                                const Divider(
+                                  height: 1,
+                                  indent: 62,
+                                  color: AppColors.borderSubtle,
+                                ),
+                                Opacity(
+                                  opacity: settings.soundEnabled ? 1 : 0.45,
+                                  child: _ActionRow(
+                                    icon: CupertinoIcons.music_note_2,
+                                    label: 'Müzik çalarken',
+                                    value: soundModeLabel(settings.soundMode),
+                                    onTap:
+                                        settings.soundEnabled
+                                            ? () => showSoundModeSheet(context)
+                                            : () {},
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: _groupGap),
+                      Reveal(
+                        delay: _revealStagger * 2,
                         duration: _revealDuration,
                         child: _ActionGroup(
                           radius: _cardRadius,
@@ -168,7 +210,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       // Yıkıcı eylem ayrı grupta ve kırmızı: yanlışlıkla çıkışla
                       // karışmasın (App Store için Hesabı Sil zorunlu).
                       Reveal(
-                        delay: _revealStagger * 2,
+                        delay: _revealStagger * 3,
                         duration: _revealDuration,
                         child: _ActionGroup(
                           radius: _cardRadius,
@@ -377,12 +419,16 @@ class _ActionRow extends StatelessWidget {
   final Color color;
   final bool showChevron;
 
+  /// Sağda gösterilen mevcut değer (ör. seçili ayar adı).
+  final String? value;
+
   const _ActionRow({
     required this.icon,
     required this.label,
     required this.onTap,
     this.color = AppColors.textPrimary,
     this.showChevron = true,
+    this.value,
   });
 
   static const double _height = 64;
@@ -414,6 +460,15 @@ class _ActionRow extends StatelessWidget {
                 style: AppTypography.body16Medium.copyWith(color: color),
               ),
             ),
+            if (value != null) ...[
+              Text(
+                value!,
+                style: AppTypography.body14Regular.copyWith(
+                  color: AppColors.textTertiary,
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
             if (showChevron)
               const Icon(
                 CupertinoIcons.chevron_right,
@@ -422,6 +477,56 @@ class _ActionRow extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Açma/kapama satırı (ayarlar).
+class _SwitchRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _SwitchRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: _ActionRow._height,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        children: [
+          Container(
+            width: _ActionRow._iconTile,
+            height: _ActionRow._iconTile,
+            decoration: const BoxDecoration(
+              color: AppColors.fillSubtle,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 18, color: AppColors.textPrimary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: AppTypography.body16Medium.copyWith(
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          CupertinoSwitch(
+            value: value,
+            activeTrackColor: AppColors.homeHero,
+            onChanged: onChanged,
+          ),
+        ],
       ),
     );
   }
