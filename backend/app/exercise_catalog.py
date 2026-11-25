@@ -44,6 +44,7 @@ def _load() -> Tuple[List[dict], Dict[str, dict]]:
                 "tokens": _tokens(name),
                 "norm": _normalize(name),
                 "rank": _rank(name, ex.get("equipment") or "", freq),
+                "slot": classify(name, ex.get("target") or ""),
             }
         )
     return items, {it["id"]: it for it in items}
@@ -114,6 +115,56 @@ _COMMON = {
 }
 
 
+# Herkesin tanıdığı temel hareketler: sıralamada öne alınır.
+_STAPLES = {
+    "barbell bench press", "barbell incline bench press", "dumbbell bench press",
+    "dumbbell incline bench press", "push-up", "dumbbell fly", "pull-up", "chin-up",
+    "cable pulldown", "barbell bent over row", "dumbbell bent over row", "cable seated row",
+    "dumbbell lateral raise", "cable lateral raise", "barbell curl", "dumbbell biceps curl",
+    "dumbbell hammer curl", "cable curl", "cable pushdown", "barbell lying triceps extension",
+    "triceps dip", "chest dip", "barbell full squat", "dumbbell squat", "barbell front squat",
+    "lever leg extension", "lever seated leg curl", "lever lying leg curl", "barbell deadlift",
+    "barbell romanian deadlift", "dumbbell romanian deadlift", "walking lunge", "dumbbell lunge",
+    "barbell lunge", "lever standing calf raise", "dumbbell standing calf raise", "crunch floor",
+    "hanging leg raise", "russian twist", "barbell shrug", "dumbbell shrug",
+    "dumbbell rear lateral raise", "dumbbell goblet squat", "lever chest press",
+    "dumbbell seated shoulder press", "sled 45в° leg press", "sled hack squat",
+    "barbell seated overhead press", "cable seated row",
+}
+
+_LEG_TARGETS = {"quads", "glutes", "hamstrings", "adductors", "abductors"}
+_DIRECT_SLOTS = {
+    "pectorals", "lats", "upper back", "delts", "biceps", "triceps", "forearms", "traps",
+    "abs", "calves", "spine", "cardiovascular system",
+}
+
+
+def classify(name: str, target: str) -> Optional[str]:
+    """Hareketi bir 'yuva'ya (kas grubu ya da bacak hareket kalıbı) atar. Veri setinde
+    temel bacak hareketleri (squat, deadlift) 'glutes' hedefinde olduğu için bacaklar
+    kalıba göre ayrılır."""
+    n = name.lower()
+    if target in _LEG_TARGETS:
+        if "jump" in n or "jerk" in n or "plyo" in n:
+            return None
+        if any(w in n for w in ("lunge", "step-up", "split squat", "bulgarian")):
+            return "lunge"
+        if any(w in n for w in ("deadlift", "good morning", "hip thrust", "glute bridge", "hip extension")):
+            return "hinge"
+        if "leg curl" in n:
+            return "leg_curl"
+        if "leg extension" in n:
+            return "leg_ext"
+        if "leg press" in n or "hack" in n:
+            return "leg_press"
+        if "squat" in n:
+            return "squat"
+        return None
+    if target in _DIRECT_SLOTS:
+        return target
+    return None
+
+
 def _rank(name: str, equipment: str, freq: Dict[str, int]) -> float:
     """Düşük = temel/yaygın hareket. Uzun adlı varyasyonlar sona gider."""
     n = name.lower()
@@ -127,6 +178,8 @@ def _rank(name: str, equipment: str, freq: Dict[str, int]) -> float:
     if equipment in _EXOTIC:
         score += 2
     score += 2 * sum(1 for w in _tokens(name) if freq.get(w, 0) < 3)
+    if n in _STAPLES:
+        score -= 6
     return score
 
 
@@ -214,25 +267,30 @@ _GYM_ORDER = ["barbell", "dumbbell", "cable", "leverage machine", "smith machine
               "ez barbell", "kettlebell", "body weight"]
 
 
-def _pick_diverse(candidates: List[dict], quota: int, gym: bool = False) -> List[dict]:
-    """Önce temel hareketler, ekipmanlar arasında dönüşümlü: çeşitlilik sağlar."""
-    groups: Dict[str, List[dict]] = {}
-    for c in sorted(candidates, key=lambda x: (x["rank"], x["name"])):
-        groups.setdefault(c["equipment"], []).append(c)
-    # en yaygın (en iyi sıralı) ekipman önce gelsin
+def pool_order(it: dict, gym: bool) -> tuple:
+    """Kalite sırası: temel/yaygın hareketler önde. Salonda salon ekipmanı hafif öncelikli."""
+    penalty = 0.0
     if gym:
-        order = sorted(groups, key=lambda k: (_GYM_ORDER.index(k) if k in _GYM_ORDER else len(_GYM_ORDER), groups[k][0]["rank"]))
-    else:
-        order = sorted(groups, key=lambda k: groups[k][0]["rank"])
-    if gym and "body weight" in groups:
-        groups["body weight"] = groups["body weight"][:2]  # ağırlıksız hareketler listeyi doldurmasın
+        eq = it["equipment"]
+        penalty = 0.7 * (_GYM_ORDER.index(eq) if eq in _GYM_ORDER else len(_GYM_ORDER) - 1)
+    return (it["rank"] + penalty, it["name"])
+
+
+def _pick_diverse(candidates: List[dict], quota: int, gym: bool = False) -> List[dict]:
+    """Kalite sırasıyla (temel hareketler önde) en iyi `quota` hareket; tek bir ekipman
+    türü listeyi doldurmasın diye ekipman başına üst sınır var."""
+    cap = max(3, (quota * 6) // 10)
+    per_equipment: Dict[str, int] = {}
     picked: List[dict] = []
-    i = 0
-    while len(picked) < quota and any(i < len(groups[k]) for k in order):
-        for k in order:
-            if i < len(groups[k]) and len(picked) < quota:
-                picked.append(groups[k][i])
-        i += 1
+    for c in sorted(candidates, key=lambda x: pool_order(x, gym)):
+        eq = c["equipment"]
+        limit = 3 if (gym and eq == "body weight") else cap
+        if per_equipment.get(eq, 0) >= limit:
+            continue
+        per_equipment[eq] = per_equipment.get(eq, 0) + 1
+        picked.append(c)
+        if len(picked) >= quota:
+            break
     return picked
 
 
@@ -255,6 +313,99 @@ _SKIP_EQUIPMENT = {
 }
 
 
+# Antrenman programına uymayan (dövüş, yoga pozu vb.) hareketlerin ad sözcükleri
+_ALWAYS_EXCLUDED_WORDS = ("boxing", "yoga", "battling", "overhead squat", "bench squat")
+
+# Programda anlamsız ya da tanınmayan (tek sözcüklü, ne olduğu belli olmayan) adlar
+_OBSCURE_NAMES = {
+    "quads", "sphinx", "elevator", "flag", "cocoons", "butt-ups", "bottoms-up",
+    "body-up", "handstand", "elbow-to-knee", "inchworm",
+}
+
+
+def _has_words(name: str, rule: str) -> bool:
+    """"barbell+squat" gibi kurallarda tüm parçalar adda geçmeli."""
+    return all(part in name for part in rule.split("+"))
+
+
+def filtered_pool(
+    equipment: Optional[Set[str]],
+    include_stretches: bool = False,
+    excluded_words: Iterable[str] = (),
+) -> List[dict]:
+    """Ekipmana uyan, esneme/çok özel ekipman ve istenmeyen sözcükler elenmiş havuz."""
+    words = [w.lower() for w in excluded_words]
+    pool = [
+        e for e in all_exercises()
+        if (equipment is None or e["equipment"] in equipment)
+        and e["equipment"] not in _SKIP_EQUIPMENT
+        and (include_stretches or "stretch" not in e["name"])
+        and e["name"] not in _OBSCURE_NAMES
+        and not any(w in e["name"] for w in _ALWAYS_EXCLUDED_WORDS)
+        and not any(_has_words(e["name"], w) for w in words)
+    ]
+    return _dedupe_gender(pool)
+
+
+# Sağlık kısıtı -> o bölgeyi zorlayan hareketlerin ad sözcükleri
+_RESTRICTION_WORDS = {
+    "diz": ["jump", "lunge", "pistol", "jerk", "box", "step-up", "burpee", "skater", "split squat", "hack"],
+    "bel/sırt": ["deadlift", "good morning", "hyperextension", "bent over", "bent-over", "pendlay", "t-bar", "stiff", "sumo", "jerk", "snatch", "clean",
+                 "barbell+squat", "overhead", "back extension"],
+    "omuz": ["upright row", "behind", "overhead", "shoulder press", "military", "arnold", "snatch", "jerk", "clean", "dip", "handstand"],
+    "bilek": ["wrist", "handstand", "planche"],
+    "dirsek": ["lying extension", "skull", "dip", "french"],
+    "kalça": ["sumo", "lunge", "split squat"],
+    "boyun": ["neck", "shrug", "behind"],
+    "ayak bileği": ["jump", "skater", "burpee", "calf raise"],
+}
+
+
+PULL_UP_BAR_WORDS = ["pull-up", "pull up", "chin", "hanging", "muscle", "chest dip"]
+
+
+def restriction_words(restrictions: Iterable[str]) -> List[str]:
+    out: List[str] = []
+    for r in restrictions or []:
+        key = r.strip().lower()
+        # "Bel" ya da "Sırt" tek başına yazılmışsa da "bel/sırt" kuralı uygulanır.
+        words = _RESTRICTION_WORDS.get(key) or next(
+            (v for k, v in _RESTRICTION_WORDS.items() if key and key in k.split("/")), []
+        )
+        for w in words:
+            if w not in out:
+                out.append(w)
+    return out
+
+
+def candidates_by_slot(
+    slots: Iterable[str],
+    *,
+    equipment: Optional[Set[str]],
+    focus_slots: Iterable[str] = (),
+    include_stretches: bool = False,
+    excluded_words: Iterable[str] = (),
+    quota: int = 14,
+    focus_quota: int = 18,
+) -> Dict[str, List[dict]]:
+    """Her yuva (kas grubu / bacak kalıbı) için, temel hareketler önde ve ekipman
+    bakımından çeşitli aday listesi."""
+    pool = filtered_pool(equipment, include_stretches, excluded_words)
+    by_slot: Dict[str, List[dict]] = {}
+    for e in pool:
+        if e["slot"]:
+            by_slot.setdefault(e["slot"], []).append(e)
+    focus = set(focus_slots)
+    gym = equipment is None
+    return {
+        slot: sorted(
+            _pick_diverse(by_slot.get(slot, []), focus_quota if slot in focus else quota, gym=gym),
+            key=lambda it: pool_order(it, gym),
+        )
+        for slot in slots
+    }
+
+
 def select_exercises(
     *,
     equipment: Optional[Set[str]],
@@ -266,13 +417,7 @@ def select_exercises(
     cardio_quota: int = 4,
     include_stretches: bool = False,
 ) -> List[dict]:
-    pool = [
-        e for e in all_exercises()
-        if (equipment is None or e["equipment"] in equipment)
-        and e["equipment"] not in _SKIP_EQUIPMENT
-        and (include_stretches or "stretch" not in e["name"])
-    ]
-    pool = _dedupe_gender(pool)
+    pool = filtered_pool(equipment, include_stretches)
 
     focus = list(focus_targets)
     by_target: Dict[str, List[dict]] = {}
@@ -319,12 +464,11 @@ def format_catalog(items: List[dict], gym: bool = False) -> str:
     """Kas grubuna göre gruplu, sıkıştırılmış metin: 'id|ad|ekipman'."""
     groups: Dict[str, List[dict]] = {}
     for it in items:
-        groups.setdefault(it["target"] or "other", []).append(it)
+        groups.setdefault(it.get("slot") or it["target"] or "other", []).append(it)
     lines = []
     for target in sorted(groups):
         lines.append(f"[{target}]")
-        order = _gym_sort_key if gym else (lambda x: (x["rank"], x["name"]))
-        for it in sorted(groups[target], key=order):
+        for it in sorted(groups[target], key=lambda x: pool_order(x, gym)):
             lines.append(f"{it['id']}|{it['name']}|{it['equipment']}")
     return "\n".join(lines)
 
