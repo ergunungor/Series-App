@@ -44,18 +44,20 @@ class ProgramService {
         'user_id': userId,
         'current_program': currentProgram,
         'prompt': prompt,
-        'model_type':
-            'flash', // GÜNCELLENDİ: Zeki revizeler için Pro modeli gönderiliyor
+        'model_type': 'pro',
       }),
     );
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
-    } else if (response.statusCode == 429) {
-      final errorData = jsonDecode(response.body);
-      throw Exception(errorData['detail']);
     }
-    throw Exception('Program güncellenemedi: ${response.body}');
+    // Sunucunun Türkçe açıklamasını göster; ham yanıtı değil.
+    String message = 'Program güncellenemedi. Lütfen tekrar dene.';
+    try {
+      final detail = jsonDecode(response.body)['detail'];
+      if (detail is String && detail.isNotEmpty) message = detail;
+    } catch (_) {}
+    throw Exception(message);
   }
 
   static Future<String> saveProgram(

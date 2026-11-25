@@ -92,6 +92,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
           p.workouts
               .map(
                 (w) => {
+                  "id": w.id,
                   "day_number": w.dayNumber,
                   "name": w.name,
                   "estimated_duration_min": w.estimatedDurationMin,
@@ -151,14 +152,21 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
         _programToJson(widget.program),
         prompt,
       );
-      final newData = reviseResponse['data'];
+      final newData = Map<String, dynamic>.from(
+        reviseResponse['data'] as Map,
+      );
 
-      // 2. Yeni programı DB'ye kaydet
-      final newProgramId = await ProgramService.saveProgram(user.id, newData);
-
-      // 3. Eski programı sil ve yenisini aktif yap
-      await ProgramRepository.deleteProgram(widget.program.id);
-      await ProgramRepository.setActiveProgram(user.id, newProgramId);
+      // 2. Programı yerinde güncelle: program ve gün kimlikleri (aktif
+      // program, geçmiş kayıtları) korunur. Yapılamazsa eski yönteme dön.
+      final updatedInPlace = await ProgramRepository.applyRevision(
+        widget.program,
+        newData,
+      );
+      if (!updatedInPlace) {
+        final newProgramId = await ProgramService.saveProgram(user.id, newData);
+        await ProgramRepository.deleteProgram(widget.program.id);
+        await ProgramRepository.setActiveProgram(user.id, newProgramId);
+      }
 
       // 4. Limiti düşür
       await _consumeAICredit(user.id);
