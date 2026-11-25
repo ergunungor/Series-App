@@ -262,6 +262,36 @@ def parse_program_from_input(text: str = None, file_bytes: bytes = None, mime_ty
     return sanitize_program_data(result)
 
 
+_STD_EQUIPMENT = ["barbell", "dumbbell"]
+
+
+def _standard_variant(query: str, cands: list):
+    """Ad ekipman belirtmiyorsa ("bench press") aynı hareketin en yaygın ekipmanlı
+    halini seçer: aday adı = sorgu + tek bir ekipman kelimesi. Barbell > dumbbell > ..."""
+    q = set(catalog._normalize(query).split())
+    if not q:
+        return None
+    best, best_rank = None, None
+    for it, _ in cands:
+        extra = set(it["norm"].split()) - q
+        if not q <= set(it["norm"].split()) or len(extra) != 1:
+            continue
+        word = next(iter(extra))
+        if word not in _STD_EQUIPMENT:
+            continue
+        rank = _STD_EQUIPMENT.index(word)
+        if best is None or rank < best_rank:
+            best, best_rank = it, rank
+    # Dumbbell seçilecekse ama barbell'lı (daha uzun adlı) bir varyasyon da
+    # varsa ("squat" -> "barbell full squat") yapay zekaya bırak.
+    if best is not None and best_rank > 0:
+        for it in catalog.all_exercises():
+            toks = set(it["norm"].split())
+            if "barbell" in toks and q <= toks:
+                return None
+    return best
+
+
 def _match_to_pool(program: dict):
     """Programdaki hareketleri havuzla eşleştirir; eşleşirse "id" alanı dolar.
 
@@ -277,9 +307,14 @@ def _match_to_pool(program: dict):
             queries = [q for q in (ex.get("english_name"), ex.get("name")) if q]
             best = []
             for q in queries:
-                cands = catalog.find_candidates(q, limit=5, min_score=CANDIDATE_MIN_SCORE)
+                cands = catalog.find_candidates(q, limit=10, min_score=CANDIDATE_MIN_SCORE)
                 if cands and cands[0][1] >= AUTO_MATCH_SCORE:
                     ex["id"] = cands[0][0]["id"]
+                    best = []
+                    break
+                std = _standard_variant(q, cands)
+                if std:
+                    ex["id"] = std["id"]
                     best = []
                     break
                 if cands and (not best or cands[0][1] > best[0][1]):
@@ -296,8 +331,10 @@ def _match_to_pool(program: dict):
     ]
     prompt = (
         "Her öğe için adaylardan AYNI hareket olanın sıra numarasını (0'dan başlar) yaz; "
-        "yoksa null yaz. Ağırlıklı, eğimli, farklı ekipmanlı ya da farklı tutuşlu varyasyonlar "
-        "aynı hareket sayılmaz.\n"
+        "yoksa null yaz. Aynı hareketin farklı yazılışı (kelime sırası, 'bench' gibi ek kelimeler) "
+        "aynı sayılır. Ad ekipman belirtmiyorsa en yaygın/standart olanı seç (genelde barbell, "
+        "ya da hareketin klasik hali). Ad eğim, tutuş ya da ekipman belirtiyorsa bunlar adayla "
+        "uyuşmalı; farklı bir hareket ise null yaz.\n"
         f"{json.dumps(items, ensure_ascii=False, separators=(',', ':'))}\n"
         'Sadece JSON döndür: {"0": 2, "1": null, ...}'
     )
