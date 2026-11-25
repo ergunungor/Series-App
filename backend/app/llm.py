@@ -71,6 +71,10 @@ def _call_gemini(prompt: str, model_type: str, file_bytes, mime_type) -> str:
 
 # ------------------------------------------------------- OpenAI uyumlu uç
 
+class LLMTruncatedError(RuntimeError):
+    """Model yanıtı uzunluk sınırına takılıp yarım kaldı."""
+
+
 class _RetryableLLMError(RuntimeError):
     """Kota/yoğunluk/ağ hatası: yedek modele geçmeye değer."""
 
@@ -106,8 +110,12 @@ def _openai_request(model: str, user_content) -> str:
                 "messages": [{"role": "user", "content": user_content}],
                 "response_format": {"type": "json_object"},
                 "temperature": 0.4,
+                # Sağlayıcının varsayılan çıktı sınırı (Groq'ta 2-3 bin token) uzun
+                # programları yarıda kesiyordu.
+                "max_completion_tokens": int(os.getenv("LLM_MAX_TOKENS", "16000")),
+                **({"reasoning_effort": "low"} if "gpt-oss" in model else {}),
             },
-            timeout=60.0,
+            timeout=90.0,
         )
     except httpx.TransportError as e:  # zaman aşımı, bağlantı kopması
         raise _RetryableLLMError(f"LLM bağlantı hatası ({model}): {e}") from e
@@ -117,7 +125,11 @@ def _openai_request(model: str, user_content) -> str:
         if resp.status_code == 429 or resp.status_code >= 500 or "json_validate_failed" in resp.text:
             raise _RetryableLLMError(msg)
         raise RuntimeError(msg)
-    return resp.json()["choices"][0]["message"]["content"]
+    choice = resp.json()["choices"][0]
+    if choice.get("finish_reason") == "length":
+        # Yarım kalan çıktı eksik program demek: sessizce kaydetmek yerine hata ver.
+        raise LLMTruncatedError(f"LLM çıktısı uzunluk sınırında kesildi ({model}).")
+    return choice["message"]["content"]
 
 
 def _call_openai_compatible(prompt: str, model_type: str, file_bytes, mime_type) -> str:

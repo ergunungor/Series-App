@@ -397,3 +397,143 @@ def match_exact(name: str) -> Optional[dict]:
         return None
     cands = find_candidates(name, limit=1, min_score=0.99)
     return cands[0][0] if cands else None
+
+
+# ------------------------------------------------------------- yaygın adlar
+# Programlarda kısaca yazılan yaygın hareket adlarının havuzdaki karşılığı.
+# Havuz adları ekipmanlı ve uzun ("bench press" -> "barbell bench press"), bu
+# yüzden metin benzerliği tek başına doğru varyasyonu bulamıyor.
+_ALIASES = {
+    "barbell bench press": ["bench press", "flat bench press", "bench", "barbell bench"],
+    "barbell incline bench press": ["incline bench press", "incline barbell press", "incline barbell bench press"],
+    "dumbbell incline bench press": ["incline dumbbell press", "incline db press", "incline dumbbell bench press", "incline dumbbell bench"],
+    "dumbbell bench press": ["dumbbell press", "db bench press", "dumbbell chest press", "flat dumbbell press"],
+    "barbell decline bench press": ["decline bench press", "decline press"],
+    "barbell close-grip bench press": ["close grip bench press", "close-grip bench press", "cgbp"],
+    "barbell standing close grip military press": ["overhead press", "ohp", "military press", "standing overhead press",
+                                                    "barbell overhead press", "standing military press", "shoulder press"],
+    "dumbbell seated shoulder press": ["dumbbell shoulder press", "db shoulder press", "seated dumbbell press",
+                                       "seated dumbbell shoulder press"],
+    "dumbbell arnold press": ["arnold press"],
+    "dumbbell lateral raise": ["lateral raise", "lateral raises", "side raise", "side lateral raise", "db lateral raise"],
+    "dumbbell front raise": ["front raise", "front raises"],
+    "dumbbell rear fly": ["rear delt fly", "reverse fly", "rear fly", "rear delt flye", "reverse dumbbell fly"],
+    "cable rear delt row (with rope)": ["face pull", "face pulls", "cable face pull", "rope face pull"],
+    "band reverse fly": ["band pull-apart", "band pull apart", "band pull-aparts", "pull apart"],
+    "barbell upright row": ["upright row"],
+    "barbell shrug": ["shrug", "shrugs", "barbell shrugs"],
+    "dumbbell shrug": ["dumbbell shrugs", "db shrug"],
+    "cable lat pulldown full range of motion": ["lat pulldown", "pulldown", "wide grip lat pulldown", "lat pull down",
+                                                "cable lat pulldown", "lat pulldowns"],
+    "pull-up": ["pull up", "pullup", "pull-ups", "pull ups", "barfiks"],
+    "chin-up": ["chin up", "chinup", "chin-ups"],
+    "barbell bent over row": ["barbell row", "bent over row", "bent-over row", "barbell rows", "bent over barbell row"],
+    "dumbbell one arm bent-over row": ["dumbbell row", "one arm dumbbell row", "single arm dumbbell row", "db row"],
+    "cable seated row": ["seated cable row", "cable row", "seated row", "low row"],
+    "barbell deadlift": ["deadlift", "conventional deadlift", "deadlifts"],
+    "barbell romanian deadlift": ["romanian deadlift", "rdl", "romanian deadlifts"],
+    "barbell sumo deadlift": ["sumo deadlift"],
+    "barbell good morning": ["good morning", "good mornings"],
+    "barbell full squat": ["squat", "squats", "back squat", "barbell squat", "barbell back squat", "high bar squat"],
+    "barbell front squat": ["front squat"],
+    "dumbbell goblet squat": ["goblet squat"],
+    "dumbbell single leg split squat": ["bulgarian split squat", "bulgarian split squats", "split squat", "rear foot elevated split squat"],
+    "sled 45в° leg press": ["leg press", "45 degree leg press", "machine leg press"],
+    "lever lying leg curl": ["leg curl", "lying leg curl", "hamstring curl", "leg curls"],
+    "lever seated leg curl": ["seated leg curl"],
+    "lever leg extension": ["leg extension", "leg extensions", "quad extension"],
+    "dumbbell lunge": ["lunge", "lunges", "dumbbell lunges"],
+    "walking lunge": ["walking lunges"],
+    "dumbbell rear lunge": ["reverse lunge", "reverse lunges"],
+    "dumbbell step-up": ["step up", "step-up", "step ups", "step-ups"],
+    "dumbbell biceps curl": ["bicep curl", "biceps curl", "dumbbell curl", "dumbbell bicep curl", "db curl"],
+    "barbell curl": ["barbell bicep curl", "barbell biceps curl", "bb curl"],
+    "dumbbell hammer curl": ["hammer curl", "hammer curls"],
+    "barbell preacher curl": ["preacher curl"],
+    "dumbbell incline curl": ["incline dumbbell curl", "incline curl"],
+    "cable pushdown": ["triceps pushdown", "tricep pushdown", "pushdown", "cable triceps pushdown"],
+    "cable pushdown (with rope attachment)": ["rope pushdown", "rope triceps pushdown", "rope tricep pushdown"],
+    "barbell lying triceps extension skull crusher": ["skull crusher", "skull crushers", "skullcrusher", "lying triceps extension"],
+    "cable overhead triceps extension (rope attachment)": ["overhead triceps extension", "overhead tricep extension",
+                                                           "rope overhead extension"],
+    "dumbbell kickback": ["triceps kickback", "tricep kickback", "kickback"],
+    "chest dip": ["dips", "dip", "chest dips", "parallel bar dip"],
+    "triceps dip": ["triceps dips", "tricep dips", "bench dip", "bench dips"],
+    "push-up": ["push up", "pushup", "push-ups", "push ups", "şınav"],
+    "cable middle fly": ["cable fly", "cable flye", "cable crossover", "cable chest fly", "chest fly"],
+    "dumbbell fly": ["dumbbell flye", "db fly", "dumbbell chest fly"],
+    "lever seated fly": ["pec deck", "machine fly", "pec fly"],
+    "lever chest press": ["chest press", "machine chest press"],
+    "weighted front plank": ["plank", "front plank", "forearm plank"],
+    "crunch floor": ["crunch", "crunches", "mekik"],
+    "cable kneeling crunch": ["cable crunch", "cable crunches", "rope crunch"],
+    "hanging leg raise": ["hanging leg raises"],
+    "russian twist": ["russian twists"],
+    "mountain climber": ["mountain climbers"],
+    "burpee": ["burpees"],
+    "jump rope": ["skipping rope", "ip atlama"],
+    "farmers walk": ["farmer's walk", "farmer walk", "farmers carry", "farmer's carry"],
+    "dead bug": ["dead bugs"],
+    "bodyweight incline side plank": ["side plank", "side planks", "yan plank"],
+    "low glute bridge on floor": ["glute bridge", "glute bridges", "bridge", "köprü", "kalça köprüsü", "hip bridge"],
+    "wide hand push up": ["wide push-up", "wide push up", "wide grip push-up", "wide grip push up", "geniş şınav"],
+    "inverted row": ["australian pull-up", "australian pull up", "australian row", "inverted rows", "avustralya barfiksi"],
+    "air bike": ["bicycle crunch", "bicycle crunches", "bisiklet mekik", "bicycle sit-up"],
+    "diamond push-up": ["diamond push up", "diamond pushup", "elmas şınav", "diamond şınav"],
+    "barbell standing calf raise": ["calf raise", "standing calf raise", "calf raises"],
+}
+
+_alias_index: Optional[Dict[str, dict]] = None
+
+
+def _build_alias_index() -> Dict[str, dict]:
+    by_name = {}
+    for it in all_exercises():
+        by_name.setdefault(it["name"], it)
+    index = {}
+    for target, aliases in _ALIASES.items():
+        it = by_name.get(target)
+        if it is None:
+            continue
+        for a in [target] + aliases:
+            index[_normalize(a)] = it
+    return index
+
+
+def alias_match(name: str) -> Optional[dict]:
+    """Yaygın bir hareket adıysa havuzdaki standart karşılığını döndürür."""
+    global _alias_index
+    if not name:
+        return None
+    if _alias_index is None:
+        _alias_index = _build_alias_index()
+    for variant in _name_variants(name):
+        hit = _alias_index.get(_normalize(variant))
+        if hit:
+            return hit
+    return None
+
+
+_QUALIFIERS = re.compile(
+    r"\b(each|per|her|iki)\s+(leg|side|arm|bacak|taraf|kol|yön)\b|\b(her\s+bacakta|her\s+tarafta)\b",
+    re.IGNORECASE,
+)
+
+
+def _name_variants(name: str) -> List[str]:
+    """"Lunge (her bacak)" -> ["Lunge (her bacak)", "Lunge", ...]: parantez içi ve
+    "her bacak / each side" gibi niteleyiciler atılmış halleri de dener."""
+    out = [name]
+    no_paren = re.sub(r"\([^)]*\)", " ", name)
+    for v in (no_paren, _QUALIFIERS.sub(" ", no_paren)):
+        v = " ".join(v.replace(",", " ").split())
+        if v and v not in out:
+            out.append(v)
+    # Parantez içi asıl ad olabilir: "köprü (glute bridge)"
+    out += [m.strip() for m in re.findall(r"\(([^)]*)\)", name) if m.strip()]
+    return out
+
+
+def missing_alias_targets() -> List[str]:
+    names = {it["name"] for it in all_exercises()}
+    return [t for t in _ALIASES if t not in names]
