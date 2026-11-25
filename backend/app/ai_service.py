@@ -222,20 +222,76 @@ def save_generated_program(supabase_client, user_id: str, generated_program: dic
 
 # ------------------------------------------------------------ program yükleme
 
-_PARSE_PROMPT = """Verilen antrenman programını (metin, görsel veya PDF) JSON'a çevir.
+_PARSE_PROMPT = """Verilen antrenman programını JSON'a çevir.
 
 Kurallar:
-- Programda yazanı kullan, hareket uydurma.
-- "name": programda yazdığı ad. "english_name": aynı hareketin yaygın İngilizce spor salonu adı (örn. Şınav -> push-up, Barfiks -> pull-up).
-- "instructions": hareketin nasıl yapıldığını anlatan 1-2 cümle.
-- Hareketin yanında sn/saniye/sec/dk/dakika gibi süre varsa "reps": null ve süreyi saniyeye çevirip "duration_seconds" alanına yaz (30 sn -> 30). Süre yoksa "reps" kullan.
-- Süperset: "süperset/superset/SS", "A1/A2", "B1/B2", "+" ya da "ara vermeden/arka arkaya" ile birbirine bağlanan hareketlere aynı tam sayıyı "superset_group" olarak ver (her süperset için yeni sayı: 1, 2, ...). Bu hareketler listede art arda kalsın, süperset olmayanlarda null. Süpersetteki hareketlerin set sayısı aynı olsun.
-- Dropset: "dropset/drop set" yazan harekette "drop_sets" = ek düşürme sayısı (belirtilmemişse 2); yoksa 0.
-- Programdaki TÜM günleri ve her günün TÜM hareketlerini eksiksiz yaz; hiçbirini atlama ya da kısaltma.
+- Programda yazanı kullan, hareket uydurma. Programdaki TÜM günleri ve her günün TÜM hareketlerini sırasıyla yaz; hiçbirini atlama, birleştirme ya da kısaltma.
+- Isınma/soğuma hareketleri de o günün listesine girer (başta/sonda), "notes": "Isınma" ya da "Soğuma".
+- "name": programda yazdığı ad. "en": aynı hareketin yaygın İngilizce spor salonu adı (örn. Şınav -> push-up, Barfiks -> pull-up).
+- Süre (sn/saniye/sec/dk/dakika) varsa "reps": null ve süreyi saniye olarak "sec" alanına yaz (30 sn -> 30, 5 dk -> 300). Yoksa "reps" kullan ("8-12", "max", "20 adım", "40 m" gibi metin olabilir).
+- "rest": dinlenme saniyesi (yazmıyorsa 60).
+- Süperset: "süperset/superset/SS", "A1/A2", "5a/5b", "+" ya da "ara vermeden/arka arkaya" ile bağlanan hareketlere aynı tam sayıyı "ss" olarak ver (her süperset için yeni sayı). Süperset değilse alanı yazma.
+- Dropset: "dropset/drop set" yazan harekette "drop" = ek düşürme sayısı (belirtilmemişse 2). Değilse alanı yazma.
+- "notes": yalnızca programda hareketle ilgili ek bilgi varsa (örn. "her bacak", "son sette dropset"); yoksa alanı yazma.
 - İçerik bir antrenman programı değilse sadece {"error": "not_a_program"} döndür.
 
-Sadece şu şemada JSON döndür:
-{"program_name":"","description":"2 cümle","workouts":[{"day_number":1,"name":"","estimated_duration_min":45,"exercises":[{"name":"","english_name":"","sets":3,"reps":"8-12","duration_seconds":null,"rest_seconds":60,"superset_group":null,"drop_sets":0,"instructions":"","notes":null}]}]}"""
+Kısa ve boşluksuz JSON döndür, şu şemada:
+{"program_name":"","description":"1 cümle","workouts":[{"name":"","min":45,"exercises":[{"name":"","en":"","sets":3,"reps":"8-12","sec":null,"rest":60}]}]}"""
+
+
+def _expand_compact(program: dict):
+    """Kısa alan adlarıyla gelen yapay zeka çıktısını uygulamanın şemasına açar."""
+    for d, w in enumerate(program.get("workouts") or [], start=1):
+        w.setdefault("day_number", d)
+        w["estimated_duration_min"] = _to_int(w.pop("min", None) or w.get("estimated_duration_min"), 45)
+        for ex in w.get("exercises") or []:
+            if "en" in ex:
+                ex["english_name"] = ex.pop("en")
+            if "sec" in ex:
+                ex["duration_seconds"] = ex.pop("sec")
+            if "rest" in ex:
+                ex["rest_seconds"] = _to_int(ex.pop("rest"), 60)
+            if "ss" in ex:
+                ex["superset_group"] = ex.pop("ss")
+            if "drop" in ex:
+                ex["drop_sets"] = ex.pop("drop")
+            ex.setdefault("rest_seconds", 60)
+            if ex.get("duration_seconds"):
+                ex["reps"] = None
+
+
+def estimate_minutes(exercises: list) -> int:
+    """Set, süre ve molalardan antrenman süresini kabaca hesaplar (5'e yuvarlı)."""
+    total = 0
+    for ex in exercises:
+        sets = _to_int(ex.get("sets"), 3) or 1
+        work = _to_int(ex.get("duration_seconds"), 0) or 40
+        work *= 1 + _to_int(ex.get("drop_sets"), 0)
+        rest = _to_int(ex.get("rest_seconds"), 60)
+        total += sets * (work + rest)
+    return max(10, int(round(total / 60 / 5.0)) * 5)
+
+
+def _fill_missing_instructions(program: dict):
+    """Havuzla eşleşmeyen hareketler için (GIF'i olmayanlar) kısa bir tarif ister.
+    Eşleşenlerin tarifi uygulamada havuzdan geldiği için onlara gerek yok."""
+    missing = [
+        ex for w in program.get("workouts") or [] for ex in w.get("exercises") or []
+        if not ex.get("id") and not ex.get("instructions")
+    ]
+    if not missing:
+        return
+    names = {str(i): ex.get("english_name") or ex.get("name") for i, ex in enumerate(missing)}
+    prompt = (
+        "Her hareket için nasıl yapıldığını anlatan 1-2 kısa Türkçe cümle yaz.\n"
+        f"{json.dumps(names, ensure_ascii=False)}\n"
+        'Sadece JSON döndür: {"0": "...", "1": "..."}'
+    )
+    answers = generate_json(prompt, model_type="flash")
+    for i, ex in enumerate(missing):
+        text = answers.get(str(i))
+        if isinstance(text, str) and text.strip():
+            ex["instructions"] = text.strip()
 
 
 def _to_int(value, default):
@@ -331,22 +387,32 @@ def parse_program_from_input(text: str = None, file_bytes: bytes = None, mime_ty
     elif not (file_bytes and mime_type):
         raise ValueError("Ne metin ne dosya verildi.")
 
-    model = "pro" if text and len(text) > 1200 else "flash"  # uzun programlarda gün atlamasın
+    model = "pro"  # ayrıştırmada eksiksizlik hızdan önemli
     result = generate_json(prompt, model_type=model, file_bytes=file_bytes, mime_type=mime_type)
 
     if result.get("error") == "not_a_program":
         raise ValueError("Yüklenen içerik bir antrenman programına benzemiyor.")
+    _expand_compact(result)
 
     try:
         _match_to_pool(result)
     except Exception as e:  # eşleştirme isteğe bağlı: hata olursa tarifler olduğu gibi kalır
         print(f"⚠️ GIF eşleştirme atlandı: {e}")
 
+    try:
+        _fill_missing_instructions(result)
+    except Exception as e:  # tarif isteğe bağlı
+        print(f"⚠️ Tarif tamamlama atlandı: {e}")
+
     for w in result.get("workouts", []):
         for ex in w.get("exercises", []):
             ex.pop("english_name", None)
 
-    return sanitize_program_data(result)
+    result = sanitize_program_data(result)
+    # Model süreyi genelde örnekteki gibi sabit yazıyor; setlerden hesapla.
+    for w in result.get("workouts", []):
+        w["estimated_duration_min"] = estimate_minutes(w.get("exercises", []))
+    return result
 
 
 _STD_EQUIPMENT = ["barbell", "dumbbell"]
@@ -392,6 +458,10 @@ def _match_to_pool(program: dict):
             if ex.get("id"):
                 continue
             queries = [q for q in (ex.get("english_name"), ex.get("name")) if q]
+            alias = next((a for a in map(catalog.alias_match, queries) if a), None)
+            if alias:
+                ex["id"] = alias["id"]
+                continue
             best = []
             for q in queries:
                 cands = catalog.find_candidates(q, limit=10, min_score=CANDIDATE_MIN_SCORE)

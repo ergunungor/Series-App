@@ -1,4 +1,5 @@
 import os
+from .llm import LLMTruncatedError
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
@@ -83,6 +84,9 @@ async def parse_program(
 
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    except LLMTruncatedError as e:
+        print(f"Parse API Hatası: {str(e)}")
+        raise HTTPException(status_code=422, detail="Program çok uzun olduğu için tamamı okunamadı. Programı iki parçada yüklemeyi dene.")
     except Exception as e:
         print(f"Parse API Hatası: {str(e)}")
         raise HTTPException(status_code=429, detail="Sistem limitlerine ulaşıldı, lütfen daha sonra tekrar deneyin.")
