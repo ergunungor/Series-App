@@ -73,6 +73,52 @@ class ProgramRepository {
     return programs.first;
   }
 
+  /// Revize edilmiş programı mevcut kaydın üstüne yazar: aynı gün kimliğine
+  /// sahip günler güncellenir, yeni günler eklenir, çıkarılanlar silinir.
+  /// Güncelleme izni yoksa (hiç satır değişmezse) hiçbir şeye dokunmadan
+  /// false döner; çağıran eski yönteme (yeni kayıt + eskiyi silme) geçer.
+  static Future<bool> applyRevision(
+    ActiveProgram current,
+    Map<String, dynamic> revised,
+  ) async {
+    final client = Supabase.instance.client;
+    final updated = await client
+        .from('programs')
+        .update({
+          'name': revised['program_name'] ?? current.name,
+          'description': revised['description'] ?? current.description,
+        })
+        .eq('id', current.id)
+        .select('id');
+    if ((updated as List).isEmpty) return false;
+
+    final oldIds = current.workouts.map((w) => w.id).toSet();
+    final kept = <String>{};
+    final workouts = (revised['workouts'] as List?) ?? const [];
+    for (var i = 0; i < workouts.length; i++) {
+      final w = Map<String, dynamic>.from(workouts[i] as Map);
+      final row = {
+        'program_id': current.id,
+        'day_number': i + 1,
+        'name': w['name'],
+        'estimated_duration_min': w['estimated_duration_min'],
+        'exercises': w['exercises'] ?? const [],
+      };
+      final id = w['id']?.toString();
+      if (id != null && oldIds.contains(id) && !kept.contains(id)) {
+        await client.from('workouts').update(row).eq('id', id);
+        kept.add(id);
+      } else {
+        await client.from('workouts').insert(row);
+      }
+    }
+    final removed = oldIds.difference(kept);
+    if (removed.isNotEmpty) {
+      await client.from('workouts').delete().inFilter('id', removed.toList());
+    }
+    return true;
+  }
+
   static Future<void> deleteProgram(String programId) async {
     final client = Supabase.instance.client;
     await client.from('workouts').delete().eq('program_id', programId);

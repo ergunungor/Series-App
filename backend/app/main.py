@@ -118,6 +118,8 @@ async def revise_program(request: ReviseProgramRequest):
             "status": "success",
             "data": revised_program
         }
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         error_msg = str(e)
         print(f"Revize API Hatası: {error_msg}")

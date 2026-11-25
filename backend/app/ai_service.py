@@ -1,3 +1,4 @@
+import copy
 import json
 import re
 from typing import Optional
@@ -5,6 +6,7 @@ from typing import Optional
 from .llm import generate_json
 from .schemas import UserOnboardingData
 from . import exercise_catalog as catalog
+from . import program_edit
 
 # Eşleştirme eşikleri (exercise_catalog._score ölçeği, 0-1)
 AUTO_MATCH_SCORE = 0.99      # birebir aynı ad: yapay zekaya sormadan eşleştir
@@ -89,41 +91,56 @@ LİSTE:
 
 
 def revise_workout_program(data):
-    current = data.current_program or {}
-    include_ids = [
-        ex.get("id")
-        for w in current.get("workouts", [])
-        for ex in w.get("exercises", [])
-        if ex.get("id")
-    ]
+    """Programı istek doğrultusunda düzenler.
 
-    catalog_text = catalog.build_catalog_text(
-        locations=["Spor Salonu"],  # revizyonda kullanıcı ekipman bilgisi yok: tüm havuz
-        equipment=[],
-        include_ids=include_ids,
-        prompt_text=data.prompt,
-        include_stretches=any(k in data.prompt.lower() for k in ("esne", "stretch", "mobilite", "hareketlilik")),
-    )
+    Yapay zeka programı baştan yazmaz; yalnızca işlem listesi döndürür ve
+    işlemleri kod uygular (bkz. program_edit). İstenmeyen her şey (adlar,
+    ısınma, süperset, notlar, tarifler) aynen kalır.
+    """
+    current = copy.deepcopy(data.current_program or {})
+    if not current.get("program_name") and current.get("name"):
+        current["program_name"] = current["name"]
 
-    prompt = f"""Mevcut program:
-{json.dumps(_compact_program(current), ensure_ascii=False, separators=(",", ":"))}
+    prompt = f"""Antrenman programı:
+{program_edit.render_program(current)}
 
-İstenen değişiklik: "{data.prompt}"
+Kullanıcının isteği: "{data.prompt}"
 
-Programı bu isteğe göre güncelle; istenmeyen kısımları koru.
-Yeni hareketleri yalnızca aşağıdaki listeden seç ve "id" alanına listedeki id'yi yaz (satır: id|ad|ekipman).
-Mevcut programda id'si boş olan bir hareketi koruyorsan "id": "" bırak ve "name" alanını aynen yaz.
-Mevcut hareketlerdeki "superset_group", "drop_sets" ve "section" alanlarını istek aksini söylemiyorsa aynen koru. Süperset istenirse art arda gelen hareketlere aynı "superset_group" sayısını, dropset istenirse "drop_sets" (ek düşürme sayısı) ver; ısınma hareketlerinde "section": "warmup", soğumada "cooldown".
-{_DURATION_RULE}
-Sadece şu şemada JSON döndür ("name" yalnızca id'si boş olan hareketlerde yazılır):
-{_PROGRAM_SCHEMA.replace('"exercises":[{"id":"",', '"exercises":[{"id":"","name":"",')}
+Bu isteği yerine getiren en az sayıda işlemi yaz. İstekte geçmeyen hiçbir şeyi değiştirme.
+Yeni hareket seçerken programın ekipmanına ve amacına uygun, yaygın hareketler seç.
+{program_edit.EDIT_SCHEMA}
 
-LİSTE:
-{catalog_text}"""
+Sadece JSON döndür: {{"ops":[...]}}
+İstek bir program değişikliği değilse ya da anlaşılmıyorsa: {{"ops":[],"error":"kısa Türkçe açıklama"}}"""
 
-    result = generate_json(prompt, model_type=data.model_type)
-    _restore_instructions(result, current)
-    return sanitize_program_data(_finalize_exercises(result, allow_custom=True))
+    result = generate_json(prompt, model_type="pro")
+    ops = result.get("ops") or []
+    if not ops:
+        raise ValueError(result.get("error") or "İsteğini anlayamadım. Biraz daha açık yazar mısın?")
+
+    revised = program_edit.apply_edits(current, ops)
+
+    # Yalnızca eklenen/değiştirilen hareketler havuzla eşleştirilir.
+    added = program_edit.new_exercises(revised)
+    if added:
+        scratch = {"workouts": [{"exercises": added}]}
+        try:
+            _match_to_pool(scratch)
+        except Exception as e:
+            print(f"⚠️ GIF eşleştirme atlandı: {e}")
+        try:
+            _fill_missing_instructions(scratch)
+        except Exception as e:
+            print(f"⚠️ Tarif tamamlama atlandı: {e}")
+    for w in revised.get("workouts", []):
+        for ex in w.get("exercises", []):
+            ex.pop("_new", None)
+            ex.pop("english_name", None)
+
+    revised = sanitize_program_data(revised)
+    for w in revised.get("workouts", []):
+        w["estimated_duration_min"] = estimate_minutes(w.get("exercises", []))
+    return revised
 
 
 def _compact_program(program: dict) -> dict:
