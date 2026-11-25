@@ -1,6 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/exercise_service.dart';
 import '../services/program_repository.dart';
@@ -8,6 +11,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../utils/exercise_name.dart';
 import '../widgets/app_button.dart';
+import '../widgets/app_confirm_dialog.dart';
 import '../widgets/detail_hero.dart' show HeroStatusBarScope;
 import '../widgets/exercise_info_dialog.dart';
 import '../widgets/kiremit_hero_surface.dart';
@@ -52,6 +56,44 @@ class _DraftExercise {
   }
 }
 
+extension _DraftExerciseX on _DraftExercise {
+  Map<String, dynamic> toDraftJson() => {
+    'id': ex.id,
+    'name': ex.name,
+    'body_part': ex.bodyPart,
+    'equipment': ex.equipment,
+    'sets': sets,
+    'reps': reps,
+    'timed': timed,
+    'duration': duration,
+    'rest': rest,
+    'drops': drops,
+    'link_next': linkNext,
+  };
+
+  // ignore: unused_element
+  static _DraftExercise from(Map<String, dynamic> j) {
+    final name = (j['name'] ?? '').toString();
+    final equipment = (j['equipment'] ?? '').toString();
+    return _DraftExercise(
+        CatalogExercise(
+          id: j['id'].toString(),
+          name: name,
+          bodyPart: (j['body_part'] ?? '').toString(),
+          equipment: equipment,
+          searchKey: '$name $equipment'.toLowerCase(),
+        ),
+      )
+      ..sets = (j['sets'] as num?)?.toInt() ?? 3
+      ..reps = (j['reps'] ?? '10').toString()
+      ..timed = j['timed'] == true
+      ..duration = (j['duration'] as num?)?.toInt() ?? 30
+      ..rest = (j['rest'] as num?)?.toInt() ?? 60
+      ..drops = (j['drops'] as num?)?.toInt() ?? 0
+      ..linkNext = j['link_next'] == true;
+  }
+}
+
 class _DraftDay {
   String name;
   final List<_DraftExercise> items = [];
@@ -76,8 +118,134 @@ class _BuildProgramScreenState extends State<BuildProgramScreen> {
 
   _DraftDay get _day => _days[_selected];
 
+  // Taslak: yanlışlıkla çıkılsa da son hâli cihazda saklanır ve geri yüklenir.
+  bool _draftLoaded = false;
+  bool _discardDraft = false;
+  Timer? _persistTimer;
+
+  String get _draftKey {
+    String uid = '';
+    try {
+      uid = Supabase.instance.client.auth.currentUser?.id ?? '';
+    } catch (_) {}
+    return 'program_draft_v1_$uid';
+  }
+
+  bool get _hasContent =>
+      _nameController.text.trim().isNotEmpty ||
+      _days.length > 1 ||
+      _days.any((d) => d.items.isNotEmpty);
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.addListener(_persistSoon);
+    _restoreDraft();
+  }
+
+  Future<void> _restoreDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_draftKey);
+      if (raw != null && mounted) {
+        final data = jsonDecode(raw) as Map<String, dynamic>;
+        final days = <_DraftDay>[
+          for (final d in (data['days'] as List))
+            _DraftDay((d['name'] ?? 'Gün').toString())
+              ..items.addAll([
+                for (final e in (d['items'] as List))
+                  _DraftExerciseX.from(e as Map<String, dynamic>),
+              ]),
+        ];
+        if (days.isNotEmpty) {
+          setState(() {
+            _days
+              ..clear()
+              ..addAll(days);
+            _selected = ((data['selected'] as num?)?.toInt() ?? 0).clamp(
+              0,
+              days.length - 1,
+            );
+            _nameController.text = (data['name'] ?? '').toString();
+          });
+        }
+      }
+    } catch (_) {
+      // Bozuk taslak yok sayılır.
+    }
+    _draftLoaded = true;
+  }
+
+  @override
+  // ignore: must_call_super
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _persistSoon();
+  }
+
+  void _persistSoon() {
+    if (!_draftLoaded || _discardDraft) return;
+    _persistTimer?.cancel();
+    _persistTimer = Timer(const Duration(milliseconds: 400), _persistNow);
+  }
+
+  Future<void> _persistNow() async {
+    if (!_draftLoaded || _discardDraft) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!_hasContent) {
+        await prefs.remove(_draftKey);
+        return;
+      }
+      await prefs.setString(
+        _draftKey,
+        jsonEncode({
+          'name': _nameController.text,
+          'selected': _selected,
+          'days': [
+            for (final d in _days)
+              {
+                'name': d.name,
+                'items': [for (final e in d.items) e.toDraftJson()],
+              },
+          ],
+        }),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _clearDraft() async {
+    _persistTimer?.cancel();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_draftKey);
+    } catch (_) {}
+  }
+
+  Future<void> _confirmClearAll() async {
+    final ok = await showAppConfirmDialog(
+      context: context,
+      title: 'Tümünü Temizle',
+      message:
+          'Program adı, günler ve eklediğin tüm hareketler silinecek. Emin misin?',
+      confirmLabel: 'Temizle',
+      isDestructive: true,
+    );
+    if (!ok || !mounted) return;
+    setState(() {
+      _nameController.clear();
+      _days
+        ..clear()
+        ..add(_DraftDay('Gün 1'));
+      _selected = 0;
+    });
+    await _clearDraft();
+  }
+
   @override
   void dispose() {
+    _persistTimer?.cancel();
+    if (!_discardDraft) _persistNow();
     _nameController.dispose();
     super.dispose();
   }
@@ -288,6 +456,8 @@ class _BuildProgramScreenState extends State<BuildProgramScreen> {
 
       await client.from('workouts').insert(workouts);
       programRefreshNotifier.value++;
+      _discardDraft = true;
+      await _clearDraft();
       if (mounted) context.pop(true);
     } catch (e) {
       if (programId != null) {
@@ -431,6 +601,27 @@ class _BuildProgramScreenState extends State<BuildProgramScreen> {
                       SeriesWordmark(
                         color: Colors.white.withValues(alpha: 0.9),
                       ),
+                      if (_hasContent)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: PressableScale(
+                            pressedScale: 0.92,
+                            onTap: _confirmClearAll,
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.14),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.delete_sweep_outlined,
+                                size: 21,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
