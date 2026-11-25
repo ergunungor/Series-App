@@ -13,6 +13,7 @@ import '../widgets/exercise_info_dialog.dart';
 import '../widgets/kiremit_hero_surface.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/selectable_chip.dart';
+import '../widgets/series_wordmark.dart';
 
 const _bodyPartLabels = <String, String>{
   'chest': 'Göğüs',
@@ -402,21 +403,35 @@ class _BuildProgramScreenState extends State<BuildProgramScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                PressableScale(
-                  pressedScale: 0.92,
-                  onTap: () => context.pop(false),
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.14),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 18,
-                      color: Colors.white,
-                    ),
+                SizedBox(
+                  height: 44,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: PressableScale(
+                          pressedScale: 0.92,
+                          onTap: () => context.pop(false),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.14),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              size: 18,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SeriesWordmark(
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -464,7 +479,7 @@ class _BuildProgramScreenState extends State<BuildProgramScreen> {
           ),
         ),
         SizedBox(
-          height: 78,
+          height: 92,
           child: ListView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: _pad, vertical: 16),
