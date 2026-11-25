@@ -99,3 +99,42 @@ SessionStep advance(List<WorkoutExercise> list, SessionPos p) {
   }
   return SessionStep(p, finished: true);
 }
+
+/// Süperset bağları yalnızca art arda duran hareketlerde geçerli; sıralama
+/// sonrası tek kalanların bağı kalkar, bloklarda mola son harekete taşınır.
+List<WorkoutExercise> normalizeSupersets(List<WorkoutExercise> list) {
+  final out = <WorkoutExercise>[];
+  var i = 0;
+  while (i < list.length) {
+    final gs = groupStart(list, i);
+    final ge = groupEnd(list, i);
+    if (gs == ge) {
+      final e = list[i];
+      out.add(
+        e.supersetGroup == null
+            ? e
+            : WorkoutExercise.fromJson({
+              ...e.toJson(),
+              'superset_group': null,
+              'rest_seconds': (e.restSeconds ?? 0) > 0 ? e.restSeconds : 60,
+            }),
+      );
+      i++;
+      continue;
+    }
+    final rest = list
+        .sublist(gs, ge + 1)
+        .map((e) => e.restSeconds ?? 0)
+        .fold<int>(0, (a, b) => a > b ? a : b);
+    for (var k = gs; k <= ge; k++) {
+      out.add(
+        WorkoutExercise.fromJson({
+          ...list[k].toJson(),
+          'rest_seconds': k == ge ? (rest > 0 ? rest : 60) : 0,
+        }),
+      );
+    }
+    i = ge + 1;
+  }
+  return out;
+}

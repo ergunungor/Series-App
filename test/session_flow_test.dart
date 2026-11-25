@@ -169,4 +169,25 @@ void main() {
     expect(m.section, isNull);
     expect(m.toJson().containsKey('section'), isFalse);
   });
+
+  test('sıralama sonrası süperset bağları ve molalar düzelir', () {
+    // A-B süperset (A mola 0, B mola 90). B başa alınınca: B-A yine bitişik,
+    // mola sona (A) taşınır.
+    var list = normalizeSupersets([
+      ex('B', rest: 90, group: 1),
+      ex('A', rest: 0, group: 1),
+      ex('C', rest: 60),
+    ]);
+    expect(list.map((e) => e.restSeconds), [0, 90, 60]);
+    expect(list.map((e) => e.supersetGroup), [1, 1, null]);
+
+    // Araya başka hareket girerse bağ kalkar; molası 0 olan 60 alır.
+    list = normalizeSupersets([
+      ex('A', rest: 0, group: 1),
+      ex('C', rest: 60),
+      ex('B', rest: 90, group: 1),
+    ]);
+    expect(list.map((e) => e.supersetGroup), [null, null, null]);
+    expect(list.map((e) => e.restSeconds), [60, 60, 90]);
+  });
 }

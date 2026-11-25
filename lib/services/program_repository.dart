@@ -82,15 +82,14 @@ class ProgramRepository {
     Map<String, dynamic> revised,
   ) async {
     final client = Supabase.instance.client;
-    final updated =
-        await client
-            .from('programs')
-            .update({
-              'name': revised['program_name'] ?? current.name,
-              'description': revised['description'] ?? current.description,
-            })
-            .eq('id', current.id)
-            .select('id');
+    final updated = await client
+        .from('programs')
+        .update({
+          'name': revised['program_name'] ?? current.name,
+          'description': revised['description'] ?? current.description,
+        })
+        .eq('id', current.id)
+        .select('id');
     if ((updated as List).isEmpty) return false;
 
     final oldIds = current.workouts.map((w) => w.id).toSet();
