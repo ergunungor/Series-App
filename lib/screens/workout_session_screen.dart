@@ -10,6 +10,7 @@ import '../theme/app_typography.dart';
 import '../widgets/app_confirm_dialog.dart';
 import '../models/program.dart';
 import '../models/set_log.dart';
+import '../utils/session_flow.dart';
 import '../services/exercise_log_repository.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/workout_history.dart';
@@ -80,27 +81,8 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
 
   void _playFinish() => _playSound('sounds/finish.mp3');
 
-  // Süperset: aynı supersetGroup değerine sahip ardışık hareketler tek blok.
-  int _groupStart(int i) {
-    final g = widget.workout.exercises[i].supersetGroup;
-    if (g == null) return i;
-    var s = i;
-    while (s > 0 && widget.workout.exercises[s - 1].supersetGroup == g) {
-      s--;
-    }
-    return s;
-  }
-
-  int _groupEnd(int i) {
-    final g = widget.workout.exercises[i].supersetGroup;
-    if (g == null) return i;
-    var e = i;
-    final list = widget.workout.exercises;
-    while (e + 1 < list.length && list[e + 1].supersetGroup == g) {
-      e++;
-    }
-    return e;
-  }
+  int _groupStart(int i) => groupStart(widget.workout.exercises, i);
+  int _groupEnd(int i) => groupEnd(widget.workout.exercises, i);
 
   bool get _inSuperset =>
       _groupStart(_exerciseIndex) != _groupEnd(_exerciseIndex);
@@ -404,53 +386,26 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
       ),
     );
 
-    final justFinished = _currentExercise;
     _repsController.clear();
     _weightController.clear();
 
-    // Dropset: ağırlığı düşürüp ara vermeden devam.
-    if (justFinished.dropSets > 0 && _dropIndex < justFinished.dropSets) {
-      setState(() => _dropIndex++);
-      return;
-    }
-    _dropIndex = 0;
-
-    final rest = justFinished.restSeconds ?? 60;
-    final gs = _groupStart(_exerciseIndex);
-    final ge = _groupEnd(_exerciseIndex);
-
-    // Süperset: turdaki sıradaki harekete ara vermeden geç.
-    if (_exerciseIndex < ge) {
-      setState(() {
-        _exerciseIndex++;
-        _apiExerciseInfo = null;
-      });
-      _fetchCurrentExerciseGif();
-      return;
-    }
-
-    if (_setIndex + 1 < justFinished.sets) {
-      // Süpersette tur bitti: bloğun başına dön ve mola ver.
-      setState(() {
-        _setIndex++;
-        if (gs != ge) {
-          _exerciseIndex = gs;
-          _apiExerciseInfo = null;
-        }
-      });
-      _startRest(rest);
-      if (gs != ge) _fetchCurrentExerciseGif();
-    } else if (_exerciseIndex + 1 < widget.workout.exercises.length) {
-      setState(() {
-        _exerciseIndex++;
-        _setIndex = 0;
-        _apiExerciseInfo = null;
-      });
-      _startRest(rest);
-      _fetchCurrentExerciseGif();
-    } else {
+    final step = advance(
+      widget.workout.exercises,
+      SessionPos(_exerciseIndex, _setIndex, _dropIndex),
+    );
+    if (step.finished) {
       _finishWorkout();
+      return;
     }
+    final changedExercise = step.pos.exercise != _exerciseIndex;
+    setState(() {
+      _exerciseIndex = step.pos.exercise;
+      _setIndex = step.pos.set;
+      _dropIndex = step.pos.drop;
+      if (changedExercise) _apiExerciseInfo = null;
+    });
+    if (step.rest) _startRest(step.restSeconds);
+    if (changedExercise) _fetchCurrentExerciseGif();
   }
 
   void _startRest(int seconds) {
