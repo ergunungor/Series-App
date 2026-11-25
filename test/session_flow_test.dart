@@ -145,4 +145,28 @@ void main() {
     expect(plain.supersetGroup, isNull);
     expect(plain.toJson().containsKey('drop_sets'), isFalse);
   });
+
+  test('ısınma/soğuma alanı JSON gidiş-dönüşte korunur', () {
+    final w = WorkoutExercise.fromJson({
+      'id': '1',
+      'name': 'x',
+      'section': 'warmup',
+    });
+    expect(w.isWarmup, isTrue);
+    expect(w.isPrep, isTrue);
+    expect(w.toJson()['section'], 'warmup');
+    final c = WorkoutExercise.fromJson({
+      'id': '1',
+      'name': 'x',
+      'section': 'cooldown',
+    });
+    expect(c.isCooldown, isTrue);
+    final m = WorkoutExercise.fromJson({
+      'id': '1',
+      'name': 'x',
+      'section': 'bogus',
+    });
+    expect(m.section, isNull);
+    expect(m.toJson().containsKey('section'), isFalse);
+  });
 }

@@ -45,11 +45,14 @@ class _DraftExercise {
   /// Sonraki hareketle süperset: ara vermeden birlikte yapılır.
   bool linkNext = false;
 
+  /// Isınma hareketi: seansta tekrar/kilo sorulmaz.
+  bool warmup = false;
+
   _DraftExercise(this.ex);
 
   String get summary {
     final work = timed ? '${duration}sn' : reps;
-    final parts = ['$sets × $work'];
+    final parts = [if (warmup) 'Isınma', '$sets × $work'];
     parts.add(linkNext ? 'mola turdan sonra' : '${rest}sn mola');
     if (drops > 0) parts.add('Drop ×$drops');
     return parts.join(' · ');
@@ -69,6 +72,7 @@ extension _DraftExerciseX on _DraftExercise {
     'rest': rest,
     'drops': drops,
     'link_next': linkNext,
+    'warmup': warmup,
   };
 
   // ignore: unused_element
@@ -90,7 +94,8 @@ extension _DraftExerciseX on _DraftExercise {
       ..duration = (j['duration'] as num?)?.toInt() ?? 30
       ..rest = (j['rest'] as num?)?.toInt() ?? 60
       ..drops = (j['drops'] as num?)?.toInt() ?? 0
-      ..linkNext = j['link_next'] == true;
+      ..linkNext = j['link_next'] == true
+      ..warmup = j['warmup'] == true;
   }
 }
 
@@ -437,6 +442,7 @@ class _BuildProgramScreenState extends State<BuildProgramScreen> {
               'rest_seconds': rest,
               if (gid != null) 'superset_group': gid,
               if (e.drops > 0) 'drop_sets': e.drops,
+              if (e.warmup) 'section': 'warmup',
             });
             final perSet = e.timed ? e.duration : 40;
             final s = isSuperset ? sets : e.sets;
@@ -1035,6 +1041,14 @@ class _EditSheetState extends State<_EditSheet> {
               ),
             ),
           const SizedBox(height: 12),
+          _SwitchCard(
+            title: 'Isınma hareketi',
+            subtitle:
+                'Antrenmanda ısınma olarak gösterilir; tekrar ve kilo sorulmaz.',
+            value: e.warmup,
+            onChanged: (v) => _change(() => e.warmup = v),
+          ),
+          const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
             decoration: _cardDecoration(16),
@@ -1456,6 +1470,65 @@ class _SmallChip extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SwitchCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  const _SwitchCard({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+      decoration: _cardDecoration(16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTypography.body16Medium.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: AppTypography.body12Regular.copyWith(
+                    color: AppColors.textTertiary,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            activeThumbColor: Colors.white,
+            activeTrackColor: AppColors.espresso,
+            onChanged:
+                onChanged == null
+                    ? null
+                    : (v) {
+                      HapticFeedback.selectionClick();
+                      onChanged!(v);
+                    },
+          ),
+        ],
       ),
     );
   }

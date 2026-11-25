@@ -16,6 +16,14 @@ class WorkoutExercise {
   /// seti sayısı (dropset). 0 = yok.
   final int dropSets;
 
+  /// 'warmup' (ısınma), 'cooldown' (soğuma) ya da null (asıl antrenman).
+  /// Isınma/soğumada tekrar ve kilo girilmez, kayıt tutulmaz.
+  final String? section;
+
+  bool get isWarmup => section == 'warmup';
+  bool get isCooldown => section == 'cooldown';
+  bool get isPrep => isWarmup || isCooldown;
+
   WorkoutExercise({
     required this.id,
     required this.name,
@@ -27,6 +35,7 @@ class WorkoutExercise {
     this.instructions, // CONSTRUCTOR'A EKLENDİ
     this.supersetGroup,
     this.dropSets = 0,
+    this.section,
   });
 
   factory WorkoutExercise.fromJson(Map<String, dynamic> json) {
@@ -41,6 +50,11 @@ class WorkoutExercise {
       instructions: json['instructions'], // JSON'DAN OKUMA EKLENDİ
       supersetGroup: (json['superset_group'] as num?)?.toInt(),
       dropSets: (json['drop_sets'] as num?)?.toInt() ?? 0,
+      section: switch (json['section']) {
+        'warmup' => 'warmup',
+        'cooldown' => 'cooldown',
+        _ => null,
+      },
     );
   }
 
@@ -56,6 +70,7 @@ class WorkoutExercise {
       'instructions': instructions, // JSON'A YAZMA EKLENDİ
       if (supersetGroup != null) 'superset_group': supersetGroup,
       if (dropSets > 0) 'drop_sets': dropSets,
+      if (section != null) 'section': section,
     };
   }
 }

@@ -113,6 +113,7 @@ def revise_workout_program(data):
 Programı bu isteğe göre güncelle; istenmeyen kısımları koru.
 Yeni hareketleri yalnızca aşağıdaki listeden seç ve "id" alanına listedeki id'yi yaz (satır: id|ad|ekipman).
 Mevcut programda id'si boş olan bir hareketi koruyorsan "id": "" bırak ve "name" alanını aynen yaz.
+Mevcut hareketlerdeki "superset_group", "drop_sets" ve "section" alanlarını istek aksini söylemiyorsa aynen koru. Süperset istenirse art arda gelen hareketlere aynı "superset_group" sayısını, dropset istenirse "drop_sets" (ek düşürme sayısı) ver; ısınma hareketlerinde "section": "warmup", soğumada "cooldown".
 {_DURATION_RULE}
 Sadece şu şemada JSON döndür ("name" yalnızca id'si boş olan hareketlerde yazılır):
 {_PROGRAM_SCHEMA.replace('"exercises":[{"id":"",', '"exercises":[{"id":"","name":"",')}
@@ -138,6 +139,9 @@ def _compact_program(program: dict) -> dict:
                 "reps": ex.get("reps"),
                 "duration_seconds": ex.get("duration_seconds"),
                 "rest_seconds": ex.get("rest_seconds"),
+                "superset_group": ex.get("superset_group"),
+                "drop_sets": ex.get("drop_sets") or None,
+                "section": ex.get("section"),
             }
             exs.append({k: v for k, v in item.items() if v not in (None, "")} | {"id": item["id"]})
         workouts.append(
@@ -226,17 +230,17 @@ _PARSE_PROMPT = """Verilen antrenman programını JSON'a çevir.
 
 Kurallar:
 - Programda yazanı kullan, hareket uydurma. Programdaki TÜM günleri ve her günün TÜM hareketlerini sırasıyla yaz; hiçbirini atlama, birleştirme ya da kısaltma.
-- Isınma/soğuma hareketleri de o günün listesine girer (başta/sonda), "notes": "Isınma" ya da "Soğuma".
+- Isınma ve soğuma hareketleri de o günün listesine girer (başta/sonda) ve "part": "warmup" ya da "cooldown" alır; asıl antrenman hareketlerinde "part": null.
 - "name": programda yazdığı ad. "en": aynı hareketin yaygın İngilizce spor salonu adı (örn. Şınav -> push-up, Barfiks -> pull-up).
 - Süre (sn/saniye/sec/dk/dakika) varsa "reps": null ve süreyi saniye olarak "sec" alanına yaz (30 sn -> 30, 5 dk -> 300). Yoksa "reps" kullan ("8-12", "max", "20 adım", "40 m" gibi metin olabilir).
 - "rest": dinlenme saniyesi (yazmıyorsa 60).
-- Süperset: "süperset/superset/SS", "A1/A2", "5a/5b", "+" ya da "ara vermeden/arka arkaya" ile bağlanan hareketlere aynı tam sayıyı "ss" olarak ver (her süperset için yeni sayı). Süperset değilse alanı yazma.
-- Dropset: "dropset/drop set" yazan harekette "drop" = ek düşürme sayısı (belirtilmemişse 2). Değilse alanı yazma.
+- Süperset: "süperset/superset/SS", "A1/A2", "5a/5b", "+" ya da "ara vermeden/arka arkaya" ile bağlanan hareketlere aynı tam sayıyı "ss" olarak ver (her süperset için yeni sayı). Süperset değilse "ss": null.
+- Dropset: "dropset/drop set" yazan harekette "drop" = ek düşürme sayısı (belirtilmemişse 2). Değilse "drop": 0.
 - "notes": yalnızca programda hareketle ilgili ek bilgi varsa (örn. "her bacak", "son sette dropset"); yoksa alanı yazma.
 - İçerik bir antrenman programı değilse sadece {"error": "not_a_program"} döndür.
 
 Kısa ve boşluksuz JSON döndür, şu şemada:
-{"program_name":"","description":"1 cümle","workouts":[{"name":"","min":45,"exercises":[{"name":"","en":"","sets":3,"reps":"8-12","sec":null,"rest":60}]}]}"""
+{"program_name":"","description":"1 cümle","workouts":[{"name":"","min":45,"exercises":[{"name":"","en":"","sets":3,"reps":"8-12","sec":null,"rest":60,"part":null,"ss":null,"drop":0}]}]}"""
 
 
 def _expand_compact(program: dict):
@@ -255,6 +259,9 @@ def _expand_compact(program: dict):
                 ex["superset_group"] = ex.pop("ss")
             if "drop" in ex:
                 ex["drop_sets"] = ex.pop("drop")
+            part = ex.pop("part", None)
+            if part in ("warmup", "cooldown"):
+                ex["section"] = part
             ex.setdefault("rest_seconds", 60)
             if ex.get("duration_seconds"):
                 ex["reps"] = None
@@ -343,6 +350,8 @@ def program_from_structured_json(data: dict) -> Optional[dict]:
                 ex["reps"] = f"{e['distance_m']} m"
                 if e.get("effort"):
                     ex["notes"] = " · ".join(filter(None, [ex["notes"], f"Efor: {e['effort']}"]))
+            if kind == "warmup":
+                ex["section"] = "warmup"
             if e.get("superset_group") not in (None, ""):
                 ex["superset_group"] = e["superset_group"]
             if e.get("drop_sets"):
