@@ -18,6 +18,7 @@ import '../screens/workout_day_detail_screen.dart';
 import '../screens/workout_history_detail_screen.dart';
 import '../models/workout_history.dart';
 import '../screens/import_program_screen.dart';
+import '../screens/build_program_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // YENİ
 import 'package:supabase_flutter/supabase_flutter.dart'; // YENİ
 import '../screens/forgot_password_screen.dart'; // YENİ
@@ -144,6 +145,10 @@ class AppRouter {
           }
           return ProgramDetailScreen(program: program);
         },
+      ),
+      GoRoute(
+        path: '/build-program',
+        builder: (context, state) => const BuildProgramScreen(),
       ),
       GoRoute(
         path: '/import-program',

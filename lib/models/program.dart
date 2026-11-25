@@ -8,6 +8,14 @@ class WorkoutExercise {
   final String? notes;
   final String? instructions; // EKLENEN YENİ ALAN
 
+  /// Aynı değere sahip ardışık hareketler süperset oluşturur (ara vermeden
+  /// sırayla yapılır, mola turun sonunda). null = süperset değil.
+  final int? supersetGroup;
+
+  /// Her çalışma setinden sonra ara vermeden yapılacak ek düşük ağırlık
+  /// seti sayısı (dropset). 0 = yok.
+  final int dropSets;
+
   WorkoutExercise({
     required this.id,
     required this.name,
@@ -17,6 +25,8 @@ class WorkoutExercise {
     this.restSeconds,
     this.notes,
     this.instructions, // CONSTRUCTOR'A EKLENDİ
+    this.supersetGroup,
+    this.dropSets = 0,
   });
 
   factory WorkoutExercise.fromJson(Map<String, dynamic> json) {
@@ -29,6 +39,8 @@ class WorkoutExercise {
       restSeconds: json['rest_seconds'],
       notes: json['notes'],
       instructions: json['instructions'], // JSON'DAN OKUMA EKLENDİ
+      supersetGroup: (json['superset_group'] as num?)?.toInt(),
+      dropSets: (json['drop_sets'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -42,6 +54,8 @@ class WorkoutExercise {
       'rest_seconds': restSeconds,
       'notes': notes,
       'instructions': instructions, // JSON'A YAZMA EKLENDİ
+      if (supersetGroup != null) 'superset_group': supersetGroup,
+      if (dropSets > 0) 'drop_sets': dropSets,
     };
   }
 }

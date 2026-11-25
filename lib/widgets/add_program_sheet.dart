@@ -12,6 +12,7 @@ Future<void> showAddProgramSheet({
   required BuildContext context,
   required VoidCallback onCreateWithAi,
   required VoidCallback onImportProgram,
+  required VoidCallback onBuildManually,
 }) {
   return showModalBottomSheet(
     context: context,
@@ -139,6 +140,22 @@ Future<void> showAddProgramSheet({
                         onTap: () {
                           Navigator.of(context).pop();
                           onCreateWithAi();
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 11),
+                    Reveal(
+                      delay: const Duration(milliseconds: 35),
+                      duration: const Duration(milliseconds: 400),
+                      offsetY: 10,
+                      child: _GlassOption(
+                        icon: Icons.tune_rounded,
+                        title: 'Kendin Oluştur',
+                        subtitle:
+                            'Hareketleri, set ve dinlenmeyi sen seç; süperset ve dropset ekle',
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          onBuildManually();
                         },
                       ),
                     ),

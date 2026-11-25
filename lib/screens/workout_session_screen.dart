@@ -39,6 +39,8 @@ class WorkoutSessionScreen extends StatefulWidget {
 class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   int _exerciseIndex = 0;
   int _setIndex = 0;
+  // Dropset: 0 = normal çalışma seti, k>0 = k. düşürme (ara vermeden).
+  int _dropIndex = 0;
   bool _isResting = false;
   bool _isFinishing = false;
   bool _isPaused = false;
@@ -77,6 +79,31 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   void _playBell() => _playSound('sounds/bell.mp3');
 
   void _playFinish() => _playSound('sounds/finish.mp3');
+
+  // Süperset: aynı supersetGroup değerine sahip ardışık hareketler tek blok.
+  int _groupStart(int i) {
+    final g = widget.workout.exercises[i].supersetGroup;
+    if (g == null) return i;
+    var s = i;
+    while (s > 0 && widget.workout.exercises[s - 1].supersetGroup == g) {
+      s--;
+    }
+    return s;
+  }
+
+  int _groupEnd(int i) {
+    final g = widget.workout.exercises[i].supersetGroup;
+    if (g == null) return i;
+    var e = i;
+    final list = widget.workout.exercises;
+    while (e + 1 < list.length && list[e + 1].supersetGroup == g) {
+      e++;
+    }
+    return e;
+  }
+
+  bool get _inSuperset =>
+      _groupStart(_exerciseIndex) != _groupEnd(_exerciseIndex);
 
   WorkoutExercise get _currentExercise =>
       widget.workout.exercises[_exerciseIndex];
@@ -365,7 +392,13 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     _logs.add(
       SetLog(
         exerciseName: _currentExercise.name,
-        setNumber: _setIndex + 1,
+        // Dropset düşürmeleri, çalışma setlerinin numaralarından sonra gelir.
+        setNumber:
+            _dropIndex == 0
+                ? _setIndex + 1
+                : _currentExercise.sets +
+                    _setIndex * _currentExercise.dropSets +
+                    _dropIndex,
         repsPerformed: reps,
         weightUsed: weight,
       ),
@@ -375,18 +408,45 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     _repsController.clear();
     _weightController.clear();
 
+    // Dropset: ağırlığı düşürüp ara vermeden devam.
+    if (justFinished.dropSets > 0 && _dropIndex < justFinished.dropSets) {
+      setState(() => _dropIndex++);
+      return;
+    }
+    _dropIndex = 0;
+
+    final rest = justFinished.restSeconds ?? 60;
+    final gs = _groupStart(_exerciseIndex);
+    final ge = _groupEnd(_exerciseIndex);
+
+    // Süperset: turdaki sıradaki harekete ara vermeden geç.
+    if (_exerciseIndex < ge) {
+      setState(() {
+        _exerciseIndex++;
+        _apiExerciseInfo = null;
+      });
+      _fetchCurrentExerciseGif();
+      return;
+    }
+
     if (_setIndex + 1 < justFinished.sets) {
-      setState(() => _setIndex++);
-      // EĞER REST SECONDS BOŞ GELİRSE VARSAYILAN OLARAK 60 SANİYE MOLA VER
-      _startRest(justFinished.restSeconds ?? 60);
+      // Süpersette tur bitti: bloğun başına dön ve mola ver.
+      setState(() {
+        _setIndex++;
+        if (gs != ge) {
+          _exerciseIndex = gs;
+          _apiExerciseInfo = null;
+        }
+      });
+      _startRest(rest);
+      if (gs != ge) _fetchCurrentExerciseGif();
     } else if (_exerciseIndex + 1 < widget.workout.exercises.length) {
       setState(() {
         _exerciseIndex++;
         _setIndex = 0;
         _apiExerciseInfo = null;
       });
-      // BURAYA DA ?? 60 EKLİYORUZ
-      _startRest(justFinished.restSeconds ?? 60);
+      _startRest(rest);
       _fetchCurrentExerciseGif();
     } else {
       _finishWorkout();
@@ -431,6 +491,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     setState(() {
       _exerciseIndex = newIndex;
       _setIndex = 0;
+      _dropIndex = 0;
       _isResting = false;
       _repsController.clear();
       _weightController.clear();
@@ -532,6 +593,22 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
       return '${formatExerciseName(_currentExercise.name)} · Set ${_setIndex + 1}/${_currentExercise.sets}';
     }
 
+    // Dropset sürerken ya da süpersette bloğun sonu değilse sıradaki bellidir.
+    if (_dropIndex > 0 && _dropIndex < _currentExercise.dropSets) {
+      return 'Drop ${_dropIndex + 1}/${_currentExercise.dropSets}';
+    }
+    if (_dropIndex == 0 && _exerciseIndex < _groupEnd(_exerciseIndex)) {
+      if (_currentExercise.dropSets == 0) {
+        return formatExerciseName(
+          widget.workout.exercises[_exerciseIndex + 1].name,
+        );
+      }
+    }
+    if (_dropIndex > 0 && _exerciseIndex < _groupEnd(_exerciseIndex)) {
+      return formatExerciseName(
+        widget.workout.exercises[_exerciseIndex + 1].name,
+      );
+    }
     // Egzersiz ekranındayken (molada değilken) standart "sıradaki" hesaplaması:
     if (_setIndex + 1 < _currentExercise.sets) {
       return '${formatExerciseName(_currentExercise.name)} · Set ${_setIndex + 2}/${_currentExercise.sets}';
@@ -1024,6 +1101,29 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
             ),
           )
         else ...[
+          if (_dropIndex > 0 || exercise.dropSets > 0 || _inSuperset)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  if (_inSuperset)
+                    _TagChip(
+                      label:
+                          'SÜPERSET ${_exerciseIndex - _groupStart(_exerciseIndex) + 1}/${_groupEnd(_exerciseIndex) - _groupStart(_exerciseIndex) + 1}',
+                    ),
+                  if (_dropIndex > 0)
+                    _TagChip(
+                      label:
+                          'DROP $_dropIndex/${exercise.dropSets} · ağırlığı azalt',
+                      strong: true,
+                    )
+                  else if (exercise.dropSets > 0)
+                    _TagChip(label: 'DROPSET ×${exercise.dropSets}'),
+                ],
+              ),
+            ),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -2004,6 +2104,37 @@ class _FlowRow extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TagChip extends StatelessWidget {
+  final String label;
+  final bool strong;
+
+  const _TagChip({required this.label, this.strong = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color:
+            strong
+                ? AppColors.accentGold
+                : AppColors.accentGold.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.body12Medium.copyWith(
+          color: strong ? AppColors.espresso : AppColors.espresso,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.8,
+          height: 1,
         ),
       ),
     );
