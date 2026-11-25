@@ -231,6 +231,7 @@ _PARSE_PROMPT = """Verilen antrenman programını JSON'a çevir.
 Kurallar:
 - Programda yazanı kullan, hareket uydurma. Programdaki TÜM günleri ve her günün TÜM hareketlerini sırasıyla yaz; hiçbirini atlama, birleştirme ya da kısaltma.
 - Isınma ve soğuma hareketleri de o günün listesine girer (başta/sonda) ve "part": "warmup" ya da "cooldown" alır; asıl antrenman hareketlerinde "part": null.
+- Her öğe tek bir hareket olmalı. Aynı satırda ya da cümlede birden fazla farklı hareket geçiyorsa (nasıl yazılmış olursa olsun) her birini kendi set/tekrar/süresiyle ayrı öğe olarak yaz.
 - "name": programda yazdığı ad. "en": aynı hareketin yaygın İngilizce spor salonu adı (örn. Şınav -> push-up, Barfiks -> pull-up).
 - Süre (sn/saniye/sec/dk/dakika) varsa "reps": null ve süreyi saniye olarak "sec" alanına yaz (30 sn -> 30, 5 dk -> 300). Yoksa "reps" kullan ("8-12", "max", "20 adım", "40 m" gibi metin olabilir).
 - "rest": dinlenme saniyesi (yazmıyorsa 60).
