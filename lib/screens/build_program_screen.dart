@@ -7,6 +7,12 @@ import '../services/program_repository.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../utils/exercise_name.dart';
+import '../widgets/app_button.dart';
+import '../widgets/detail_hero.dart' show HeroStatusBarScope;
+import '../widgets/exercise_info_dialog.dart';
+import '../widgets/kiremit_hero_surface.dart';
+import '../widgets/pressable_scale.dart';
+import '../widgets/selectable_chip.dart';
 
 const _bodyPartLabels = <String, String>{
   'chest': 'Göğüs',
@@ -133,8 +139,9 @@ class _BuildProgramScreenState extends State<BuildProgramScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: AppColors.background,
+      showDragHandle: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       builder:
           (_) => _ExercisePicker(
@@ -150,8 +157,9 @@ class _BuildProgramScreenState extends State<BuildProgramScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: AppColors.background,
+      showDragHandle: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       builder:
           (_) => _EditSheet(
@@ -170,6 +178,34 @@ class _BuildProgramScreenState extends State<BuildProgramScreen> {
             },
           ),
     );
+  }
+
+  void _remove(_DraftExercise item) {
+    final list = _day.items;
+    final index = list.indexOf(item);
+    if (index < 0) return;
+    setState(() {
+      // Silinen hareket süperset zincirinin ortasındaysa zincir bozulmasın:
+      // önceki hareketin bağı, silinenin bağını devralır.
+      if (index > 0) {
+        list[index - 1].linkNext = item.linkNext && list[index - 1].linkNext;
+      }
+      list.removeAt(index);
+    });
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('${formatExerciseName(item.ex.name)} silindi'),
+          action: SnackBarAction(
+            label: 'Geri al',
+            onPressed: () {
+              if (!mounted) return;
+              setState(() => list.insert(index.clamp(0, list.length), item));
+            },
+          ),
+        ),
+      );
   }
 
   Future<void> _save() async {
@@ -265,239 +301,82 @@ class _BuildProgramScreenState extends State<BuildProgramScreen> {
     }
   }
 
+  static const double _pad = 20;
+
   @override
   Widget build(BuildContext context) {
     final items = _day.items;
+    final bottomSafe = MediaQuery.paddingOf(context).bottom;
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    onPressed: () => context.pop(false),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Program Oluştur',
-                      style: AppTypography.heading2.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
+            HeroStatusBarScope(
+              builder:
+                  (context, heroKey) => ReorderableListView.builder(
+                    physics: const BouncingScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    padding: EdgeInsets.only(bottom: bottomSafe + 120),
+                    itemCount: items.length,
+                    header: _buildHeader(heroKey),
+                    footer: Padding(
+                      padding: const EdgeInsets.fromLTRB(_pad, 6, _pad, 0),
+                      child: AppButton(
+                        text: 'Hareket Ekle',
+                        icon: Icons.add_rounded,
+                        variant: AppButtonVariant.outlined,
+                        onPressed: _pickExercises,
                       ),
                     ),
+                    onReorderItem: (from, to) {
+                      setState(() {
+                        final moved = items.removeAt(from);
+                        items.insert(to, moved);
+                        // Sıra değişince süperset bağları anlamsız kalabilir.
+                        for (final e in items) {
+                          e.linkNext = false;
+                        }
+                      });
+                    },
+                    proxyDecorator:
+                        (child, _, _) => Material(
+                          color: Colors.transparent,
+                          elevation: 6,
+                          shadowColor: Colors.black26,
+                          borderRadius: BorderRadius.circular(22),
+                          child: child,
+                        ),
+                    itemBuilder: (context, i) => _buildItem(items, i),
                   ),
-                  FilledButton(
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                ignoring: false,
+                child: Container(
+                  padding: EdgeInsets.fromLTRB(_pad, 28, _pad, bottomSafe + 14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        AppColors.background.withValues(alpha: 0),
+                        AppColors.background,
+                      ],
+                      stops: const [0, 0.38],
+                    ),
+                  ),
+                  child: AppButton(
+                    text: 'Programı Kaydet',
+                    icon: Icons.check_rounded,
+                    isLoading: _saving,
                     onPressed: _saving ? null : _save,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.espresso,
-                      foregroundColor: Colors.white,
-                    ),
-                    child:
-                        _saving
-                            ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                            : const Text('Kaydet'),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              child: TextField(
-                controller: _nameController,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: _fieldDecoration(
-                  'Program adı (örn. Push Pull Legs)',
-                ),
-              ),
-            ),
-            SizedBox(
-              height: 56,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                children: [
-                  for (var i = 0; i < _days.length; i++)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: GestureDetector(
-                        onLongPress: i == _selected ? _dayMenu : null,
-                        child: ChoiceChip(
-                          label: Text(_days[i].name),
-                          selected: i == _selected,
-                          onSelected: (_) => setState(() => _selected = i),
-                          selectedColor: AppColors.espresso,
-                          labelStyle: TextStyle(
-                            color:
-                                i == _selected
-                                    ? Colors.white
-                                    : AppColors.textPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ActionChip(
-                    avatar: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Gün'),
-                    onPressed: _addDay,
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 12, 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      items.isEmpty
-                          ? 'Henüz hareket yok'
-                          : 'Sürükleyerek sırala · karta dokunarak düzenle',
-                      style: AppTypography.body12Regular.copyWith(
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: _dayMenu,
-                    icon: const Icon(Icons.edit_outlined, size: 16),
-                    label: const Text('Günü düzenle'),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ReorderableListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                itemCount: items.length,
-                onReorderItem: (from, to) {
-                  setState(() {
-                    final moved = items.removeAt(from);
-                    items.insert(to, moved);
-                    // Sıra değişince süperset bağları anlamsız kalabilir.
-                    for (final e in items) {
-                      e.linkNext = false;
-                    }
-                  });
-                },
-                footer: Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: OutlinedButton.icon(
-                    onPressed: _pickExercises,
-                    icon: const Icon(Icons.add_rounded),
-                    label: const Text('Hareket ekle'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(52),
-                      foregroundColor: AppColors.espresso,
-                      side: BorderSide(
-                        color: AppColors.espresso.withValues(alpha: 0.3),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
                   ),
                 ),
-                itemBuilder: (context, i) {
-                  final e = items[i];
-                  final grouped =
-                      e.linkNext || (i > 0 && items[i - 1].linkNext);
-                  final startsGroup =
-                      e.linkNext && !(i > 0 && items[i - 1].linkNext);
-                  return Padding(
-                    key: e.key,
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Material(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        onTap: () => _edit(e),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border(
-                              left: BorderSide(
-                                color:
-                                    grouped
-                                        ? AppColors.accentGold
-                                        : Colors.transparent,
-                                width: 5,
-                              ),
-                            ),
-                          ),
-                          padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (startsGroup)
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 4,
-                                        ),
-                                        child: Text(
-                                          'SÜPERSET',
-                                          style: AppTypography.body12Medium
-                                              .copyWith(
-                                                color: AppColors.goldDeep,
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w800,
-                                                letterSpacing: 1.2,
-                                              ),
-                                        ),
-                                      ),
-                                    Text(
-                                      formatExerciseName(e.ex.name),
-                                      style: AppTypography.body16Medium
-                                          .copyWith(
-                                            color: AppColors.textPrimary,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      e.summary,
-                                      style: AppTypography.body12Regular
-                                          .copyWith(
-                                            color: AppColors.textTertiary,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              ReorderableDragStartListener(
-                                index: i,
-                                child: const Padding(
-                                  padding: EdgeInsets.all(10),
-                                  child: Icon(
-                                    Icons.drag_indicator_rounded,
-                                    color: AppColors.textTertiary,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
               ),
             ),
           ],
@@ -505,18 +384,317 @@ class _BuildProgramScreenState extends State<BuildProgramScreen> {
       ),
     );
   }
+
+  Widget _buildHeader(GlobalKey heroKey) {
+    return Column(
+      key: const ValueKey('header'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        KiremitHeroSurface(
+          heroKey: heroKey,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              _pad,
+              MediaQuery.paddingOf(context).top + 8,
+              _pad,
+              28,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                PressableScale(
+                  pressedScale: 0.92,
+                  onTap: () => context.pop(false),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.14),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Kendin Oluştur',
+                  style: AppTypography.heading1.copyWith(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.8,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Hareketleri sen seç; set, dinlenme, süperset ve dropset senin elinde.',
+                  style: AppTypography.body14Regular.copyWith(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(_pad, 24, _pad, 0),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+            decoration: _cardDecoration(24),
+            child: TextField(
+              controller: _nameController,
+              textCapitalization: TextCapitalization.sentences,
+              cursorColor: AppColors.homeHero,
+              style: AppTypography.body16Medium.copyWith(
+                color: AppColors.textPrimary,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Program adı (örn. Push Pull Legs)',
+                hintStyle: AppTypography.body16Medium.copyWith(
+                  color: AppColors.textTertiary.withValues(alpha: 0.8),
+                ),
+                border: InputBorder.none,
+              ),
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 78,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: _pad, vertical: 16),
+            children: [
+              for (var i = 0; i < _days.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onLongPress: i == _selected ? _dayMenu : null,
+                    child: SelectableChip(
+                      label: _days[i].name,
+                      isSelected: i == _selected,
+                      onTap: () => setState(() => _selected = i),
+                    ),
+                  ),
+                ),
+              SelectableChip(label: '+ Gün', isSelected: false, onTap: _addDay),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(_pad, 0, _pad - 6, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _day.items.isEmpty
+                      ? 'Henüz hareket yok'
+                      : 'Sola kaydır: sil · dokun: düzenle · sürükle: sırala',
+                  style: AppTypography.body12Regular.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: _dayMenu,
+                child: Text(
+                  'Günü düzenle',
+                  style: AppTypography.body12Medium.copyWith(
+                    color: AppColors.homeHero,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildItem(List<_DraftExercise> items, int i) {
+    final e = items[i];
+    final prevLinked = i > 0 && items[i - 1].linkNext;
+    final grouped = e.linkNext || prevLinked;
+    final startsGroup = e.linkNext && !prevLinked;
+
+    return Dismissible(
+      key: e.key,
+      direction: DismissDirection.endToStart,
+      onDismissed: (_) => _remove(e),
+      background: Container(
+        margin: const EdgeInsets.fromLTRB(_pad, 0, _pad, 10),
+        padding: const EdgeInsets.only(right: 24),
+        alignment: Alignment.centerRight,
+        decoration: BoxDecoration(
+          color: AppColors.error,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(_pad, 0, _pad, 10),
+        child: PressableScale(
+          pressedScale: 0.985,
+          onTap: () => _edit(e),
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: _cardDecoration(22),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 5,
+                    color: grouped ? AppColors.accentGold : Colors.transparent,
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 14, 0, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (startsGroup)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 5),
+                              child: Text(
+                                'SÜPERSET',
+                                style: AppTypography.body12Medium.copyWith(
+                                  color: AppColors.goldDeep,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.4,
+                                ),
+                              ),
+                            ),
+                          Text(
+                            formatExerciseName(e.ex.name),
+                            style: AppTypography.body16Medium.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            e.summary,
+                            style: AppTypography.body12Regular.copyWith(
+                              color: AppColors.textTertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  _RoundIconButton(
+                    icon: Icons.info_outline_rounded,
+                    onTap:
+                        () => showExerciseInfoDialog(
+                          context,
+                          exerciseId: e.ex.id,
+                          name: e.ex.name,
+                        ),
+                  ),
+                  ReorderableDragStartListener(
+                    index: i,
+                    child: const Padding(
+                      padding: EdgeInsets.fromLTRB(4, 12, 14, 12),
+                      child: Icon(
+                        Icons.drag_indicator_rounded,
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-InputDecoration _fieldDecoration(String hint) => InputDecoration(
-  hintText: hint,
-  filled: true,
-  fillColor: Colors.white,
-  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-  border: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(16),
-    borderSide: BorderSide.none,
-  ),
+BoxDecoration _cardDecoration(double radius) => BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(radius),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.04),
+      blurRadius: 16,
+      offset: const Offset(0, 4),
+    ),
+  ],
 );
+
+class _RoundIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _RoundIconButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      pressedScale: 0.88,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: const BoxDecoration(
+            color: AppColors.fillSubtle,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 19, color: AppColors.homeHero),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetFrame extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const _SheetFrame({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+            child: Text(
+              title,
+              style: AppTypography.heading3.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.4,
+              ),
+            ),
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+              child: child,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// Tek bir hareketin set / tekrar / süre / mola / dropset / süperset ayarı.
 class _EditSheet extends StatefulWidget {
@@ -556,127 +734,171 @@ class _EditSheetState extends State<_EditSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              formatExerciseName(e.ex.name),
-              style: AppTypography.heading3.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w700,
+    return _SheetFrame(
+      title: formatExerciseName(e.ex.name),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _StepperRow(
+            label: 'Set',
+            value: e.sets,
+            min: 1,
+            max: 10,
+            step: 1,
+            onChanged: (v) => _change(() => e.sets = v),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: SelectableChip(
+                  label: 'Tekrar',
+                  isSelected: !e.timed,
+                  onTap: () => _change(() => e.timed = false),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SelectableChip(
+                  label: 'Süre',
+                  isSelected: e.timed,
+                  onTap: () => _change(() => e.timed = true),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (e.timed)
             _StepperRow(
-              label: 'Set',
-              value: e.sets,
-              min: 1,
-              max: 10,
-              step: 1,
-              onChanged: (v) => _change(() => e.sets = v),
-            ),
-            const SizedBox(height: 12),
-            SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(value: false, label: Text('Tekrar')),
-                ButtonSegment(value: true, label: Text('Süre')),
-              ],
-              selected: {e.timed},
-              onSelectionChanged: (s) => _change(() => e.timed = s.first),
-            ),
-            const SizedBox(height: 12),
-            if (e.timed)
-              _StepperRow(
-                label: 'Süre (sn)',
-                value: e.duration,
-                min: 5,
-                max: 600,
-                step: 5,
-                onChanged: (v) => _change(() => e.duration = v),
-              )
-            else
-              TextField(
+              label: 'Süre (sn)',
+              value: e.duration,
+              min: 5,
+              max: 600,
+              step: 5,
+              onChanged: (v) => _change(() => e.duration = v),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              decoration: _cardDecoration(16),
+              child: TextField(
                 controller: _reps,
-                decoration: _fieldDecoration('Tekrar (örn. 10 ya da 8-12)'),
+                cursorColor: AppColors.homeHero,
+                style: AppTypography.body16Medium.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Tekrar (örn. 10 ya da 8-12)',
+                  border: InputBorder.none,
+                  labelStyle: AppTypography.body14Regular.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
                 onChanged: (v) {
                   e.reps = v.trim().isEmpty ? '10' : v.trim();
                   widget.onChanged();
                 },
               ),
-            const SizedBox(height: 12),
-            _StepperRow(
-              label: 'Dinlenme (sn)',
-              value: e.rest,
-              min: 0,
-              max: 300,
-              step: 15,
-              onChanged: (v) => _change(() => e.rest = v),
             ),
-            const SizedBox(height: 12),
-            _StepperRow(
-              label: 'Dropset (ek düşürme)',
-              value: e.drops,
-              min: 0,
-              max: 4,
-              step: 1,
-              onChanged: (v) => _change(() => e.drops = v),
-            ),
-            if (e.drops > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  'Her setten sonra ara vermeden ${e.drops} kez ağırlığı azaltıp devam edersin.',
-                  style: AppTypography.body12Regular.copyWith(
-                    color: AppColors.textTertiary,
-                  ),
+          const SizedBox(height: 12),
+          _StepperRow(
+            label: 'Dinlenme (sn)',
+            value: e.rest,
+            min: 0,
+            max: 300,
+            step: 15,
+            onChanged: (v) => _change(() => e.rest = v),
+          ),
+          const SizedBox(height: 12),
+          _StepperRow(
+            label: 'Dropset (ek düşürme)',
+            value: e.drops,
+            min: 0,
+            max: 4,
+            step: 1,
+            onChanged: (v) => _change(() => e.drops = v),
+          ),
+          if (e.drops > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+              child: Text(
+                'Her setten sonra ara vermeden ${e.drops} kez ağırlığı azaltıp devam edersin.',
+                style: AppTypography.body12Regular.copyWith(
+                  color: AppColors.textTertiary,
                 ),
               ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: e.linkNext && widget.canLinkNext,
-              onChanged:
-                  widget.canLinkNext
-                      ? (v) {
-                        HapticFeedback.selectionClick();
-                        _change(() => e.linkNext = v);
-                      }
-                      : null,
-              title: const Text('Sonraki hareketle süperset'),
-              subtitle: Text(
-                widget.canLinkNext
-                    ? 'İkisi ara vermeden art arda yapılır, mola turun sonunda. Set sayısı ilk hareketinkine eşitlenir.'
-                    : 'Önce altına bir hareket daha ekle.',
-              ),
             ),
-            const SizedBox(height: 8),
-            Row(
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+            decoration: _cardDecoration(16),
+            child: Row(
               children: [
-                TextButton.icon(
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sonraki hareketle süperset',
+                        style: AppTypography.body16Medium.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        widget.canLinkNext
+                            ? 'Ara vermeden art arda yapılır, mola turun sonunda. Set sayısı ilk hareketinkine eşitlenir.'
+                            : 'Önce altına bir hareket daha ekle.',
+                        style: AppTypography.body12Regular.copyWith(
+                          color: AppColors.textTertiary,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: e.linkNext && widget.canLinkNext,
+                  activeThumbColor: Colors.white,
+                  activeTrackColor: AppColors.espresso,
+                  onChanged:
+                      widget.canLinkNext
+                          ? (v) {
+                            HapticFeedback.selectionClick();
+                            _change(() => e.linkNext = v);
+                          }
+                          : null,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  text: 'Sil',
+                  icon: Icons.delete_outline_rounded,
+                  variant: AppButtonVariant.outlined,
+                  color: AppColors.error,
                   onPressed: () {
                     widget.onDelete();
                     Navigator.pop(context);
                   },
-                  icon: const Icon(Icons.delete_outline_rounded),
-                  label: const Text('Hareketi sil'),
-                  style: TextButton.styleFrom(foregroundColor: AppColors.error),
                 ),
-                const Spacer(),
-                FilledButton(
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: AppButton(
+                  text: 'Tamam',
+                  icon: Icons.check_rounded,
                   onPressed: () => Navigator.pop(context),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.espresso,
-                  ),
-                  child: const Text('Tamam'),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -699,14 +921,30 @@ class _StepperRow extends StatelessWidget {
     required this.onChanged,
   });
 
+  Widget _btn(IconData icon, VoidCallback? onTap) {
+    return Opacity(
+      opacity: onTap == null ? 0.35 : 1,
+      child: PressableScale(
+        pressedScale: 0.88,
+        onTap: onTap,
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: const BoxDecoration(
+            color: AppColors.fillSubtle,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 20, color: AppColors.homeHero),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
+      padding: const EdgeInsets.fromLTRB(18, 10, 12, 10),
+      decoration: _cardDecoration(16),
       child: Row(
         children: [
           Expanded(
@@ -717,15 +955,14 @@ class _StepperRow extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            onPressed:
-                value > min
-                    ? () => onChanged((value - step).clamp(min, max))
-                    : null,
-            icon: const Icon(Icons.remove_circle_outline_rounded),
+          _btn(
+            Icons.remove_rounded,
+            value > min
+                ? () => onChanged((value - step).clamp(min, max))
+                : null,
           ),
           SizedBox(
-            width: 40,
+            width: 52,
             child: Text(
               '$value',
               textAlign: TextAlign.center,
@@ -735,12 +972,11 @@ class _StepperRow extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            onPressed:
-                value < max
-                    ? () => onChanged((value + step).clamp(min, max))
-                    : null,
-            icon: const Icon(Icons.add_circle_outline_rounded),
+          _btn(
+            Icons.add_rounded,
+            value < max
+                ? () => onChanged((value + step).clamp(min, max))
+                : null,
           ),
         ],
       ),
@@ -767,55 +1003,88 @@ class _ExercisePickerState extends State<_ExercisePicker> {
 
   @override
   Widget build(BuildContext context) {
+    final total = _added.values.fold(0, (a, b) => a + b);
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+            padding: const EdgeInsets.fromLTRB(20, 0, 12, 10),
             child: Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    decoration: _fieldDecoration(
-                      'Hareket ara (İngilizce ad)',
-                    ).copyWith(prefixIcon: const Icon(Icons.search_rounded)),
-                    onChanged:
-                        (v) => setState(() => _query = v.toLowerCase().trim()),
+                  child: Container(
+                    height: 52,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: _cardDecoration(16),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.search_rounded,
+                          size: 20,
+                          color: AppColors.textTertiary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            cursorColor: AppColors.homeHero,
+                            style: AppTypography.body16Medium.copyWith(
+                              color: AppColors.textPrimary,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Hareket ara (İngilizce ad)',
+                              hintStyle: AppTypography.body16Medium.copyWith(
+                                color: AppColors.textTertiary.withValues(
+                                  alpha: 0.8,
+                                ),
+                              ),
+                              border: InputBorder.none,
+                              isDense: true,
+                            ),
+                            onChanged:
+                                (v) => setState(
+                                  () => _query = v.toLowerCase().trim(),
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: Text(
-                    _added.isEmpty
-                        ? 'Kapat'
-                        : 'Bitti (${_added.values.fold(0, (a, b) => a + b)})',
+                    total == 0 ? 'Kapat' : 'Bitti ($total)',
+                    style: AppTypography.body14Medium.copyWith(
+                      color: AppColors.homeHero,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
           SizedBox(
-            height: 44,
+            height: 52,
             child: ListView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
               children: [
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: const Text('Tümü'),
+                  child: _SmallChip(
+                    label: 'Tümü',
                     selected: _part == null,
-                    onSelected: (_) => setState(() => _part = null),
+                    onTap: () => setState(() => _part = null),
                   ),
                 ),
                 for (final entry in _bodyPartLabels.entries)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(entry.value),
+                    child: _SmallChip(
+                      label: entry.value,
                       selected: _part == entry.key,
-                      onSelected: (_) => setState(() => _part = entry.key),
+                      onTap: () => setState(() => _part = entry.key),
                     ),
                   ),
               ],
@@ -826,7 +1095,12 @@ class _ExercisePickerState extends State<_ExercisePicker> {
               future: _future,
               builder: (context, snap) {
                 if (!snap.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      color: AppColors.homeHero,
+                    ),
+                  );
                 }
                 final list =
                     snap.data!
@@ -837,27 +1111,98 @@ class _ExercisePickerState extends State<_ExercisePicker> {
                         )
                         .toList();
                 if (list.isEmpty) {
-                  return const Center(child: Text('Sonuç yok'));
+                  return Center(
+                    child: Text(
+                      'Sonuç yok',
+                      style: AppTypography.body14Regular.copyWith(
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
+                  );
                 }
                 return ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
                   itemCount: list.length,
                   itemBuilder: (context, i) {
                     final e = list[i];
                     final n = _added[e.id] ?? 0;
-                    return ListTile(
-                      title: Text(formatExerciseName(e.name)),
-                      subtitle: Text(
-                        '${_bodyPartLabels[e.bodyPart] ?? e.bodyPart} · ${e.equipment}',
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: PressableScale(
+                        pressedScale: 0.985,
+                        onTap: () {
+                          widget.onAdd(e);
+                          setState(() => _added[e.id] = n + 1);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(16, 6, 6, 6),
+                          decoration: _cardDecoration(18),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      formatExerciseName(e.name),
+                                      style: AppTypography.body14Medium
+                                          .copyWith(
+                                            color: AppColors.textPrimary,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${_bodyPartLabels[e.bodyPart] ?? e.bodyPart} · ${e.equipment}',
+                                      style: AppTypography.body12Regular
+                                          .copyWith(
+                                            color: AppColors.textTertiary,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              _RoundIconButton(
+                                icon: Icons.info_outline_rounded,
+                                onTap:
+                                    () => showExerciseInfoDialog(
+                                      context,
+                                      exerciseId: e.id,
+                                      name: e.name,
+                                    ),
+                              ),
+                              Container(
+                                width: 34,
+                                height: 34,
+                                margin: const EdgeInsets.only(right: 4),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color:
+                                      n > 0
+                                          ? AppColors.espresso
+                                          : AppColors.goldTint,
+                                  shape: BoxShape.circle,
+                                ),
+                                child:
+                                    n > 0
+                                        ? Text(
+                                          '$n',
+                                          style: AppTypography.body12Medium
+                                              .copyWith(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                        )
+                                        : const Icon(
+                                          Icons.add_rounded,
+                                          size: 20,
+                                          color: AppColors.goldDeep,
+                                        ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      trailing:
-                          n > 0
-                              ? Chip(label: Text('×$n'))
-                              : const Icon(Icons.add_circle_outline_rounded),
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        widget.onAdd(e);
-                        setState(() => _added[e.id] = n + 1);
-                      },
                     );
                   },
                 );
@@ -865,6 +1210,46 @@ class _ExercisePickerState extends State<_ExercisePicker> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SmallChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SmallChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      pressedScale: 0.96,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.espresso : Colors.white,
+          borderRadius: BorderRadius.circular(45),
+          border: Border.all(
+            color: selected ? AppColors.espresso : AppColors.borderSubtle,
+            width: 1.5,
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppTypography.body14Medium.copyWith(
+            color: selected ? Colors.white : AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }
