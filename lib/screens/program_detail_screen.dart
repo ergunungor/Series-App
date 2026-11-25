@@ -110,6 +110,7 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                               if (e.supersetGroup != null)
                                 "superset_group": e.supersetGroup,
                               if (e.dropSets > 0) "drop_sets": e.dropSets,
+                              if (e.section != null) "section": e.section,
                             },
                           )
                           .toList(),

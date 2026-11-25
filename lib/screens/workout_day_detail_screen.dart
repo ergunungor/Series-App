@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 import '../models/program.dart';
+import '../utils/session_flow.dart';
 import '../widgets/app_confirm_dialog.dart';
 import '../widgets/detail_hero.dart';
 import '../widgets/pressable_scale.dart';
@@ -149,9 +150,33 @@ class _WorkoutDayDetailScreenState extends State<WorkoutDayDetailScreen> {
   Widget build(BuildContext context) {
     final workout = widget.workout;
 
+    final exercises = workout.exercises;
+    final hasSections = exercises.any((e) => e.isPrep);
     final rows = <Widget>[];
-    for (var i = 0; i < workout.exercises.length; i++) {
-      final exercise = workout.exercises[i];
+    String? lastSection = '_';
+    for (var i = 0; i < exercises.length; i++) {
+      final exercise = exercises[i];
+
+      // Isınma / antrenman / soğuma başlıkları (programda ısınma varsa).
+      if (hasSections && exercise.section != lastSection) {
+        lastSection = exercise.section;
+        rows.add(
+          _SectionHeader(
+            label:
+                exercise.isWarmup
+                    ? 'ISINMA'
+                    : exercise.isCooldown
+                    ? 'SOĞUMA'
+                    : 'ANTRENMAN',
+            first: rows.isEmpty,
+          ),
+        );
+      } else if (i > 0) {
+        final linked =
+            exercise.supersetGroup != null &&
+            exercises[i - 1].supersetGroup == exercise.supersetGroup;
+        if (!linked) rows.add(const _RowDivider());
+      }
 
       // Süre varsa süreyi, yoksa tekrarı gösteriyoruz
       final String repsOrDuration =
@@ -159,15 +184,26 @@ class _WorkoutDayDetailScreenState extends State<WorkoutDayDetailScreen> {
               ? '${exercise.durationSeconds}sn'
               : '${exercise.reps ?? ""}';
 
-      if (i > 0) rows.add(const _RowDivider());
+      final gs = groupStart(exercises, i);
+      final ge = groupEnd(exercises, i);
+      final inSuperset = gs != ge;
+
       rows.add(
         _ExerciseRow(
           number: i + 1,
           name: formatExerciseName(exercise.name),
           setsLabel: '${exercise.sets} × $repsOrDuration',
-          // restSeconds null gelirse varsayılan 60sn
-          restLabel: '${exercise.restSeconds ?? 60}sn dinlenme',
+          // Süpersette mola yalnızca bloğun sonunda verilir.
+          restLabel:
+              inSuperset && i < ge
+                  ? 'ara vermeden'
+                  : '${exercise.restSeconds ?? 60}sn dinlenme',
           notes: exercise.notes,
+          supersetLabel: inSuperset && i == gs ? 'SÜPERSET' : null,
+          supersetTop: inSuperset && i > gs,
+          supersetBottom: inSuperset && i < ge,
+          inSuperset: inSuperset,
+          dropSets: exercise.dropSets,
         ),
       );
     }
@@ -233,6 +269,41 @@ class _WorkoutDayDetailScreenState extends State<WorkoutDayDetailScreen> {
   }
 }
 
+class _SectionHeader extends StatelessWidget {
+  final String label;
+  final bool first;
+
+  const _SectionHeader({required this.label, required this.first});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+      decoration: BoxDecoration(
+        color: AppColors.fillSubtle.withValues(alpha: 0.6),
+        border:
+            first
+                ? null
+                : Border(
+                  top: BorderSide(
+                    color: AppColors.espresso.withValues(alpha: 0.08),
+                  ),
+                ),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.body12Medium.copyWith(
+          color: AppColors.textTertiary,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.6,
+          fontSize: 11,
+        ),
+      ),
+    );
+  }
+}
+
 class _RowDivider extends StatelessWidget {
   const _RowDivider();
 
@@ -254,12 +325,26 @@ class _ExerciseRow extends StatelessWidget {
   final String restLabel;
   final String? notes;
 
+  /// Süperset bloğunun ilk satırında gösterilen etiket.
+  final String? supersetLabel;
+  final bool inSuperset;
+
+  /// Sol bağ çizgisi üst/alt komşu satıra uzansın mı.
+  final bool supersetTop;
+  final bool supersetBottom;
+  final int dropSets;
+
   const _ExerciseRow({
     required this.number,
     required this.name,
     required this.setsLabel,
     required this.restLabel,
     this.notes,
+    this.supersetLabel,
+    this.inSuperset = false,
+    this.supersetTop = false,
+    this.supersetBottom = false,
+    this.dropSets = 0,
   });
 
   static const double _tileSize = 34;
@@ -304,6 +389,27 @@ class _ExerciseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final row = _buildRow();
+    if (!inSuperset) return row;
+    // Süperset: numara karolarını dikey bir altın çizgiyle birbirine bağlar.
+    return Stack(
+      children: [
+        // İlk satırda karodan aşağı, sonuncuda yukarıdan karoya, ortadakilerde
+        // boydan boya.
+        Positioned(
+          left: 14 + _tileSize / 2 - 1.5,
+          top: supersetTop ? 0 : 14 + _tileSize / 2,
+          bottom: supersetBottom ? 0 : null,
+          height: supersetBottom ? null : 14 + _tileSize / 2,
+          width: 3,
+          child: const ColoredBox(color: AppColors.accentGold),
+        ),
+        row,
+      ],
+    );
+  }
+
+  Widget _buildRow() {
     return Padding(
       padding: const EdgeInsets.all(14),
       child: Row(
@@ -314,7 +420,7 @@ class _ExerciseRow extends StatelessWidget {
             height: _tileSize,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: AppColors.goldTint,
+              color: inSuperset ? AppColors.accentGold : AppColors.goldTint,
               borderRadius: BorderRadius.circular(11),
             ),
             child: Text(
@@ -330,6 +436,23 @@ class _ExerciseRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (supersetLabel != null || dropSets > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      [
+                        if (supersetLabel != null)
+                          '$supersetLabel · ara vermeden art arda',
+                        if (dropSets > 0) 'DROPSET ×$dropSets',
+                      ].join('   '),
+                      style: AppTypography.body12Medium.copyWith(
+                        color: AppColors.goldDeep,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
                 // Ad, karonun dikey ortasına hizalı; uzun ad iki satıra inerse
                 // blok büyür ve karo ilk satırla hizalı kalır.
                 ConstrainedBox(

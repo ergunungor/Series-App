@@ -73,3 +73,21 @@ class TruncationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SectionTests(unittest.TestCase):
+    def test_part_becomes_section(self):
+        p = {"workouts": [{"name": "G", "exercises": [
+            {"name": "Koşu", "en": "treadmill", "sets": 1, "sec": 300, "part": "warmup"},
+            {"name": "Bench", "en": "bench press", "sets": 3, "reps": "8"},
+            {"name": "Esneme", "en": "stretch", "sets": 1, "sec": 30, "part": "cooldown"},
+        ]}]}
+        _expand_compact(p)
+        self.assertEqual([e.get("section") for e in p["workouts"][0]["exercises"]], ["warmup", None, "cooldown"])
+
+    def test_structured_warmup_marked(self):
+        from app.ai_service import program_from_structured_json
+        out = program_from_structured_json({"schedule": [{"title_tr": "A", "warmup": [
+            {"exercise_id": "0993", "sets": 2, "reps": "20"}], "items": [
+            {"exercise_id": "0025", "sets": 3, "reps": "8"}]}]})
+        self.assertEqual([e.get("section") for e in out["workouts"][0]["exercises"]], ["warmup", None])

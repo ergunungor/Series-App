@@ -301,12 +301,30 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                   physics: const BouncingScrollPhysics(),
                   padding: EdgeInsets.fromLTRB(16, 0, 16, bottomSafe + 24),
                   itemCount: exercises.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  // Süperset hareketleri birbirine yapışık durur.
+                  separatorBuilder: (_, index) {
+                    final g = exercises[index].supersetGroup;
+                    final linked =
+                        g != null && exercises[index + 1].supersetGroup == g;
+                    return SizedBox(height: linked ? 3 : 10);
+                  },
                   itemBuilder: (context, index) {
+                    final e = exercises[index];
+                    final inSuperset = _groupStart(index) != _groupEnd(index);
+                    final work =
+                        (e.durationSeconds ?? 0) > 0
+                            ? '${e.durationSeconds} sn'
+                            : '${e.reps}';
                     final row = _FlowRow(
-                      name: formatExerciseName(exercises[index].name),
-                      detail:
-                          '${exercises[index].sets} Set x ${exercises[index].reps}',
+                      name: formatExerciseName(e.name),
+                      detail: [
+                        if (e.isWarmup) 'Isınma',
+                        if (e.isCooldown) 'Soğuma',
+                        if (inSuperset) 'Süperset',
+                        '${e.sets} Set x $work',
+                        if (e.dropSets > 0) 'Drop ×${e.dropSets}',
+                      ].join(' · '),
+                      superset: inSuperset,
                       number: index + 1,
                       isCompleted: index < _exerciseIndex,
                       isCurrent: index == _exerciseIndex,
@@ -336,6 +354,13 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   void _confirmSet() {
     if (_isPaused) return;
     _playBell();
+    if (_currentExercise.isPrep) {
+      // Isınma/soğuma: tekrar ve kilo kaydı tutulmaz, yalnızca ilerlenir.
+      _repsController.clear();
+      _weightController.clear();
+      _advanceAfterSet();
+      return;
+    }
     // 1. Varsayılan tekrar sayısını bul (Programdaki hedeften al)
     int defaultReps = 1;
     final repsStr = _currentExercise.reps.toString();
@@ -389,6 +414,10 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     _repsController.clear();
     _weightController.clear();
 
+    _advanceAfterSet();
+  }
+
+  void _advanceAfterSet() {
     final step = advance(
       widget.workout.exercises,
       SessionPos(_exerciseIndex, _setIndex, _dropIndex),
@@ -1023,6 +1052,37 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (exercise.isPrep ||
+            _dropIndex > 0 ||
+            exercise.dropSets > 0 ||
+            _inSuperset)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                if (exercise.isPrep)
+                  _TagChip(
+                    label: exercise.isWarmup ? 'ISINMA' : 'SOĞUMA',
+                    strong: true,
+                  ),
+                if (_inSuperset)
+                  _TagChip(
+                    label:
+                        'SÜPERSET ${_exerciseIndex - _groupStart(_exerciseIndex) + 1}/${_groupEnd(_exerciseIndex) - _groupStart(_exerciseIndex) + 1}',
+                  ),
+                if (_dropIndex > 0)
+                  _TagChip(
+                    label:
+                        'DROP $_dropIndex/${exercise.dropSets} · ağırlığı azalt',
+                    strong: true,
+                  )
+                else if (exercise.dropSets > 0)
+                  _TagChip(label: 'DROPSET ×${exercise.dropSets}'),
+              ],
+            ),
+          ),
         if (isTimed)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -1056,29 +1116,6 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
             ),
           )
         else ...[
-          if (_dropIndex > 0 || exercise.dropSets > 0 || _inSuperset)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  if (_inSuperset)
-                    _TagChip(
-                      label:
-                          'SÜPERSET ${_exerciseIndex - _groupStart(_exerciseIndex) + 1}/${_groupEnd(_exerciseIndex) - _groupStart(_exerciseIndex) + 1}',
-                    ),
-                  if (_dropIndex > 0)
-                    _TagChip(
-                      label:
-                          'DROP $_dropIndex/${exercise.dropSets} · ağırlığı azalt',
-                      strong: true,
-                    )
-                  else if (exercise.dropSets > 0)
-                    _TagChip(label: 'DROPSET ×${exercise.dropSets}'),
-                ],
-              ),
-            ),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -1138,35 +1175,46 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
             ],
           ),
           const SizedBox(height: _sectionGap),
-          Row(
-            children: [
-              Expanded(
-                child: _SetField(
-                  label: 'TEKRAR',
-                  controller: _repsController,
-                  keyboardType: TextInputType.number,
-                  hintText:
-                      last != null
-                          ? '${last.repsPerformed} (önceki)'
-                          : exercise.reps.toString(),
-                ),
+          if (exercise.isPrep)
+            Text(
+              exercise.isWarmup
+                  ? 'Isınma hareketi: tekrar ve kilo girmene gerek yok. Bitirince seti tamamla.'
+                  : 'Soğuma hareketi: tekrar ve kilo girmene gerek yok. Bitirince seti tamamla.',
+              style: AppTypography.body14Regular.copyWith(
+                color: AppColors.textTertiary,
+                height: 1.45,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _SetField(
-                  label: 'AĞIRLIK (KG)',
-                  controller: _weightController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: _SetField(
+                    label: 'TEKRAR',
+                    controller: _repsController,
+                    keyboardType: TextInputType.number,
+                    hintText:
+                        last != null
+                            ? '${last.repsPerformed} (önceki)'
+                            : exercise.reps.toString(),
                   ),
-                  hintText:
-                      last != null
-                          ? '${_formatWeight(last.weightUsed)} (önceki)'
-                          : '0',
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _SetField(
+                    label: 'AĞIRLIK (KG)',
+                    controller: _weightController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    hintText:
+                        last != null
+                            ? '${_formatWeight(last.weightUsed)} (önceki)'
+                            : '0',
+                  ),
+                ),
+              ],
+            ),
         ],
       ],
     );
@@ -1932,6 +1980,9 @@ class _FlowRow extends StatelessWidget {
   final bool isCurrent;
   final VoidCallback onTap;
 
+  /// Süperset üyesi: solda altın şerit.
+  final bool superset;
+
   const _FlowRow({
     required this.name,
     required this.detail,
@@ -1939,6 +1990,7 @@ class _FlowRow extends StatelessWidget {
     required this.isCompleted,
     required this.isCurrent,
     required this.onTap,
+    this.superset = false,
   });
 
   static const double _radius = 20;
@@ -1967,7 +2019,12 @@ class _FlowRow extends StatelessWidget {
         foregroundDecoration: BoxDecoration(
           borderRadius: BorderRadius.circular(_radius),
           border: Border.all(
-            color: isCurrent ? AppColors.homeHero : Colors.transparent,
+            color:
+                isCurrent
+                    ? AppColors.homeHero
+                    : (superset
+                        ? AppColors.accentGold.withValues(alpha: 0.7)
+                        : Colors.transparent),
             width: 1.5,
           ),
         ),
