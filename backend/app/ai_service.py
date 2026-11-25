@@ -229,10 +229,12 @@ Kurallar:
 - "name": programda yazdığı ad. "english_name": aynı hareketin yaygın İngilizce spor salonu adı (örn. Şınav -> push-up, Barfiks -> pull-up).
 - "instructions": hareketin nasıl yapıldığını anlatan 1-2 cümle.
 - Hareketin yanında sn/saniye/sec/dk/dakika gibi süre varsa "reps": null ve süreyi saniyeye çevirip "duration_seconds" alanına yaz (30 sn -> 30). Süre yoksa "reps" kullan.
+- Süperset: "süperset/superset/SS", "A1/A2", "B1/B2", "+" ya da "ara vermeden/arka arkaya" ile birbirine bağlanan hareketlere aynı tam sayıyı "superset_group" olarak ver (her süperset için yeni sayı: 1, 2, ...). Bu hareketler listede art arda kalsın, süperset olmayanlarda null. Süpersetteki hareketlerin set sayısı aynı olsun.
+- Dropset: "dropset/drop set" yazan harekette "drop_sets" = ek düşürme sayısı (belirtilmemişse 2); yoksa 0.
 - İçerik bir antrenman programı değilse sadece {"error": "not_a_program"} döndür.
 
 Sadece şu şemada JSON döndür:
-{"program_name":"","description":"2 cümle","workouts":[{"day_number":1,"name":"","estimated_duration_min":45,"exercises":[{"name":"","english_name":"","sets":3,"reps":"8-12","duration_seconds":null,"rest_seconds":60,"instructions":"","notes":null}]}]}"""
+{"program_name":"","description":"2 cümle","workouts":[{"day_number":1,"name":"","estimated_duration_min":45,"exercises":[{"name":"","english_name":"","sets":3,"reps":"8-12","duration_seconds":null,"rest_seconds":60,"superset_group":null,"drop_sets":0,"instructions":"","notes":null}]}]}"""
 
 
 def parse_program_from_input(text: str = None, file_bytes: bytes = None, mime_type: str = None):
@@ -307,8 +309,50 @@ def _match_to_pool(program: dict):
             ex["id"] = cands[choice]["id"]
 
 
+def normalize_supersets(exercises: list):
+    """Süperset ve dropset alanlarını uygulamanın beklediği biçime getirir.
+
+    Yalnızca art arda gelen, en az 2 hareketlik gruplar süperset sayılır; gruplar
+    1, 2, ... diye yeniden numaralanır, set sayısı ilk hareketinkine eşitlenir ve
+    mola yalnızca bloğun son hareketinde kalır.
+    """
+    def key(ex):
+        raw = ex.get("superset_group")
+        return None if raw in (None, "", 0, False) else str(raw)
+
+    n, i, next_id = len(exercises), 0, 1
+    while i < n:
+        k = key(exercises[i])
+        j = i
+        while k is not None and j + 1 < n and key(exercises[j + 1]) == k:
+            j += 1
+        if k is not None and j > i:
+            for idx in range(i, j + 1):
+                ex = exercises[idx]
+                ex["superset_group"] = next_id
+                ex["sets"] = exercises[i].get("sets") or ex.get("sets") or 3
+                if idx < j:
+                    ex["rest_seconds"] = 0
+            next_id += 1
+        else:
+            for idx in range(i, j + 1):
+                exercises[idx].pop("superset_group", None)
+        i = j + 1
+
+    for ex in exercises:
+        try:
+            drops = max(0, min(4, int(ex.get("drop_sets") or 0)))
+        except (TypeError, ValueError):
+            drops = 0
+        if drops:
+            ex["drop_sets"] = drops
+        else:
+            ex.pop("drop_sets", None)
+
+
 def sanitize_program_data(data: dict):
     for workout in data.get("workouts", []):
+        normalize_supersets(workout.get("exercises", []))
         for exercise in workout.get("exercises", []):
             reps = exercise.get("reps")
             dur = exercise.get("duration_seconds")

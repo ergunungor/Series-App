@@ -10,6 +10,7 @@ import '../theme/app_typography.dart';
 import '../widgets/app_confirm_dialog.dart';
 import '../models/program.dart';
 import '../models/set_log.dart';
+import '../utils/session_flow.dart';
 import '../services/exercise_log_repository.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/workout_history.dart';
@@ -24,6 +25,7 @@ import '../widgets/reveal.dart';
 import '../widgets/series_wordmark.dart';
 import '../utils/exercise_name.dart';
 import 'package:audioplayers/audioplayers.dart';
+import '../services/app_settings.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 class WorkoutSessionScreen extends StatefulWidget {
@@ -38,6 +40,8 @@ class WorkoutSessionScreen extends StatefulWidget {
 class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   int _exerciseIndex = 0;
   int _setIndex = 0;
+  // Dropset: 0 = normal çalışma seti, k>0 = k. düşürme (ara vermeden).
+  int _dropIndex = 0;
   bool _isResting = false;
   bool _isFinishing = false;
   bool _isPaused = false;
@@ -59,20 +63,29 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
   // Ses oynatıcıları
   final AudioPlayer _audioPlayer = AudioPlayer();
 
-  void _playBell() async {
-    // Aynı anda birden fazla tetiklenirse sesi baştan başlatır
-    await _audioPlayer.play(
-      AssetSource('sounds/bell.mp3'),
-      mode: PlayerMode.lowLatency,
-    );
+  // Sesi çalar. Ayarlardan kapatılmışsa çalmaz; müzikle karışma/kısma/duraklatma
+  // davranışı Ayarlar'daki seçime göre (ses oturumu) belirlenir.
+  Future<void> _playSound(String asset) async {
+    final settings = AppSettings.instance;
+    if (!settings.soundEnabled) return;
+    try {
+      await _audioPlayer.setAudioContext(settings.audioContext);
+      // Aynı anda birden fazla tetiklenirse sesi baştan başlatır
+      await _audioPlayer.play(AssetSource(asset), mode: PlayerMode.lowLatency);
+    } catch (e) {
+      debugPrint('Ses çalınamadı: $e');
+    }
   }
 
-  void _playFinish() async {
-    await _audioPlayer.play(
-      AssetSource('sounds/finish.mp3'),
-      mode: PlayerMode.lowLatency,
-    );
-  }
+  void _playBell() => _playSound('sounds/bell.mp3');
+
+  void _playFinish() => _playSound('sounds/finish.mp3');
+
+  int _groupStart(int i) => groupStart(widget.workout.exercises, i);
+  int _groupEnd(int i) => groupEnd(widget.workout.exercises, i);
+
+  bool get _inSuperset =>
+      _groupStart(_exerciseIndex) != _groupEnd(_exerciseIndex);
 
   WorkoutExercise get _currentExercise =>
       widget.workout.exercises[_exerciseIndex];
@@ -230,6 +243,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     WakelockPlus.disable();
     _restTimer?.cancel();
     _elapsedTimer?.cancel();
+    _audioPlayer.dispose();
     _repsController.dispose();
     _weightController.dispose();
     super.dispose();
@@ -360,32 +374,38 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     _logs.add(
       SetLog(
         exerciseName: _currentExercise.name,
-        setNumber: _setIndex + 1,
+        // Dropset düşürmeleri, çalışma setlerinin numaralarından sonra gelir.
+        setNumber:
+            _dropIndex == 0
+                ? _setIndex + 1
+                : _currentExercise.sets +
+                    _setIndex * _currentExercise.dropSets +
+                    _dropIndex,
         repsPerformed: reps,
         weightUsed: weight,
       ),
     );
 
-    final justFinished = _currentExercise;
     _repsController.clear();
     _weightController.clear();
 
-    if (_setIndex + 1 < justFinished.sets) {
-      setState(() => _setIndex++);
-      // EĞER REST SECONDS BOŞ GELİRSE VARSAYILAN OLARAK 60 SANİYE MOLA VER
-      _startRest(justFinished.restSeconds ?? 60);
-    } else if (_exerciseIndex + 1 < widget.workout.exercises.length) {
-      setState(() {
-        _exerciseIndex++;
-        _setIndex = 0;
-        _apiExerciseInfo = null;
-      });
-      // BURAYA DA ?? 60 EKLİYORUZ
-      _startRest(justFinished.restSeconds ?? 60);
-      _fetchCurrentExerciseGif();
-    } else {
+    final step = advance(
+      widget.workout.exercises,
+      SessionPos(_exerciseIndex, _setIndex, _dropIndex),
+    );
+    if (step.finished) {
       _finishWorkout();
+      return;
     }
+    final changedExercise = step.pos.exercise != _exerciseIndex;
+    setState(() {
+      _exerciseIndex = step.pos.exercise;
+      _setIndex = step.pos.set;
+      _dropIndex = step.pos.drop;
+      if (changedExercise) _apiExerciseInfo = null;
+    });
+    if (step.rest) _startRest(step.restSeconds);
+    if (changedExercise) _fetchCurrentExerciseGif();
   }
 
   void _startRest(int seconds) {
@@ -426,6 +446,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
     setState(() {
       _exerciseIndex = newIndex;
       _setIndex = 0;
+      _dropIndex = 0;
       _isResting = false;
       _repsController.clear();
       _weightController.clear();
@@ -527,6 +548,22 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
       return '${formatExerciseName(_currentExercise.name)} · Set ${_setIndex + 1}/${_currentExercise.sets}';
     }
 
+    // Dropset sürerken ya da süpersette bloğun sonu değilse sıradaki bellidir.
+    if (_dropIndex > 0 && _dropIndex < _currentExercise.dropSets) {
+      return 'Drop ${_dropIndex + 1}/${_currentExercise.dropSets}';
+    }
+    if (_dropIndex == 0 && _exerciseIndex < _groupEnd(_exerciseIndex)) {
+      if (_currentExercise.dropSets == 0) {
+        return formatExerciseName(
+          widget.workout.exercises[_exerciseIndex + 1].name,
+        );
+      }
+    }
+    if (_dropIndex > 0 && _exerciseIndex < _groupEnd(_exerciseIndex)) {
+      return formatExerciseName(
+        widget.workout.exercises[_exerciseIndex + 1].name,
+      );
+    }
     // Egzersiz ekranındayken (molada değilken) standart "sıradaki" hesaplaması:
     if (_setIndex + 1 < _currentExercise.sets) {
       return '${formatExerciseName(_currentExercise.name)} · Set ${_setIndex + 2}/${_currentExercise.sets}';
@@ -1019,6 +1056,29 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
             ),
           )
         else ...[
+          if (_dropIndex > 0 || exercise.dropSets > 0 || _inSuperset)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  if (_inSuperset)
+                    _TagChip(
+                      label:
+                          'SÜPERSET ${_exerciseIndex - _groupStart(_exerciseIndex) + 1}/${_groupEnd(_exerciseIndex) - _groupStart(_exerciseIndex) + 1}',
+                    ),
+                  if (_dropIndex > 0)
+                    _TagChip(
+                      label:
+                          'DROP $_dropIndex/${exercise.dropSets} · ağırlığı azalt',
+                      strong: true,
+                    )
+                  else if (exercise.dropSets > 0)
+                    _TagChip(label: 'DROPSET ×${exercise.dropSets}'),
+                ],
+              ),
+            ),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -1999,6 +2059,37 @@ class _FlowRow extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TagChip extends StatelessWidget {
+  final String label;
+  final bool strong;
+
+  const _TagChip({required this.label, this.strong = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color:
+            strong
+                ? AppColors.accentGold
+                : AppColors.accentGold.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.body12Medium.copyWith(
+          color: strong ? AppColors.espresso : AppColors.espresso,
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.8,
+          height: 1,
         ),
       ),
     );

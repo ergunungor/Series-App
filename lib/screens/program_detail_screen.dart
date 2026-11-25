@@ -107,6 +107,9 @@ class _ProgramDetailScreenState extends State<ProgramDetailScreen> {
                               "rest_seconds": e.restSeconds,
                               "instructions": e.instructions,
                               "notes": e.notes,
+                              if (e.supersetGroup != null)
+                                "superset_group": e.supersetGroup,
+                              if (e.dropSets > 0) "drop_sets": e.dropSets,
                             },
                           )
                           .toList(),

@@ -6,11 +6,14 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/services.dart';
 import 'config/api_config.dart';
+import 'services/app_settings.dart';
 import 'services/supabase_endpoint.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('tr_TR', null);
+  // Ses ayarları (set arası sesler, müzikle karışma) ve ses oturumu.
+  await AppSettings.instance.load();
 
   // Doğrudan erişilemiyorsa (supabase.co engelli ağ) vekil adres kullanılır.
   final supabaseUrl = await SupabaseEndpoint.resolve();

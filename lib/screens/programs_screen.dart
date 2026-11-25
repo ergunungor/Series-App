@@ -601,6 +601,12 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                               onCreateWithAi: () async {
                                 await context.push<bool>('/onboarding-survey');
                               },
+                              onBuildManually: () async {
+                                final created = await context.push<bool>(
+                                  '/build-program',
+                                );
+                                if (created == true) _fetch();
+                              },
                               onImportProgram: () async {
                                 final created = await context.push<bool>(
                                   '/import-program',
