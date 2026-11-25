@@ -231,13 +231,99 @@ Kurallar:
 - Hareketin yanında sn/saniye/sec/dk/dakika gibi süre varsa "reps": null ve süreyi saniyeye çevirip "duration_seconds" alanına yaz (30 sn -> 30). Süre yoksa "reps" kullan.
 - Süperset: "süperset/superset/SS", "A1/A2", "B1/B2", "+" ya da "ara vermeden/arka arkaya" ile birbirine bağlanan hareketlere aynı tam sayıyı "superset_group" olarak ver (her süperset için yeni sayı: 1, 2, ...). Bu hareketler listede art arda kalsın, süperset olmayanlarda null. Süpersetteki hareketlerin set sayısı aynı olsun.
 - Dropset: "dropset/drop set" yazan harekette "drop_sets" = ek düşürme sayısı (belirtilmemişse 2); yoksa 0.
+- Programdaki TÜM günleri ve her günün TÜM hareketlerini eksiksiz yaz; hiçbirini atlama ya da kısaltma.
 - İçerik bir antrenman programı değilse sadece {"error": "not_a_program"} döndür.
 
 Sadece şu şemada JSON döndür:
 {"program_name":"","description":"2 cümle","workouts":[{"day_number":1,"name":"","estimated_duration_min":45,"exercises":[{"name":"","english_name":"","sets":3,"reps":"8-12","duration_seconds":null,"rest_seconds":60,"superset_group":null,"drop_sets":0,"instructions":"","notes":null}]}]}"""
 
 
+def _to_int(value, default):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def program_from_structured_json(data: dict) -> Optional[dict]:
+    """Hareket kimlikleri (exercise_id) zaten içeren hazır program JSON'unu
+    ("schedule": [{ "warmup": [...], "items": [...] }]) yapay zekasız çevirir.
+    Tanınmayan bir yapıysa None döner."""
+    schedule = data.get("schedule")
+    if not isinstance(schedule, list) or not schedule:
+        return None
+
+    workouts = []
+    for d, day in enumerate(schedule, start=1):
+        if not isinstance(day, dict):
+            continue
+        entries = [("warmup", e) for e in (day.get("warmup") or [])]
+        entries += [("main", e) for e in (day.get("items") or [])]
+
+        exercises = []
+        for kind, e in entries:
+            if not isinstance(e, dict):
+                continue
+            ex_id = e.get("exercise_id") or e.get("fallback_exercise_id")
+            item = catalog.get_by_id(ex_id)
+            name = e.get("display_name_tr") or e.get("exercise_name") or (item or {}).get("name") or "Hareket"
+            notes = [n for n in (e.get("notes_tr"),) if n]
+            if e.get("per_side"):
+                notes.append("Her taraf için")
+            if e.get("exercise_id_note"):
+                notes.append(e["exercise_id_note"])
+
+            ex = {
+                "name": name,
+                "sets": _to_int(e.get("sets") or e.get("repeats"), 3),
+                "reps": str(e.get("reps") or ""),
+                "duration_seconds": None,
+                "rest_seconds": _to_int(e.get("rest_sec") or e.get("recovery_sec"), 30 if kind == "warmup" else 60),
+                "notes": " · ".join(notes) or None,
+            }
+            if item:
+                ex["id"] = item["id"]
+            if e.get("distance_m"):
+                ex["reps"] = f"{e['distance_m']} m"
+                if e.get("effort"):
+                    ex["notes"] = " · ".join(filter(None, [ex["notes"], f"Efor: {e['effort']}"]))
+            if e.get("superset_group") not in (None, ""):
+                ex["superset_group"] = e["superset_group"]
+            if e.get("drop_sets"):
+                ex["drop_sets"] = e["drop_sets"]
+            exercises.append(ex)
+
+        if not exercises:
+            continue
+        title = day.get("title_tr") or day.get("title") or f"Gün {d}"
+        day_name = day.get("day_tr")
+        workouts.append({
+            "day_number": len(workouts) + 1,
+            "name": f"{day_name}: {title}" if day_name and day_name not in title else title,
+            "estimated_duration_min": _to_int(day.get("est_duration_min"), 45),
+            "exercises": exercises,
+        })
+
+    if not workouts:
+        return None
+    return {
+        "program_name": data.get("program_name") or "Programım",
+        "description": f"{len(workouts)} günlük program",
+        "workouts": workouts,
+    }
+
+
 def parse_program_from_input(text: str = None, file_bytes: bytes = None, mime_type: str = None):
+    # Hazır yapılandırılmış JSON ise yapay zekaya gerek yok: hiçbir gün/hareket
+    # kaybolmaz ve hareket kimlikleri aynen korunur.
+    if text and text.lstrip().startswith("{"):
+        try:
+            structured = program_from_structured_json(json.loads(text))
+        except (ValueError, TypeError):
+            structured = None
+        if structured:
+            return sanitize_program_data(structured)
+
     prompt = _PARSE_PROMPT
     if text:
         prompt += f"\n\nPROGRAM:\n{text}"
@@ -245,7 +331,8 @@ def parse_program_from_input(text: str = None, file_bytes: bytes = None, mime_ty
     elif not (file_bytes and mime_type):
         raise ValueError("Ne metin ne dosya verildi.")
 
-    result = generate_json(prompt, model_type="flash", file_bytes=file_bytes, mime_type=mime_type)
+    model = "pro" if text and len(text) > 1200 else "flash"  # uzun programlarda gün atlamasın
+    result = generate_json(prompt, model_type=model, file_bytes=file_bytes, mime_type=mime_type)
 
     if result.get("error") == "not_a_program":
         raise ValueError("Yüklenen içerik bir antrenman programına benzemiyor.")
